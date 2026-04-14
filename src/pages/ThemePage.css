@@ -735,6 +735,57 @@
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);
 }
 
+.theme-layout-order-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(249, 115, 22, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(255, 214, 228, 0.34), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 247, 242, 0.94));
+}
+
+.theme-layout-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.theme-layout-order-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(249, 115, 22, 0.14);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.theme-layout-order-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theme-layout-order-copy strong {
+  font-size: 13px;
+  color: #111827;
+}
+
+.theme-layout-order-copy small {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.theme-layout-order-row input {
+  width: 84px;
+  text-align: center;
+  font-weight: 800;
+}
+
 .theme-palette-preview-card {
   padding: 18px;
   border-radius: 24px;
@@ -1132,6 +1183,10 @@
 
   .theme-color-input-shell {
     min-height: 58px;
+  }
+
+  .theme-layout-order-card {
+    grid-template-columns: 1fr;
   }
 
   .theme-modal-search {

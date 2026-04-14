@@ -26,7 +26,27 @@ const pretty = (value, fallback) => JSON.stringify(value ?? fallback, null, 2);
 const parseJson = (value, fallback) => (!String(value || '').trim() ? fallback : JSON.parse(value));
 const previewBg = (theme) => `linear-gradient(135deg, ${theme.primary_color || '#C0241A'} 0%, ${theme.secondary_color || '#2B2F7E'} 100%)`;
 const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+const HOME_LAYOUT_OPTIONS = [
+  { key: 'gallery', label: 'Gallery' },
+  { key: 'quickActions', label: 'Quick Actions' },
+  { key: 'sponsors', label: 'Sponsors' },
+  { key: 'marquee', label: 'Marquee' },
+  { key: 'trustList', label: 'Trust List' },
+];
 const normalizePickerColor = (value, fallback) => (HEX_COLOR_RE.test(String(value || '').trim()) ? String(value).trim() : fallback);
+const normalizePreviewPaint = (value, fallback) => {
+  const trimmed = String(value || '').trim();
+  return trimmed || fallback;
+};
+const createLayoutOrderMap = (layout = []) => {
+  const parsedLayout = Array.isArray(layout) ? layout : [];
+  const nextMap = {};
+  HOME_LAYOUT_OPTIONS.forEach((item) => {
+    const index = parsedLayout.findIndex((entry) => String(entry || '').trim() === item.key);
+    nextMap[item.key] = index >= 0 ? index + 1 : '';
+  });
+  return nextMap;
+};
 
 export default function ThemePage() {
   const navigate = useNavigate();
@@ -48,6 +68,7 @@ export default function ThemePage() {
   const [assigningId, setAssigningId] = useState(null);
   const [overridesText, setOverridesText] = useState('{}');
   const [form, setForm] = useState(EMPTY_FORM);
+  const [homeLayoutOrder, setHomeLayoutOrder] = useState(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
 
   useEffect(() => {
     if (!trustId) navigate('/dashboard', { replace: true, state: { userName, trust } });
@@ -94,13 +115,19 @@ export default function ThemePage() {
     { key: 'secondary_color', label: 'Secondary', fallback: '#2B2F7E' },
     { key: 'accent_color', label: 'Accent', fallback: '#FDECEA' },
     { key: 'accent_bg', label: 'Accent BG', fallback: '#EAEBF8' },
+    { key: 'navbar_bg', label: 'Navbar BG', fallback: 'rgba(234,235,248,0.88)' },
+    { key: 'page_bg', label: 'Page BG', fallback: 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)' },
   ];
 
   useEffect(() => {
     if (!selectedTemplate) {
       setForm(EMPTY_FORM);
+      setHomeLayoutOrder(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
       return;
     }
+    const nextHomeLayout = Array.isArray(selectedTemplate.home_layout)
+      ? selectedTemplate.home_layout
+      : ['gallery', 'quickActions', 'sponsors'];
     setForm({
       name: selectedTemplate.name || '',
       description: selectedTemplate.description || '',
@@ -111,16 +138,18 @@ export default function ThemePage() {
       accent_bg: selectedTemplate.accent_bg || '#EAEBF8',
       navbar_bg: selectedTemplate.navbar_bg || 'rgba(234,235,248,0.88)',
       page_bg: selectedTemplate.page_bg || 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)',
-      home_layout: pretty(selectedTemplate.home_layout, ['gallery', 'quickActions', 'sponsors']),
+      home_layout: pretty(nextHomeLayout, ['gallery', 'quickActions', 'sponsors']),
       animations: pretty(selectedTemplate.animations, { cards: 'fadeUp', navbar: 'fadeSlideDown', gallery: 'zoomIn' }),
       custom_css: selectedTemplate.custom_css || '',
       is_active: selectedTemplate.is_active !== false,
     });
+    setHomeLayoutOrder(createLayoutOrderMap(nextHomeLayout));
   }, [selectedTemplate]);
 
   const openCreate = () => {
     setSelectedId(null);
     setForm(EMPTY_FORM);
+    setHomeLayoutOrder(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
     setSaveError('');
     setShowForm(true);
     setShowPicker(false);
@@ -185,8 +214,18 @@ export default function ThemePage() {
     }
     let homeLayout;
     let animations;
-    try { homeLayout = parseJson(form.home_layout, ['gallery', 'quickActions', 'sponsors']); }
-    catch { setSaveError('Home layout must be valid JSON.'); return; }
+    homeLayout = HOME_LAYOUT_OPTIONS
+      .map((item) => ({
+        key: item.key,
+        order: Number(homeLayoutOrder[item.key]) || 0,
+      }))
+      .filter((item) => item.order > 0)
+      .sort((a, b) => a.order - b.order || a.key.localeCompare(b.key))
+      .map((item) => item.key);
+    if (!homeLayout.length) {
+      setSaveError('Home layout mein kam se kam ek section order dena zaroori hai.');
+      return;
+    }
     try { animations = parseJson(form.animations, { cards: 'fadeUp', navbar: 'fadeSlideDown', gallery: 'zoomIn' }); }
     catch { setSaveError('Animations must be valid JSON.'); return; }
 
@@ -257,6 +296,79 @@ export default function ThemePage() {
       </div>
     </label>
   );
+
+  const renderPaintField = (key, label, pickerFallback, previewFallback) => (
+    <label className="theme-field theme-color-field" key={key}>
+      <span>{label}</span>
+      <div className="theme-color-input-shell">
+        <input
+          className="theme-color-native"
+          type="color"
+          aria-label={`${label} picker`}
+          value={normalizePickerColor(form[key], pickerFallback)}
+          onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
+        />
+        <input
+          className="theme-color-text"
+          value={form[key]}
+          onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
+        />
+        <div
+          className="theme-color-chip"
+          style={{ background: normalizePreviewPaint(form[key], previewFallback) }}
+          aria-hidden="true"
+        />
+      </div>
+    </label>
+  );
+
+  const renderHomeLayoutField = () => (
+    <div className="theme-field theme-span-2" key="home_layout_order">
+      <span>Home Layout Order</span>
+      <div className="theme-layout-order-card">
+        <div className="theme-layout-order-list">
+          {HOME_LAYOUT_OPTIONS.map((item) => (
+            <label className="theme-layout-order-row" key={item.key}>
+              <div className="theme-layout-order-copy">
+                <strong>{item.label}</strong>
+                <small>{item.key}</small>
+              </div>
+              <input
+                type="number"
+                min="0"
+                placeholder="-"
+                value={homeLayoutOrder[item.key]}
+                onChange={(e) => {
+                  const rawValue = e.target.value;
+                  setHomeLayoutOrder((prev) => ({ ...prev, [item.key]: rawValue === '' ? '' : Math.max(0, Number(rawValue) || 0) }));
+                }}
+              />
+            </label>
+          ))}
+        </div>
+        <label className="theme-field">
+          <span>Generated Home Layout JSON</span>
+          <textarea rows="4" value={form.home_layout} readOnly />
+        </label>
+      </div>
+    </div>
+  );
+
+  useEffect(() => {
+    const generatedLayout = HOME_LAYOUT_OPTIONS
+      .map((item) => ({
+        key: item.key,
+        order: Number(homeLayoutOrder[item.key]) || 0,
+      }))
+      .filter((item) => item.order > 0)
+      .sort((a, b) => a.order - b.order || a.key.localeCompare(b.key))
+      .map((item) => item.key);
+    setForm((prev) => {
+      const nextHomeLayout = pretty(generatedLayout, []);
+      if (prev.home_layout === nextHomeLayout) return prev;
+      return { ...prev, home_layout: nextHomeLayout };
+    });
+  }, [homeLayoutOrder]);
 
   if (!trustId) return null;
 
@@ -389,7 +501,7 @@ export default function ThemePage() {
                         <div className="theme-palette-preview-swatch" key={item.key}>
                           <span
                             className="theme-palette-preview-sample"
-                            style={{ background: normalizePickerColor(form[item.key], item.fallback) }}
+                            style={{ background: normalizePreviewPaint(form[item.key], item.fallback) }}
                           />
                           <div>
                             <strong>{item.label}</strong>
@@ -399,9 +511,9 @@ export default function ThemePage() {
                       ))}
                     </div>
                   </div>
-                  <label className="theme-field"><span>Navbar Background</span><input value={form.navbar_bg} onChange={(e) => setForm((p) => ({ ...p, navbar_bg: e.target.value }))} /></label>
-                  <label className="theme-field"><span>Page Background</span><input value={form.page_bg} onChange={(e) => setForm((p) => ({ ...p, page_bg: e.target.value }))} /></label>
-                  <label className="theme-field theme-span-2"><span>Home Layout JSON</span><textarea rows="4" value={form.home_layout} onChange={(e) => setForm((p) => ({ ...p, home_layout: e.target.value }))} /></label>
+                  {renderPaintField('navbar_bg', 'Navbar Background', '#EAEBF8', 'rgba(234,235,248,0.88)')}
+                  {renderPaintField('page_bg', 'Page Background', '#FFF5F5', 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)')}
+                  {renderHomeLayoutField()}
                   <label className="theme-field theme-span-2"><span>Animations JSON</span><textarea rows="4" value={form.animations} onChange={(e) => setForm((p) => ({ ...p, animations: e.target.value }))} /></label>
                   <label className="theme-field theme-span-2"><span>Custom CSS</span><textarea rows="5" value={form.custom_css} onChange={(e) => setForm((p) => ({ ...p, custom_css: e.target.value }))} /></label>
                   <label className="theme-check"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} /><span>Template is active</span></label>
