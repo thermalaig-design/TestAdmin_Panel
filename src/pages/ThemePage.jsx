@@ -66,7 +66,6 @@ export default function ThemePage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [assigningId, setAssigningId] = useState(null);
-  const [overridesText, setOverridesText] = useState('{}');
   const [form, setForm] = useState(EMPTY_FORM);
   const [homeLayoutOrder, setHomeLayoutOrder] = useState(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
 
@@ -92,9 +91,7 @@ export default function ThemePage() {
     load();
   }, [trustId, trust]);
 
-  useEffect(() => {
-    setOverridesText(pretty(currentTrust?.theme_overrides, {}));
-  }, [currentTrust]);
+
 
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -191,20 +188,7 @@ export default function ThemePage() {
     setAssigningId(null);
   };
 
-  const handleSaveOverrides = async () => {
-    if (!trustId) return;
-    setSaveError('');
-    let overrides;
-    try {
-      overrides = parseJson(overridesText, {});
-    } catch {
-      setSaveError('Theme overrides must be valid JSON.');
-      return;
-    }
-    const { data, error: updateErr } = await updateTrustInfo(trustId, { theme_overrides: overrides });
-    if (updateErr) setSaveError(updateErr.message || 'Unable to save overrides.');
-    else setCurrentTrust((prev) => ({ ...(prev || {}), ...(data || {}), theme_overrides: overrides }));
-  };
+
 
   const handleSave = async () => {
     setSaveError('');
@@ -405,19 +389,8 @@ export default function ThemePage() {
             <div className="theme-hero-stats">
               <div className="theme-stat-card"><span>Templates</span><strong>{templates.length}</strong></div>
               <div className="theme-stat-card"><span>Active template</span><strong>{activeTemplateId ? 'Assigned' : 'None'}</strong></div>
-              <div className="theme-stat-card"><span>Overrides</span><strong>{currentTrust?.theme_overrides && Object.keys(currentTrust.theme_overrides).length ? 'Custom' : 'Default'}</strong></div>
-            </div>
-          </section>
 
-          <section className="theme-overrides-card">
-            <div className="theme-section-head">
-              <div>
-                <h3>Trust Theme Overrides</h3>
-                <p>Save trust-specific JSON overrides on the `Trust.theme_overrides` field.</p>
-              </div>
-              <button className="theme-secondary-btn" type="button" onClick={handleSaveOverrides}>Save Overrides</button>
             </div>
-            <textarea className="theme-json-input" rows="6" value={overridesText} onChange={(e) => setOverridesText(e.target.value)} />
           </section>
 
           <section className="theme-list">
@@ -472,6 +445,20 @@ export default function ThemePage() {
                   {renderColorField('accent_color', 'Accent Color', '#FDECEA')}
                   {renderColorField('accent_bg', 'Accent Background', '#EAEBF8')}
                   <div className="theme-span-2 theme-palette-preview-card">
+                    <div className="theme-palette-preview-swatches">
+                      {palettePreview.slice(0, 4).map((item) => (
+                        <div className="theme-palette-preview-swatch" key={item.key}>
+                          <span
+                            className="theme-palette-preview-sample"
+                            style={{ background: normalizePreviewPaint(form[item.key], item.fallback) }}
+                          />
+                          <div>
+                            <strong>{item.label}</strong>
+                            <small>{form[item.key]}</small>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                     <div className="theme-palette-preview-top">
                       <div>
                         <span className="theme-palette-preview-label">Live Palette</span>
@@ -495,20 +482,6 @@ export default function ThemePage() {
                       >
                         Preview CTA
                       </button>
-                    </div>
-                    <div className="theme-palette-preview-swatches">
-                      {palettePreview.map((item) => (
-                        <div className="theme-palette-preview-swatch" key={item.key}>
-                          <span
-                            className="theme-palette-preview-sample"
-                            style={{ background: normalizePreviewPaint(form[item.key], item.fallback) }}
-                          />
-                          <div>
-                            <strong>{item.label}</strong>
-                            <small>{form[item.key]}</small>
-                          </div>
-                        </div>
-                      ))}
                     </div>
                   </div>
                   {renderPaintField('navbar_bg', 'Navbar Background', '#EAEBF8', 'rgba(234,235,248,0.88)')}

@@ -84,6 +84,21 @@ const MODULE_CARDS = [
     ),
   },
   {
+    id: 'card-members',
+    label: 'Members',
+    description: 'Manage trust members & registrations',
+    route: '/members',
+    gradient: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="3.2" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.16)"/>
+        <path d="M4 18c0-2.8 2.46-5 5.5-5S15 15.2 15 18" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+        <circle cx="17.5" cy="9" r="2.2" stroke="white" strokeWidth="1.8"/>
+        <path d="M15.5 17.2c.55-1.62 1.96-2.7 4-2.7" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
     id: 'card-gallery',
     label: 'Gallery',
     description: 'Upload & manage photo albums',
@@ -188,6 +203,14 @@ function FeatureIcon({ flag }) {
         <rect x="3" y="3" width="18" height="18" rx="3" stroke="white" strokeWidth="1.8" />
         <circle cx="8.5" cy="8.5" r="1.5" stroke="white" strokeWidth="1.8" />
         <polyline points="21 15 16 10 5 21" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    '/members': (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="3" stroke="white" strokeWidth="1.8" />
+        <path d="M4 19c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="17.5" cy="9" r="2.2" stroke="white" strokeWidth="1.8" />
+        <path d="M15.5 18c.41-1.64 1.7-2.83 3.9-3" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     ),
     '/profiles': (

@@ -7,6 +7,7 @@ import Dashboard       from './pages/Dashboard';
 import TrusteesPage    from './pages/TrusteesPage';
 import TrustDetails    from './pages/TrustDetails';
 import SponsorsPage    from './pages/SponsorsPage';
+import MembersPage     from './pages/MembersPage';
 import GalleryPage     from './pages/GalleryPage';
 import MarqueePage     from './pages/MarqueePage';
 import ThemePage       from './pages/ThemePage';
@@ -25,6 +26,7 @@ function App() {
         <Route path="/trust-details" element={<TrustDetails />} />
         <Route path="/trustees"     element={<TrusteesPage />} />
         <Route path="/sponsor"      element={<SponsorsPage />} />
+        <Route path="/members"      element={<MembersPage />} />
         <Route path="/gallery"      element={<GalleryPage />} />
         <Route path="/marquee"      element={<MarqueePage />} />
         <Route path="/theme"        element={<ThemePage />} />

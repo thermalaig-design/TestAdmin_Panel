@@ -47,6 +47,14 @@ function FeatureIcon({ flag }) {
         <polyline points="21 15 16 10 5 21" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     ),
+    '/members': (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="3" stroke="white" strokeWidth="1.8"/>
+        <path d="M4 19c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+        <circle cx="17.5" cy="9" r="2.2" stroke="white" strokeWidth="1.8"/>
+        <path d="M15.5 18c.41-1.64 1.7-2.83 3.9-3" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+      </svg>
+    ),
     '/profiles': (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <circle cx="12" cy="8" r="4" stroke="white" strokeWidth="1.8"/>
@@ -137,6 +145,14 @@ function FeatureIcon({ flag }) {
         </g>
       </svg>
     ),
+    'members': (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="3" stroke="white" strokeWidth="1.8"/>
+        <path d="M4 19c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+        <circle cx="17.5" cy="9" r="2.2" stroke="white" strokeWidth="1.8"/>
+        <path d="M15.5 18c.41-1.64 1.7-2.83 3.9-3" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+      </svg>
+    ),
     'noticeboard': (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <rect x="4" y="5" width="16" height="12" rx="1.5" stroke="white" strokeWidth="1.8"/>
@@ -200,6 +216,7 @@ const ROUTE_GRADIENTS = {
   '/appointments': 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
   '/referrals':    'linear-gradient(135deg, #DB2777 0%, #F43F5E 100%)',
   '/gallery':      'linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%)',
+  '/members':      'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
   '/profiles':     'linear-gradient(135deg, #9333EA 0%, #A855F7 100%)',
   '/messages':     'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
   '/slots':        'linear-gradient(135deg, #0891B2 0%, #06B6D4 100%)',
@@ -233,6 +250,19 @@ const STATIC_CONTAINERS = [
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
         <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8"/>
         <path d="M12 7.2l1.6 3.2 3.5.5-2.6 2.5.6 3.5L12 15.4 8.9 16.9l.6-3.5-2.6-2.5 3.5-.5L12 7.2z" stroke="white" strokeWidth="1.6" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'members',
+    label: 'Members',
+    gradient: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="3" stroke="white" strokeWidth="1.8"/>
+        <path d="M4 19c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+        <circle cx="17.5" cy="9" r="2.2" stroke="white" strokeWidth="1.8"/>
+        <path d="M15.5 18c.41-1.64 1.7-2.83 3.9-3" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
       </svg>
     ),
   },
