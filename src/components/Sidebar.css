@@ -6,6 +6,10 @@
   flex-direction: column;
   gap: 12px;
   font-family: 'Inter', sans-serif;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .sb-brand {
@@ -147,6 +151,10 @@
 
 @media (max-width: 980px) {
   .sb-sidebar {
+    position: static;
+    top: auto;
+    height: auto;
+    overflow-y: visible;
     border-right: none;
     border-bottom: 1px solid rgba(99, 102, 241, 0.08);
   }

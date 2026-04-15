@@ -199,14 +199,6 @@ export default function MembersPage() {
     [filteredRegisteredMembers, registeredSortBy]
   );
 
-  const totalRegisteredMembers = sortedRegisteredMembers.length;
-  const totalPages = Math.max(1, Math.ceil(totalRegisteredMembers / PAGE_SIZE));
-  const currentPage = Math.min(Math.max(1, currentPageParam || 1), totalPages);
-  const paginatedRegisteredMembers = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return sortedRegisteredMembers.slice(start, start + PAGE_SIZE);
-  }, [currentPage, sortedRegisteredMembers]);
-
   const filteredDirectoryMembers = useMemo(() => {
     return directoryMembers.filter((member) => matchesMemberSearch(member, searchTerm));
   }, [directoryMembers, searchTerm]);
@@ -215,6 +207,16 @@ export default function MembersPage() {
     () => [...filteredDirectoryMembers].sort((left, right) => compareMembers(left, right, 'name_asc')),
     [filteredDirectoryMembers]
   );
+
+  const hasRegisteredMembers = sortedRegisteredMembers.length > 0;
+  const visibleMembers = hasRegisteredMembers ? sortedRegisteredMembers : sortedDirectoryMembers;
+  const totalVisibleMembers = visibleMembers.length;
+  const totalPages = Math.max(1, Math.ceil(totalVisibleMembers / PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, currentPageParam || 1), totalPages);
+  const paginatedVisibleMembers = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return visibleMembers.slice(start, start + PAGE_SIZE);
+  }, [currentPage, visibleMembers]);
 
   const myDirectoryMembers = useMemo(
     () => sortedDirectoryMembers.filter((member) => member.member_type === 'my'),
@@ -464,7 +466,7 @@ export default function MembersPage() {
               <section className="sp-list">
                 {loading && <div className="sp-loading">Loading members...</div>}
 
-                {!loading && sortedRegisteredMembers.length === 0 && (
+                {!loading && totalVisibleMembers === 0 && (
                   <div className="sp-empty">
                     <div className="sp-empty-icon">M</div>
                     <h3>No matching members found</h3>
@@ -473,17 +475,18 @@ export default function MembersPage() {
                   </div>
                 )}
 
-                {!loading && sortedRegisteredMembers.length > 0 && (
+                {!loading && totalVisibleMembers > 0 && (
                   <div className="sp-modal-section sp-list-section my">
                     <div className="sp-section-title-row">
-                      <div className="sp-modal-section-title">Registered Members</div>
-                      <span className="sp-section-count">Total: {totalRegisteredMembers}</span>
+                      <div className="sp-modal-section-title">{hasRegisteredMembers ? 'Registered Members' : 'Members Directory'}</div>
+                      <span className="sp-section-count">Total: {totalVisibleMembers}</span>
                     </div>
-                    {paginatedRegisteredMembers.map((member) => (
+                    {paginatedVisibleMembers.map((member) => (
                       <div
-                        key={member.id}
+                        key={member.id || member.member_id}
                         className={`sp-card ${selectedId === member.id ? 'active' : ''} ${member.member_type === 'my' ? 'my' : 'other'}`}
                         onClick={() => {
+                          if (!hasRegisteredMembers) return;
                           setSelectedId(member.id);
                           openDetail(member.id);
                         }}
@@ -503,23 +506,36 @@ export default function MembersPage() {
                         </div>
                         <div className="sp-card-actions">
                           <button
-                            className={`sp-status-btn ${member.is_active ? 'active' : 'inactive'}`}
+                            className={`sp-status-btn ${hasRegisteredMembers && !member.is_active ? 'inactive' : 'active'}`}
                             type="button"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {member.is_active ? 'Active' : 'Inactive'}
+                            {hasRegisteredMembers ? (member.is_active ? 'Active' : 'Inactive') : 'Directory'}
                           </button>
-                          <button
-                            className="sp-icon-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openRegistrationEditForm(member);
-                            }}
-                            type="button"
-                          >
-                            Edit Registration
-                          </button>
-                          {member.is_editable && (
+                          {hasRegisteredMembers ? (
+                            <button
+                              className="sp-icon-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openRegistrationEditForm(member);
+                              }}
+                              type="button"
+                            >
+                              Edit Registration
+                            </button>
+                          ) : (
+                            <button
+                              className="sp-icon-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openRegisterForm(member);
+                              }}
+                              type="button"
+                            >
+                              Register
+                            </button>
+                          )}
+                          {hasRegisteredMembers && member.is_editable && (
                             <button
                               className="sp-icon-btn"
                               onClick={(e) => {
@@ -531,16 +547,18 @@ export default function MembersPage() {
                               Edit
                             </button>
                           )}
-                          <button
-                            className="sp-icon-btn danger"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUnregister(member.id);
-                            }}
-                            type="button"
-                          >
-                            Unregister
-                          </button>
+                          {hasRegisteredMembers && (
+                            <button
+                              className="sp-icon-btn danger"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUnregister(member.id);
+                              }}
+                              type="button"
+                            >
+                              Unregister
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

@@ -28,6 +28,7 @@ function App() {
         <Route path="/sponsor"      element={<SponsorsPage />} />
         <Route path="/members"      element={<MembersPage />} />
         <Route path="/gallery"      element={<GalleryPage />} />
+        <Route path="/gallery/:folderId" element={<GalleryPage />} />
         <Route path="/marquee"      element={<MarqueePage />} />
         <Route path="/theme"        element={<ThemePage />} />
       </Routes>

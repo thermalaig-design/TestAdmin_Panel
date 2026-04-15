@@ -3,6 +3,18 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchTrustDetails, updateTrustContent, updateTrustInfo } from '../services/trustService';
 import './TrustDetails.css';
 
+function normalizeRichContent(content = '') {
+  return String(content || '')
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<p>\s*<strong>\s*Heading\s*:?\s*<\/strong>\s*/gi, '<p>')
+    .replace(/<p>\s*<strong>\s*Description\s*:?\s*<\/strong>\s*/gi, '<p>')
+    .replace(/<strong>\s*Heading\s*:?\s*<\/strong>\s*/gi, '')
+    .replace(/<strong>\s*Description\s*:?\s*<\/strong>\s*/gi, '')
+    .replace(/(^|>|\n)\s*Heading\s*:\s*/gi, '$1')
+    .replace(/(^|>|\n)\s*Description\s*:\s*/gi, '$1')
+    .trim();
+}
+
 function TrustDetails() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -282,7 +294,10 @@ function TrustDetails() {
             ) : (
               <div className="content-display">
                 {trust.terms_content ? (
-                  <p>{trust.terms_content}</p>
+                  <div
+                    className="content-rich-text"
+                    dangerouslySetInnerHTML={{ __html: normalizeRichContent(trust.terms_content) }}
+                  />
                 ) : (
                   <p className="text-not-set">Not set</p>
                 )}
@@ -332,7 +347,10 @@ function TrustDetails() {
             ) : (
               <div className="content-display">
                 {trust.privacy_content ? (
-                  <p>{trust.privacy_content}</p>
+                  <div
+                    className="content-rich-text"
+                    dangerouslySetInnerHTML={{ __html: normalizeRichContent(trust.privacy_content) }}
+                  />
                 ) : (
                   <p className="text-not-set">Not set</p>
                 )}
@@ -346,3 +364,4 @@ function TrustDetails() {
 }
 
 export default TrustDetails;
+

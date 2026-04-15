@@ -107,15 +107,6 @@ export default function ThemePage() {
   const selectedTemplate = useMemo(() => templates.find((item) => item.id === selectedId) || null, [templates, selectedId]);
   const detailTemplate = useMemo(() => templates.find((item) => item.id === detailId) || null, [templates, detailId]);
   const canEdit = (item) => item?.trust_id === trustId;
-  const palettePreview = [
-    { key: 'primary_color', label: 'Primary', fallback: '#C0241A' },
-    { key: 'secondary_color', label: 'Secondary', fallback: '#2B2F7E' },
-    { key: 'accent_color', label: 'Accent', fallback: '#FDECEA' },
-    { key: 'accent_bg', label: 'Accent BG', fallback: '#EAEBF8' },
-    { key: 'navbar_bg', label: 'Navbar BG', fallback: 'rgba(234,235,248,0.88)' },
-    { key: 'page_bg', label: 'Page BG', fallback: 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)' },
-  ];
-
   useEffect(() => {
     if (!selectedTemplate) {
       setForm(EMPTY_FORM);
@@ -169,14 +160,9 @@ export default function ThemePage() {
     if (!template?.id || !trustId) return;
     setSaveError('');
     setAssigningId(template.id);
-    let overrides;
-    try {
-      overrides = parseJson(overridesText, {});
-    } catch {
-      setAssigningId(null);
-      setSaveError('Theme overrides must be valid JSON.');
-      return;
-    }
+    const overrides = currentTrust?.theme_overrides && typeof currentTrust.theme_overrides === 'object'
+      ? currentTrust.theme_overrides
+      : {};
     const { data, error: assignErr } = await assignTemplateToTrust(trustId, template.id, overrides);
     if (assignErr) {
       setSaveError(assignErr.message || 'Unable to apply template.');
@@ -261,50 +247,47 @@ export default function ThemePage() {
       <span>{label}</span>
       <div className="theme-color-input-shell">
         <input
+          className="theme-color-text"
+          value={form[key]}
+          onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
+        />
+        <input
           className="theme-color-native"
+          id={`theme-color-picker-${key}`}
           type="color"
           aria-label={`${label} picker`}
           value={normalizePickerColor(form[key], fallback)}
           onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
         />
+      </div>
+    </label>
+  );
+
+  const renderPaintField = (key, label, pickerFallback) => (
+    <label className="theme-field theme-color-field" key={key}>
+      <span>{label}</span>
+      <div className="theme-color-input-shell">
         <input
           className="theme-color-text"
           value={form[key]}
           onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
         />
-        <div
-          className="theme-color-chip"
-          style={{ background: normalizePickerColor(form[key], fallback) }}
-          aria-hidden="true"
-        />
-      </div>
-    </label>
-  );
-
-  const renderPaintField = (key, label, pickerFallback, previewFallback) => (
-    <label className="theme-field theme-color-field" key={key}>
-      <span>{label}</span>
-      <div className="theme-color-input-shell">
         <input
           className="theme-color-native"
+          id={`theme-color-picker-${key}`}
           type="color"
           aria-label={`${label} picker`}
           value={normalizePickerColor(form[key], pickerFallback)}
           onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
         />
-        <input
-          className="theme-color-text"
-          value={form[key]}
-          onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
-        />
-        <div
-          className="theme-color-chip"
-          style={{ background: normalizePreviewPaint(form[key], previewFallback) }}
-          aria-hidden="true"
-        />
       </div>
     </label>
   );
+
+  const openColorPicker = (key) => {
+    const picker = document.getElementById(`theme-color-picker-${key}`);
+    if (picker) picker.click();
+  };
 
   const renderHomeLayoutField = () => (
     <div className="theme-field theme-span-2" key="home_layout_order">
@@ -440,31 +423,41 @@ export default function ThemePage() {
                   <label className="theme-field"><span>Name *</span><input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} /></label>
                   <label className="theme-field"><span>Template Key</span><input value={form.template_key} onChange={(e) => setForm((p) => ({ ...p, template_key: e.target.value }))} /></label>
                   <label className="theme-field theme-span-2"><span>Description</span><textarea rows="3" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></label>
-                  {renderColorField('primary_color', 'Primary Color', '#C0241A')}
-                  {renderColorField('secondary_color', 'Secondary Color', '#2B2F7E')}
-                  {renderColorField('accent_color', 'Accent Color', '#FDECEA')}
-                  {renderColorField('accent_bg', 'Accent Background', '#EAEBF8')}
+                  {renderColorField('primary_color', 'Primary Color Shade', '#C0241A')}
+                  {renderColorField('secondary_color', 'Secondary Color Shade', '#2B2F7E')}
+                  {renderColorField('accent_color', 'Accent Color Shade', '#FDECEA')}
+                  {renderColorField('accent_bg', 'Accent Background Shade', '#EAEBF8')}
                   <div className="theme-span-2 theme-palette-preview-card">
-                    <div className="theme-palette-preview-swatches">
-                      {palettePreview.slice(0, 4).map((item) => (
-                        <div className="theme-palette-preview-swatch" key={item.key}>
-                          <span
-                            className="theme-palette-preview-sample"
-                            style={{ background: normalizePreviewPaint(form[item.key], item.fallback) }}
-                          />
-                          <div>
-                            <strong>{item.label}</strong>
-                            <small>{form[item.key]}</small>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                     <div className="theme-palette-preview-top">
                       <div>
                         <span className="theme-palette-preview-label">Live Palette</span>
                         <strong>Modern color preview</strong>
                       </div>
-                      <div className="theme-palette-preview-dots"><span /><span /><span /></div>
+                      <div className="theme-palette-preview-chips">
+                        {[
+                          { key: 'primary_color', label: 'Primary', fallback: '#C0241A' },
+                          { key: 'secondary_color', label: 'Secondary', fallback: '#2B2F7E' },
+                          { key: 'accent_color', label: 'Accent', fallback: '#FDECEA' },
+                          { key: 'accent_bg', label: 'Accent Bg', fallback: '#EAEBF8' },
+                        ].map((item) => (
+                          <button
+                            key={item.key}
+                            className="theme-palette-preview-chip"
+                            type="button"
+                            onClick={() => openColorPicker(item.key)}
+                          >
+                            <span
+                              className="theme-palette-preview-chip-sample"
+                              style={{ background: normalizePickerColor(form[item.key], item.fallback) }}
+                              aria-hidden="true"
+                            />
+                            <span className="theme-palette-preview-chip-copy">
+                              <strong>{item.label}</strong>
+                              <small>{form[item.key] || item.fallback}</small>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div
                       className="theme-palette-preview-hero"
@@ -484,8 +477,26 @@ export default function ThemePage() {
                       </button>
                     </div>
                   </div>
-                  {renderPaintField('navbar_bg', 'Navbar Background', '#EAEBF8', 'rgba(234,235,248,0.88)')}
-                  {renderPaintField('page_bg', 'Page Background', '#FFF5F5', 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)')}
+                  {renderPaintField('navbar_bg', 'Navbar Background Shade', '#EAEBF8')}
+                  <div className="theme-span-2 theme-navbar-preview-card">
+                    <span className="theme-navbar-preview-label">Navbar Preview</span>
+                    <div className="theme-navbar-preview-shell" style={{ background: normalizePreviewPaint(form.navbar_bg, 'rgba(234,235,248,0.88)') }}>
+                      <div className="theme-navbar-preview-brand" style={{ color: form.secondary_color || '#2B2F7E' }}>Trust Admin</div>
+                      <div className="theme-navbar-preview-links">
+                        <span style={{ color: form.primary_color || '#C0241A' }}>Home</span>
+                        <span style={{ color: form.secondary_color || '#2B2F7E' }}>Events</span>
+                        <span style={{ color: form.secondary_color || '#2B2F7E' }}>Gallery</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="theme-navbar-preview-cta"
+                        style={{ background: form.accent_color || '#FDECEA', color: form.primary_color || '#C0241A' }}
+                      >
+                        Action
+                      </button>
+                    </div>
+                  </div>
+                  {renderPaintField('page_bg', 'Page Background Shade', '#FFF5F5')}
                   {renderHomeLayoutField()}
                   <label className="theme-field theme-span-2"><span>Animations JSON</span><textarea rows="4" value={form.animations} onChange={(e) => setForm((p) => ({ ...p, animations: e.target.value }))} /></label>
                   <label className="theme-field theme-span-2"><span>Custom CSS</span><textarea rows="5" value={form.custom_css} onChange={(e) => setForm((p) => ({ ...p, custom_css: e.target.value }))} /></label>
@@ -543,8 +554,6 @@ export default function ThemePage() {
                 </div>
                 <div className="theme-detail-info">
                   <div><strong>Template key:</strong> {detailTemplate.template_key || '-'}</div>
-                  <div><strong>Primary color:</strong> {detailTemplate.primary_color}</div>
-                  <div><strong>Secondary color:</strong> {detailTemplate.secondary_color}</div>
                   <div><strong>Assigned:</strong> {activeTemplateId === detailTemplate.id ? 'Yes' : 'No'}</div>
                 </div>
                 <div className="theme-detail-actions">

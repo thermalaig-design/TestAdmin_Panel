@@ -1,10 +1,14 @@
 import { supabase } from '../lib/supabase';
 
-const REGISTERED_TABLE_CANDIDATES = ['registered_members', 'reg_members'];
-const MEMBER_TABLE_CANDIDATES = ['members', 'Members'];
+const REGISTERED_TABLE_CANDIDATES = ['reg_members'];
+const MEMBER_TABLE_CANDIDATES = ['Members'];
+const MEMBER_FETCH_CHUNK_SIZE = 100;
+const TABLE_PAGE_SIZE = 1000;
 
 let resolvedRegisteredTable = null;
 let resolvedMembersTable = null;
+let resolvedRegisteredTables = null;
+let resolvedMemberTables = null;
 
 function pickFirst(row = {}, keys = []) {
   for (const key of keys) {
@@ -32,6 +36,28 @@ async function resolveTable(candidates, cacheKey) {
   throw lastError || new Error(`Unable to resolve ${cacheKey} table.`);
 }
 
+async function resolveAvailableTables(candidates, cacheKey) {
+  if (cacheKey === 'registered' && resolvedRegisteredTables) return resolvedRegisteredTables;
+  if (cacheKey === 'members' && resolvedMemberTables) return resolvedMemberTables;
+
+  const availableTables = [];
+  let lastError = null;
+
+  for (const table of candidates) {
+    const { error } = await supabase.from(table).select('*').limit(1);
+    if (!error) availableTables.push(table);
+    else lastError = error;
+  }
+
+  if (!availableTables.length) {
+    throw lastError || new Error(`Unable to resolve ${cacheKey} tables.`);
+  }
+
+  if (cacheKey === 'registered') resolvedRegisteredTables = availableTables;
+  if (cacheKey === 'members') resolvedMemberTables = availableTables;
+  return availableTables;
+}
+
 function getMemberUniqueId(row = {}) {
   return pickFirst(row, ['member_id', 'members_id', 'id']);
 }
@@ -42,6 +68,33 @@ function getRegisteredMemberId(row = {}) {
 
 function getMembershipNumber(row = {}) {
   return pickFirst(row, ['membership_number', 'Membership number']);
+}
+
+function chunkValues(values = [], size = MEMBER_FETCH_CHUNK_SIZE) {
+  const chunks = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function fetchAllRows(queryBuilder) {
+  const allRows = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + TABLE_PAGE_SIZE - 1;
+    const { data, error } = await queryBuilder.range(from, to);
+    if (error) return { data: [], error };
+
+    const rows = data || [];
+    allRows.push(...rows);
+
+    if (rows.length < TABLE_PAGE_SIZE) break;
+    from += TABLE_PAGE_SIZE;
+  }
+
+  return { data: allRows, error: null };
 }
 
 function normalizeMemberRow(row = {}, currentTrustId = null) {
@@ -134,13 +187,26 @@ function buildRegisteredPayload(payload, trustId, memberId, table) {
 }
 
 async function fetchMemberRowsByIds(memberIds) {
-  const membersTable = await resolveTable(MEMBER_TABLE_CANDIDATES, 'members');
-  if (!memberIds.length) return { data: [], error: null, table: membersTable };
+  const memberTables = await resolveAvailableTables(MEMBER_TABLE_CANDIDATES, 'members');
+  if (!memberIds.length) return { data: [], error: null, table: memberTables[0] };
 
   const ids = [...new Set(memberIds.filter(Boolean))];
-  const idColumn = membersTable === 'members' ? 'member_id' : 'members_id';
-  const { data, error } = await supabase.from(membersTable).select('*').in(idColumn, ids);
-  return { data: data || [], error, table: membersTable };
+  const idChunks = chunkValues(ids);
+  const combinedRows = [];
+  let lastTable = memberTables[0];
+
+  for (const membersTable of memberTables) {
+    const idColumn = membersTable === 'members' ? 'member_id' : 'members_id';
+    lastTable = membersTable;
+
+    for (const chunk of idChunks) {
+      const { data, error } = await supabase.from(membersTable).select('*').in(idColumn, chunk);
+      if (error) return { data: [], error, table: membersTable };
+      combinedRows.push(...(data || []));
+    }
+  }
+
+  return { data: combinedRows, error: null, table: lastTable };
 }
 
 async function fetchRegisteredRowById(id, currentTrustId) {
@@ -159,14 +225,20 @@ async function fetchRegisteredRowById(id, currentTrustId) {
 export async function fetchRegisteredMembersByTrust(trustId) {
   if (!trustId) return { data: [], error: null };
 
-  const registeredTable = await resolveTable(REGISTERED_TABLE_CANDIDATES, 'registered');
-  const { data: registeredRows, error } = await supabase
-    .from(registeredTable)
-    .select('*')
-    .eq('trust_id', trustId)
-    .order('joined_date', { ascending: false, nullsFirst: false });
+  const registeredTables = await resolveAvailableTables(REGISTERED_TABLE_CANDIDATES, 'registered');
+  const registeredRows = [];
 
-  if (error) return { data: [], error };
+  for (const registeredTable of registeredTables) {
+    const { data, error } = await fetchAllRows(
+      supabase
+        .from(registeredTable)
+        .select('*')
+        .eq('trust_id', trustId)
+        .order('joined_date', { ascending: false, nullsFirst: false })
+    );
+    if (error) return { data: [], error };
+    registeredRows.push(...(data || []));
+  }
 
   const memberIds = (registeredRows || []).map(getRegisteredMemberId).filter(Boolean);
   const { data: memberRows, error: memberError } = await fetchMemberRowsByIds(memberIds);
@@ -181,10 +253,18 @@ export async function fetchRegisteredMembersByTrust(trustId) {
 }
 
 export async function fetchAllMembersDirectory(currentTrustId) {
-  const membersTable = await resolveTable(MEMBER_TABLE_CANDIDATES, 'members');
-  const { data, error } = await supabase.from(membersTable).select('*');
-  if (error) return { data: [], error };
-  return { data: (data || []).map((row) => normalizeMemberRow(row, currentTrustId)), error: null };
+  const memberTables = await resolveAvailableTables(MEMBER_TABLE_CANDIDATES, 'members');
+  const memberRows = [];
+
+  for (const membersTable of memberTables) {
+    const { data, error } = await fetchAllRows(
+      supabase.from(membersTable).select('*')
+    );
+    if (error) return { data: [], error };
+    memberRows.push(...(data || []));
+  }
+
+  return { data: memberRows.map((row) => normalizeMemberRow(row, currentTrustId)), error: null };
 }
 
 export async function registerExistingMember(trustId, memberId, payload = {}) {

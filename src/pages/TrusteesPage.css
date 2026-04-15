@@ -629,10 +629,10 @@
 /* Rich content (HTML from DB) */
 .tp-rich-content {
   border-top: 1px solid rgba(99, 102, 241, 0.08);
-  padding-top: 18px;
+  padding-top: 12px;
   font-size: 13.5px;
   color: #374151;
-  line-height: 1.75;
+  line-height: 1.6;
 }
 
 .tp-rich-text {
@@ -658,21 +658,22 @@
 .tp-rich-content h3 {
   font-family: 'Poppins', sans-serif;
   color: #1E1F3B;
-  margin: 16px 0 8px;
+  margin: 10px 0 6px;
 }
 
+.tp-rich-content h1 { display: none; }
 .tp-rich-content h2 { font-size: 16px; font-weight: 700; }
 .tp-rich-content h3 { font-size: 15px; font-weight: 600; }
 
-.tp-rich-content p { margin: 8px 0; }
+.tp-rich-content p { margin: 6px 0; }
 
 .tp-rich-content ul,
 .tp-rich-content ol {
   padding-left: 20px;
-  margin: 8px 0;
+  margin: 6px 0;
 }
 
-.tp-rich-content li { margin: 4px 0; }
+.tp-rich-content li { margin: 2px 0; }
 
 .tp-rich-content strong { color: #1E1F3B; font-weight: 700; }
 .tp-rich-content em    { color: #6366F1; }

@@ -54,6 +54,24 @@ export async function createGalleryFolder(name, trustId) {
   return { data: data ? normalizeFolderRow(data, 0) : null, error };
 }
 
+export async function updateGalleryFolder(folderId, updates) {
+  if (!folderId) return { data: null, error: { message: 'No folder id provided.' } };
+
+  const payload = {
+    ...updates,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from(FOLDERS_TABLE)
+    .update(payload)
+    .eq('id', folderId)
+    .select('*')
+    .single();
+
+  return { data: data ? normalizeFolderRow(data, 0) : null, error };
+}
+
 export async function createGalleryPhoto(payload) {
   const row = {
     storage_path: payload.imageUrl,
@@ -69,4 +87,26 @@ export async function createGalleryPhoto(payload) {
     .single();
 
   return { data: data ? normalizePhotoRow(data, 0) : null, error };
+}
+
+export async function deleteGalleryPhoto(photoId) {
+  if (!photoId) return { error: { message: 'No photo id provided.' } };
+
+  const { error } = await supabase
+    .from(PHOTOS_TABLE)
+    .delete()
+    .eq('id', photoId);
+
+  return { error };
+}
+
+export async function deleteGalleryFolder(folderId) {
+  if (!folderId) return { error: { message: 'No folder id provided.' } };
+
+  const { error } = await supabase
+    .from(FOLDERS_TABLE)
+    .delete()
+    .eq('id', folderId);
+
+  return { error };
 }

@@ -6,6 +6,18 @@ import './TrusteesPage.css';
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const initials = (name = '') =>
   name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'T';
+function normalizeRichContent(content = '') {
+  return String(content || '')
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<p>\s*<strong>\s*Heading\s*:?\s*<\/strong>\s*/gi, '<p>')
+    .replace(/<p>\s*<strong>\s*Description\s*:?\s*<\/strong>\s*/gi, '<p>')
+    .replace(/<strong>\s*Heading\s*:?\s*<\/strong>\s*/gi, '')
+    .replace(/<strong>\s*Description\s*:?\s*<\/strong>\s*/gi, '')
+    .replace(/(^|>|\n)\s*Heading\s*:\s*/gi, '$1')
+    .replace(/(^|>|\n)\s*Description\s*:\s*/gi, '$1')
+    .trim();
+}
+
 // ── Collapsible rich-text section ────────────────────────────────────────────
 function ContentSection({
   title,
@@ -114,7 +126,10 @@ function ContentSection({
           ) : (
             hasContent ? (
               <div className="tp-rich-content">
-                <p className="tp-rich-text">{content}</p>
+                <div
+                  className="tp-rich-text"
+                  dangerouslySetInnerHTML={{ __html: normalizeRichContent(content) }}
+                />
               </div>
             ) : null
           )}
