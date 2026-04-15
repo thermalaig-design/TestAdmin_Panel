@@ -1,0 +1,209 @@
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { FeatureIconRenderer } from '../../pages/Dashboard';
+
+function toDefaults(row) {
+  return {
+    display_name: row.display_name || row.master_name || '',
+    tagline: row.tagline || row.master_subname || '',
+    icon_url: row.icon_url || '',
+    quick_order: row.quick_order ?? '',
+  };
+}
+
+function validate(values) {
+  const errors = {};
+
+  const displayName = String(values.display_name || '').trim();
+  if (!displayName || displayName.length < 2 || displayName.length > 60) {
+    errors.display_name = 'Display name must be 2 to 60 characters.';
+  }
+
+  const quickOrder = String(values.quick_order).trim();
+  if (quickOrder !== '' && !/^\d+$/.test(quickOrder)) {
+    errors.quick_order = 'Quick order must be a numeric value.';
+  }
+
+  const iconUrl = String(values.icon_url || '').trim();
+  const isUrl = /^https?:\/\//i.test(iconUrl);
+  const isPath = /^\/?[A-Za-z0-9._\-/]+$/.test(iconUrl);
+  const isData = /^data:image\//i.test(iconUrl);
+  const isEmojiOrGlyph = !isUrl && !isPath && !isData && iconUrl.length <= 12;
+  if (iconUrl && !(isUrl || isPath || isData || isEmojiOrGlyph)) {
+    errors.icon_url = 'Icon should be URL/path/data image or emoji.';
+  }
+
+  return errors;
+}
+
+export default function FeatureEditModal({
+  open,
+  row,
+  tier,
+  saving,
+  saveError,
+  onClose,
+  onSave,
+}) {
+  const [form, setForm] = useState(() => toDefaults(row || {}));
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [uploadError, setUploadError] = useState('');
+  const [instantPreviewUrl, setInstantPreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (instantPreviewUrl) URL.revokeObjectURL(instantPreviewUrl);
+    };
+  }, [instantPreviewUrl]);
+
+  if (!open || !row || !form) return null;
+
+  const handleChange = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => ({ ...prev, [key]: '' }));
+  };
+
+  const handleIconFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please upload an image file only.');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('Icon image should be under 2MB.');
+      return;
+    }
+
+    if (instantPreviewUrl) URL.revokeObjectURL(instantPreviewUrl);
+    setInstantPreviewUrl(URL.createObjectURL(file));
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      handleChange('icon_url', String(reader.result || ''));
+      setUploadError('');
+    };
+    reader.onerror = () => {
+      setUploadError('Unable to read selected image.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = () => {
+    const errors = validate(form);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) return;
+
+    onSave({
+      quick_order: String(form.quick_order).trim() === '' ? null : Number(form.quick_order),
+      display_name: String(form.display_name || '').trim(),
+      tagline: String(form.tagline || '').trim(),
+      icon_url: String(form.icon_url || '').trim(),
+    });
+  };
+
+  const handleRemoveIcon = () => {
+    if (instantPreviewUrl) URL.revokeObjectURL(instantPreviewUrl);
+    setInstantPreviewUrl('');
+    handleChange('icon_url', '');
+  };
+
+  return createPortal(
+    <div className="fc-modal-overlay" onClick={onClose}>
+      <div className="fc-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="fc-modal-head">
+          <div>
+            <h3>Edit Feature</h3>
+            <p>Customize trust-specific feature visibility and UI settings.</p>
+          </div>
+          <button type="button" className="fc-close" onClick={onClose}>x</button>
+        </div>
+
+        <div className="fc-modal-content">
+          <div className="fc-modal-readonly">
+            <div><strong>Feature Name:</strong> {row.master_name}</div>
+            <div><strong>Tier:</strong> {tier}</div>
+          </div>
+
+          <div className="fc-modal-grid">
+            <label>
+              <span>Display Name</span>
+              <input value={form.display_name} onChange={(event) => handleChange('display_name', event.target.value)} />
+              {fieldErrors.display_name ? <small>{fieldErrors.display_name}</small> : null}
+            </label>
+
+            <label>
+              <span>Tagline</span>
+              <input value={form.tagline} onChange={(event) => handleChange('tagline', event.target.value)} />
+            </label>
+
+            <label className="fc-span-2">
+              <span>Icon</span>
+              <div className="fc-icon-editor">
+                <div className="fc-icon-action-row">
+                  <div className="fc-icon-upload-row">
+                    <label className="fc-upload-btn">
+                      Upload Icon
+                      <input type="file" accept="image/*" onChange={handleIconFileChange} />
+                    </label>
+                    <button type="button" className="fc-btn" onClick={handleRemoveIcon} disabled={!form.icon_url && !instantPreviewUrl}>
+                      Remove Icon
+                    </button>
+                  </div>
+                  <div className="fc-icon-preview-panel" aria-live="polite">
+                    {instantPreviewUrl || form.icon_url ? (
+                      <div className="fc-icon-preview-box">
+                        <FeatureIconRenderer icon_url={instantPreviewUrl || form.icon_url} route={row.route} size={28} />
+                      </div>
+                    ) : (
+                      <div className="fc-icon-preview-empty">No Icon</div>
+                    )}
+                    <span className="fc-icon-preview-label">Preview</span>
+                  </div>
+                </div>
+              </div>
+              {uploadError ? <small>{uploadError}</small> : null}
+            </label>
+
+            <label>
+              <span>Quick Order</span>
+              <input
+                type="number"
+                min="0"
+                value={form.quick_order}
+                onChange={(event) => handleChange('quick_order', event.target.value)}
+              />
+              {fieldErrors.quick_order ? <small>{fieldErrors.quick_order}</small> : null}
+            </label>
+          </div>
+        </div>
+
+        {saveError ? <div className="fc-error-inline">{saveError}</div> : null}
+
+        <div className="fc-modal-actions">
+          <button type="button" className="fc-btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="fc-btn fc-btn-primary" onClick={handleSubmit} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}

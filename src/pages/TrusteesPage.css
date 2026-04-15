@@ -518,7 +518,7 @@
 .tp-sections-wrap {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
 }
 
@@ -540,15 +540,15 @@
   display: flex;
   align-items: stretch;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 10px 14px;
 }
 
 .tp-section-toggle {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 4px 6px;
+  gap: 10px;
+  padding: 3px 5px;
   background: none;
   border: none;
   cursor: pointer;
@@ -568,9 +568,9 @@
 }
 
 .tp-section-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -584,7 +584,7 @@
 
 .tp-section-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: #1E1F3B;
   flex: 1;
@@ -594,7 +594,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .tp-section-badge {
@@ -616,7 +616,7 @@
 
 /* Section body */
 .tp-section-body {
-  padding: 0 22px 22px;
+  padding: 0 16px 14px;
   animation: fadeSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -629,10 +629,10 @@
 /* Rich content (HTML from DB) */
 .tp-rich-content {
   border-top: 1px solid rgba(99, 102, 241, 0.08);
-  padding-top: 12px;
-  font-size: 13.5px;
+  padding-top: 8px;
+  font-size: 13px;
   color: #374151;
-  line-height: 1.6;
+  line-height: 1.45;
 }
 
 .tp-rich-text {
@@ -645,7 +645,7 @@
   border: 1.5px solid rgba(99, 102, 241, 0.2);
   background: #F8FAFF;
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   font-size: 13.5px;
   font-weight: 600;
   color: #1E1F3B;
@@ -658,22 +658,22 @@
 .tp-rich-content h3 {
   font-family: 'Poppins', sans-serif;
   color: #1E1F3B;
-  margin: 10px 0 6px;
+  margin: 6px 0 4px;
 }
 
 .tp-rich-content h1 { display: none; }
 .tp-rich-content h2 { font-size: 16px; font-weight: 700; }
 .tp-rich-content h3 { font-size: 15px; font-weight: 600; }
 
-.tp-rich-content p { margin: 6px 0; }
+.tp-rich-content p { margin: 4px 0; }
 
 .tp-rich-content ul,
 .tp-rich-content ol {
   padding-left: 20px;
-  margin: 6px 0;
+  margin: 4px 0;
 }
 
-.tp-rich-content li { margin: 2px 0; }
+.tp-rich-content li { margin: 1px 0; }
 
 .tp-rich-content strong { color: #1E1F3B; font-weight: 700; }
 .tp-rich-content em    { color: #6366F1; }

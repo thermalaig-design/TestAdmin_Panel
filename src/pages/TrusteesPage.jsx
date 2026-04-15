@@ -169,7 +169,6 @@ export default function TrusteesPage() {
   const [contentSaving,  setContentSaving]  = useState(false);
   const [contentError,   setContentError]   = useState('');
 
-  const userInitials = initials(userName);
 
   // ── Fetch full trust details ─────────────────────────────────────────────
   const loadTrust = useCallback(async () => {
@@ -188,6 +187,7 @@ export default function TrusteesPage() {
   useEffect(() => { loadTrust(); }, [loadTrust]);
 
   const trustName = trust?.name || trustFromState?.name || 'Trust';
+  const userInitials = initials(userName);
 
   const startEdit = (field) => {
     setSaveError('');

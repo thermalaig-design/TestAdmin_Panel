@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Dashboard.css';
 
 // ── Export reusable icon renderer component ───────────────────────────────────
-export function FeatureIconRenderer({ icon_url, route, size = 26, className = '' }) {
+export function FeatureIconRenderer({ icon_url, size = 26, className = '' }) {
   const rawIcon = icon_url?.trim() || '';
   const decodedIcon = rawIcon
     .replace(/&lt;/g, '<')
@@ -40,7 +40,15 @@ export function FeatureIconRenderer({ icon_url, route, size = 26, className = ''
   }
 
   // 3. Full URL / data URL — render as image
-  if (decodedIcon && (decodedIcon.startsWith('http') || decodedIcon.startsWith('/') || decodedIcon.startsWith('data:image'))) {
+  if (
+    decodedIcon &&
+    (
+      decodedIcon.startsWith('http') ||
+      decodedIcon.startsWith('/') ||
+      decodedIcon.startsWith('data:image') ||
+      decodedIcon.startsWith('blob:')
+    )
+  ) {
     return (
       <img
         src={decodedIcon}
@@ -138,6 +146,34 @@ const MODULE_CARDS = [
         <circle cx="8" cy="10" r="1.2" fill="white" />
         <circle cx="11.5" cy="7.5" r="1.2" fill="white" />
         <circle cx="15.5" cy="9" r="1.2" fill="white" />
+      </svg>
+    ),
+  },
+  {
+    id: 'card-feature-control',
+    label: 'Feature Control',
+    description: 'Manage feature access & visibility',
+    route: '/feature-control',
+    gradient: 'linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="4" width="18" height="16" rx="3" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.18)"/>
+        <path d="M8 9h8M8 12h5M8 15h3" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+        <circle cx="17.5" cy="15" r="2.2" stroke="white" strokeWidth="1.8"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'card-sub-feature-control',
+    label: 'Sub Feature Control',
+    description: 'Manage sub feature labels and visibility',
+    route: '/sub-feature-control',
+    gradient: 'linear-gradient(135deg, #0EA5E9 0%, #1D4ED8 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="4" width="18" height="16" rx="3" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.18)"/>
+        <path d="M8 9h8M8 12h8M8 15h5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+        <circle cx="17.5" cy="15" r="1.6" fill="white"/>
       </svg>
     ),
   },
@@ -400,6 +436,23 @@ export default function Dashboard() {
   const trustId = trust?.id || null;
   const trustName = trust?.name || 'No Trust Selected';
 
+  const [collapsed, setCollapsed] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const userInitials = initials(userName);
+  const pageTitle = 'Dashboard';
+  const filteredModules = useMemo(() => {
+    const query = String(searchTerm || '').trim().toLowerCase();
+    if (!query) return MODULE_CARDS;
+
+    return MODULE_CARDS.filter((card) => {
+      const label = String(card.label || '').toLowerCase();
+      const description = String(card.description || '').toLowerCase();
+      return label.includes(query) || description.includes(query);
+    });
+  }, [searchTerm]);
+
   // If no trust is linked, redirect
   useEffect(() => {
     if (!trustId) {
@@ -408,12 +461,6 @@ export default function Dashboard() {
   }, [trustId, navigate, location.state]);
 
   if (!trustId) return null;
-
-  const [collapsed, setCollapsed] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
-
-  const userInitials = initials(userName);
-  const pageTitle = 'Dashboard';
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -525,6 +572,8 @@ export default function Dashboard() {
                 placeholder="Search..."
                 className="search-input"
                 id="dash-search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
               />
@@ -576,42 +625,39 @@ export default function Dashboard() {
           </div>
 
           {/* ──── 4 Module Cards ──── */}
-          <div className="modules-grid">
-            {MODULE_CARDS.map((card, i) => (
-              <button
-                key={card.id}
-                id={card.id}
-                className="module-card"
-                style={{
-                  background: card.gradient,
-                  animationDelay: `${i * 0.08}s`,
-                }}
-                onClick={() => navigate(card.route, { state: { userName, trust } })}
-                title={card.label}
-              >
-                {/* Shine overlay */}
-                <div className="module-card-shine" />
-
-                {/* Icon */}
-                <div className="module-icon-wrap">
-                  {card.icon}
-                </div>
-
-                {/* Text */}
-                <div className="module-card-body">
-                  <span className="module-card-label">{card.label}</span>
-                  <span className="module-card-desc">{card.description}</span>
-                </div>
-
-                {/* Arrow */}
-                <div className="module-card-arrow">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12h14M12 5l7 7-7 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              </button>
-            ))}
-          </div>
+          {filteredModules.length ? (
+            <div className="modules-grid">
+              {filteredModules.map((card, i) => (
+                <button
+                  key={card.id}
+                  id={card.id}
+                  className="module-card"
+                  style={{
+                    background: card.gradient,
+                    animationDelay: `${i * 0.08}s`,
+                  }}
+                  onClick={() => navigate(card.route, { state: { userName, trust } })}
+                  title={card.label}
+                >
+                  <div className="module-card-shine" />
+                  <div className="module-icon-wrap">
+                    {card.icon}
+                  </div>
+                  <div className="module-card-body">
+                    <span className="module-card-label">{card.label}</span>
+                    <span className="module-card-desc">{card.description}</span>
+                  </div>
+                  <div className="module-card-arrow">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <path d="M5 12h14M12 5l7 7-7 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="features-empty">No module found for "{searchTerm}".</div>
+          )}
         </div>
       </main>
     </div>

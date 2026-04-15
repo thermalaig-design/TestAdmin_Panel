@@ -293,6 +293,8 @@
 .dash-main {
   flex: 1;
   overflow-x: hidden;
+  overflow-y: auto;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
@@ -317,7 +319,7 @@
   -webkit-backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 50;
   box-shadow: 0 2px 16px rgba(99, 102, 241, 0.05);
   gap: 16px;
 }

@@ -11,6 +11,8 @@ import MembersPage     from './pages/MembersPage';
 import GalleryPage     from './pages/GalleryPage';
 import MarqueePage     from './pages/MarqueePage';
 import ThemePage       from './pages/ThemePage';
+import FeatureControlPage from './pages/FeatureControlPage';
+import SubFeatureControlPage from './pages/SubFeatureControlPage';
 import './index.css';
 
 function App() {
@@ -31,6 +33,8 @@ function App() {
         <Route path="/gallery/:folderId" element={<GalleryPage />} />
         <Route path="/marquee"      element={<MarqueePage />} />
         <Route path="/theme"        element={<ThemePage />} />
+        <Route path="/feature-control" element={<FeatureControlPage />} />
+        <Route path="/sub-feature-control" element={<SubFeatureControlPage />} />
       </Routes>
     </BrowserRouter>
   );
