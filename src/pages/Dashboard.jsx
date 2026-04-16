@@ -177,6 +177,20 @@ const MODULE_CARDS = [
       </svg>
     ),
   },
+  {
+    id: 'card-profile',
+    label: 'Profile',
+    description: 'View member profile details by member id',
+    route: '/member-profile',
+    gradient: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="8" r="3.3" stroke="white" strokeWidth="1.8" />
+        <path d="M5 19c0-3.2 2.9-5.8 7-5.8s7 2.6 7 5.8" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <rect x="16.3" y="14.5" width="5.2" height="5.2" rx="1.2" stroke="white" strokeWidth="1.6" />
+      </svg>
+    ),
+  },
 ];
 
 // ── Nav items ─────────────────────────────────────────────────────────────────
