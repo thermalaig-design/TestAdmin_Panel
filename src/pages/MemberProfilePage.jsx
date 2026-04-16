@@ -5,9 +5,12 @@ import Sidebar from '../components/Sidebar';
 import {
   createFamilyMember,
   deleteFamilyMember,
+  fetchAllMembersDirectory,
   fetchFamilyMembersByMemberId,
   fetchMemberProfileView,
   fetchRegisteredMembersDirectory,
+  registerExistingMember,
+  unregisterRegisteredMember,
   updateFamilyMember,
   updateRegisteredMember,
   updateRegisteredMembership,
@@ -72,11 +75,17 @@ const PROFILE_SECTIONS = [
 ];
 const MEMBERS_CACHE_TTL_MS = 3 * 60 * 1000;
 const LIST_PAGE_SIZE = 10;
+const PICKER_PAGE_SIZE = 6;
+const CREATE_NEW_ROLE_VALUE = '__create_new_role__';
 const FAMILY_GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const FAMILY_BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 function getMembersCacheKey(trustId) {
   return `member_profile_members_${trustId}`;
+}
+
+function getDirectoryCacheKey(trustId) {
+  return `member_profile_directory_${trustId}`;
 }
 
 function readMembersCache(trustId) {
@@ -98,6 +107,32 @@ function writeMembersCache(trustId, members = []) {
   try {
     sessionStorage.setItem(
       getMembersCacheKey(trustId),
+      JSON.stringify({ timestamp: Date.now(), members })
+    );
+  } catch {
+    // Ignore storage failures and continue with live data.
+  }
+}
+
+function readDirectoryCache(trustId) {
+  if (!trustId) return null;
+  try {
+    const raw = sessionStorage.getItem(getDirectoryCacheKey(trustId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.timestamp || !Array.isArray(parsed?.members)) return null;
+    if (Date.now() - Number(parsed.timestamp) > MEMBERS_CACHE_TTL_MS) return null;
+    return parsed.members;
+  } catch {
+    return null;
+  }
+}
+
+function writeDirectoryCache(trustId, members = []) {
+  if (!trustId) return;
+  try {
+    sessionStorage.setItem(
+      getDirectoryCacheKey(trustId),
       JSON.stringify({ timestamp: Date.now(), members })
     );
   } catch {
@@ -225,6 +260,46 @@ function compareMembers(left = {}, right = {}, sortBy = 'name_asc') {
   return byNameAsc;
 }
 
+function matchesMemberSearch(member = {}, term = '') {
+  const normalizedTerm = String(term || '').trim().toLowerCase();
+  if (!normalizedTerm) return true;
+
+  const searchableFields = [
+    member.name,
+    member.company_name,
+    member.address_home,
+    member.address_office,
+    member.resident_landline,
+    member.office_landline,
+    member.mobile,
+    member.email,
+    member.membership_number,
+    member.role,
+    member.joined_date,
+    member.member_type,
+    member.is_active ? 'active' : 'inactive',
+  ];
+
+  return searchableFields.some((value) => String(value || '').toLowerCase().includes(normalizedTerm));
+}
+
+function comparePickerMembers(left = {}, right = {}, sortBy = 'name_asc') {
+  const leftName = String(left.name || '').toLowerCase();
+  const rightName = String(right.name || '').toLowerCase();
+  const leftCompany = String(left.company_name || '').toLowerCase();
+  const rightCompany = String(right.company_name || '').toLowerCase();
+
+  const byNameAsc = leftName.localeCompare(rightName, undefined, { sensitivity: 'base', numeric: true });
+  const byNameDesc = rightName.localeCompare(leftName, undefined, { sensitivity: 'base', numeric: true });
+  const byCompanyAsc = leftCompany.localeCompare(rightCompany, undefined, { sensitivity: 'base', numeric: true }) || byNameAsc;
+  const byCompanyDesc = rightCompany.localeCompare(leftCompany, undefined, { sensitivity: 'base', numeric: true }) || byNameAsc;
+
+  if (sortBy === 'name_desc') return byNameDesc;
+  if (sortBy === 'company_asc') return byCompanyAsc;
+  if (sortBy === 'company_desc') return byCompanyDesc;
+  return byNameAsc;
+}
+
 export default function MemberProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -232,8 +307,15 @@ export default function MemberProfilePage() {
   const trustId = trust?.id || null;
 
   const [members, setMembers] = useState([]);
+  const [directoryMembers, setDirectoryMembers] = useState([]);
+  const [directoryTrustId, setDirectoryTrustId] = useState(null);
+  const [loadingDirectory, setLoadingDirectory] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [memberSearch, setMemberSearch] = useState('');
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [pickerFilter, setPickerFilter] = useState('all');
+  const [pickerSortBy, setPickerSortBy] = useState('name_asc');
+  const [pickerPage, setPickerPage] = useState(1);
   const [sortBy, setSortBy] = useState('name_asc');
   const [roleFilter, setRoleFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -250,6 +332,21 @@ export default function MemberProfilePage() {
   const [familyForm, setFamilyForm] = useState(() => buildFamilyForm());
   const [isFamilyEditing, setIsFamilyEditing] = useState(false);
   const [familySaving, setFamilySaving] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [unregistering, setUnregistering] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [registeringId, setRegisteringId] = useState(null);
+  const [registerCandidate, setRegisterCandidate] = useState(null);
+  const [registerForm, setRegisterForm] = useState({
+    membership_number: '',
+    role: '',
+    joined_date: '',
+    is_active: true,
+  });
+  const [useCustomEditRole, setUseCustomEditRole] = useState(false);
+  const [useCustomRegisterRole, setUseCustomRegisterRole] = useState(false);
+  const [registerError, setRegisterError] = useState('');
   const [familyError, setFamilyError] = useState('');
   const [error, setError] = useState('');
 
@@ -305,6 +402,31 @@ export default function MemberProfilePage() {
     };
   }, [trustId]);
 
+  const ensureDirectoryMembersLoaded = async ({ forceRefresh = false } = {}) => {
+    if (!trustId) return;
+    if (loadingDirectory) return;
+    if (!forceRefresh && directoryTrustId === trustId && directoryMembers.length > 0) return;
+
+    if (!forceRefresh) {
+      const cachedDirectory = readDirectoryCache(trustId);
+      if (cachedDirectory?.length) {
+        setDirectoryMembers(cachedDirectory);
+        setDirectoryTrustId(trustId);
+        return;
+      }
+    }
+
+    setLoadingDirectory(true);
+    const { data, error: fetchError } = await fetchAllMembersDirectory(trustId);
+    if (!fetchError) {
+      const next = data || [];
+      setDirectoryMembers(next);
+      setDirectoryTrustId(trustId);
+      writeDirectoryCache(trustId, next);
+    }
+    setLoadingDirectory(false);
+  };
+
   const membersForRoleCount = useMemo(() => {
     if (activeGroup === 'my') {
       return members.filter((member) => String(member.member_type || '').toLowerCase() === 'my');
@@ -324,6 +446,16 @@ export default function MemberProfilePage() {
       left.localeCompare(right, undefined, { sensitivity: 'base', numeric: true })
     );
   }, [membersForRoleCount]);
+  const trustRoleOptions = useMemo(() => {
+    const uniqueRoles = new Set(
+      (members || [])
+        .map((member) => String(member.role || '').trim())
+        .filter(Boolean)
+    );
+    return [...uniqueRoles].sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: 'base', numeric: true })
+    );
+  }, [members]);
 
   const profileName = useMemo(() => toText(profile?.name) || 'Member Profile', [profile]);
   const filteredMembers = useMemo(() => {
@@ -368,6 +500,10 @@ export default function MemberProfilePage() {
     return sortedVisibleMembers.slice(start, start + LIST_PAGE_SIZE);
   }, [safeCurrentPage, sortedVisibleMembers]);
   const panelTitle = activeGroup === 'my' ? 'My Members' : activeGroup === 'others' ? 'Others Members' : 'All Members';
+  const registeredMemberIds = useMemo(
+    () => new Set((members || []).map((member) => String(member.member_id || '')).filter(Boolean)),
+    [members]
+  );
   const roleCountMap = useMemo(() => {
     const map = new Map();
     for (const member of membersForRoleCount) {
@@ -386,6 +522,32 @@ export default function MemberProfilePage() {
     if (selectedExists) return selectedMemberId;
     return sortedVisibleMembers[0]?.member_id || '';
   }, [sortedVisibleMembers, selectedMemberId]);
+  const filteredDirectoryMembers = useMemo(() => {
+    return directoryMembers
+      .filter((member) => !registeredMemberIds.has(String(member.member_id || '')))
+      .filter((member) => matchesMemberSearch(member, pickerSearch))
+      .filter((member) => {
+        if (pickerFilter === 'my') return String(member.member_type || '').toLowerCase() === 'my';
+        if (pickerFilter === 'others') return String(member.member_type || '').toLowerCase() !== 'my';
+        return true;
+      });
+  }, [directoryMembers, pickerFilter, pickerSearch, registeredMemberIds]);
+  const sortedPickerMembers = useMemo(
+    () => [...filteredDirectoryMembers].sort((left, right) => comparePickerMembers(left, right, pickerSortBy)),
+    [filteredDirectoryMembers, pickerSortBy]
+  );
+  const pickerTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(sortedPickerMembers.length / PICKER_PAGE_SIZE)),
+    [sortedPickerMembers.length]
+  );
+  const safePickerPage = useMemo(
+    () => Math.min(pickerPage, pickerTotalPages),
+    [pickerPage, pickerTotalPages]
+  );
+  const paginatedPickerMembers = useMemo(() => {
+    const start = (safePickerPage - 1) * PICKER_PAGE_SIZE;
+    return sortedPickerMembers.slice(start, start + PICKER_PAGE_SIZE);
+  }, [safePickerPage, sortedPickerMembers]);
 
   useEffect(() => {
     let cancelled = false;
@@ -407,9 +569,11 @@ export default function MemberProfilePage() {
       if (fetchError) {
         setError(fetchError.message || 'Unable to load member profile.');
         setProfile(null);
+        setUseCustomEditRole(false);
       } else {
         setProfile(data || null);
         setEditForm(buildEditForm(data || {}));
+        setUseCustomEditRole(false);
       }
     };
 
@@ -465,12 +629,16 @@ export default function MemberProfilePage() {
   const handleStartEdit = () => {
     if (!canEditDetails || !profile) return;
     setEditForm(buildEditForm(profile));
+    setUseCustomEditRole(
+      !!profile.role && !trustRoleOptions.includes(String(profile.role || '').trim())
+    );
     setSaveError('');
     setIsEditing(true);
   };
 
   const handleCancelEdit = () => {
     setEditForm(buildEditForm(profile || {}));
+    setUseCustomEditRole(false);
     setSaveError('');
     setIsEditing(false);
   };
@@ -556,6 +724,7 @@ export default function MemberProfilePage() {
       setProfile(refreshedProfile || null);
       setEditForm(buildEditForm(refreshedProfile || {}));
     }
+    setUseCustomEditRole(false);
     setIsEditing(false);
     setSaving(false);
   };
@@ -660,6 +829,118 @@ export default function MemberProfilePage() {
     }
   };
 
+  const handleToggleRegistrationStatus = async () => {
+    if (!profile?.registration_id || !trustId) return;
+    setSaveError('');
+    setStatusUpdating(true);
+
+    const payload = {
+      membership_number: profile.membership_number || null,
+      role: profile.role || null,
+      joined_date: profile.joined_date || null,
+      is_active: profile.is_active === false,
+    };
+
+    const { data, error: toggleError } = await updateRegisteredMembership(profile.registration_id, payload, trustId);
+    if (toggleError) {
+      setSaveError(toggleError.message || 'Unable to update member status.');
+      setStatusUpdating(false);
+      return;
+    }
+
+    const updated = data || {};
+    setProfile((prev) => ({ ...prev, ...updated }));
+    setMembers((prev) =>
+      prev.map((member) =>
+        String(member.member_id) === String(updated.member_id)
+          ? { ...member, ...updated }
+          : member
+      )
+    );
+    setStatusUpdating(false);
+  };
+
+  const handleUnregisterMember = async () => {
+    if (!profile?.registration_id || !trustId) return;
+    const ok = window.confirm('Unregister this member from the current trust? This will not delete master member data.');
+    if (!ok) return;
+
+    setSaveError('');
+    setUnregistering(true);
+    const { error: unregisterError } = await unregisterRegisteredMember(profile.registration_id, trustId);
+    if (unregisterError) {
+      setSaveError(unregisterError.message || 'Unable to unregister member.');
+      setUnregistering(false);
+      return;
+    }
+
+    const removedMemberId = profile.member_id;
+    setMembers((prev) => prev.filter((member) => String(member.member_id) !== String(removedMemberId)));
+    setSelectedMemberId('');
+    setProfile(null);
+    setUnregistering(false);
+  };
+
+  const openPicker = () => {
+    setPickerSearch('');
+    setPickerFilter('all');
+    setPickerSortBy('name_asc');
+    setPickerPage(1);
+    setRegisterError('');
+    setShowPicker(true);
+    ensureDirectoryMembersLoaded();
+  };
+
+  const openNewMemberForm = () => {
+    setShowPicker(false);
+    setShowRegisterForm(false);
+    navigate('/member/create_member', { state: { userName, trust } });
+  };
+
+  const openRegisterForm = (directoryMember) => {
+    setRegisterCandidate(directoryMember);
+    setRegisterForm({
+      membership_number: '',
+      role: '',
+      joined_date: '',
+      is_active: true,
+    });
+    setUseCustomRegisterRole(false);
+    setRegisterError('');
+    setShowRegisterForm(true);
+  };
+
+  const handleRegisterExisting = async (directoryMember) => {
+    if (!trustId || !directoryMember?.member_id) return;
+    setRegisteringId(directoryMember.member_id);
+    setRegisterError('');
+    const { data, error: registerErr } = await registerExistingMember(trustId, directoryMember.member_id, registerForm);
+    if (registerErr) {
+      setRegisterError(registerErr.message || 'Unable to register member for this trust.');
+      setRegisteringId(null);
+      return;
+    }
+
+    const nextMemberId = data?.member_id || directoryMember.member_id;
+    setMembers((prev) => {
+      const exists = prev.some((member) => String(member.member_id) === String(nextMemberId));
+      const next = exists
+        ? prev.map((member) => (
+          String(member.member_id) === String(nextMemberId)
+            ? { ...member, ...data }
+            : member
+        ))
+        : [{ ...directoryMember, ...data }, ...prev];
+      writeMembersCache(trustId, next);
+      return next;
+    });
+    setSelectedMemberId(nextMemberId);
+    setRegisterCandidate(null);
+    setRegisteringId(null);
+    setShowRegisterForm(false);
+    setShowPicker(false);
+  };
+
   if (!trustId) return null;
 
   return (
@@ -737,6 +1018,10 @@ export default function MemberProfilePage() {
                   setCurrentPage(1);
                 }}
               />
+              <button className="mp-add-member-btn" onClick={openPicker} type="button">
+                <span className="mp-add-member-icon" aria-hidden="true">+</span>
+                <span className="mp-add-member-text">Add a Member</span>
+              </button>
               <div className="mp-members-controls">
                 <label className="mp-sort-label" htmlFor="mp-sort">
                   Sort By
@@ -818,6 +1103,24 @@ export default function MemberProfilePage() {
                     <div className="mp-hero-meta">
                       <h2>{profileName}</h2>
                       <p>{canEditProfile ? 'My Member' : 'Others Member'}</p>
+                      <div className="mp-registration-actions">
+                        <button
+                          type="button"
+                          className={`mp-registration-status ${profile.is_active !== false ? 'active' : 'inactive'}`}
+                          onClick={handleToggleRegistrationStatus}
+                          disabled={statusUpdating || unregistering}
+                        >
+                          {statusUpdating ? 'Updating...' : profile.is_active !== false ? 'Active' : 'Inactive'}
+                        </button>
+                        <button
+                          type="button"
+                          className="mp-registration-unregister"
+                          onClick={handleUnregisterMember}
+                          disabled={statusUpdating || unregistering}
+                        >
+                          {unregistering ? 'Unregistering...' : 'Unregister'}
+                        </button>
+                      </div>
                     </div>
                   </section>
 
@@ -905,14 +1208,45 @@ export default function MemberProfilePage() {
                             {REGISTRATION_FIELDS.map((field) => (
                               <label key={field.key}>
                                 <span>{field.label}</span>
-                                <input
-                                  value={getProfileFieldValue(field.key)}
-                                  onChange={(event) => {
-                                    if (!isFieldEditable(field.key)) return;
-                                    setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
-                                  }}
-                                  readOnly={!isFieldEditable(field.key)}
-                                />
+                                {field.key === 'role' && isFieldEditable(field.key) ? (
+                                  <>
+                                    <select
+                                      value={useCustomEditRole ? CREATE_NEW_ROLE_VALUE : (editForm.role || '')}
+                                      onChange={(event) => {
+                                        const nextValue = event.target.value;
+                                        if (nextValue === CREATE_NEW_ROLE_VALUE) {
+                                          setUseCustomEditRole(true);
+                                          setEditForm((prev) => ({ ...prev, role: '' }));
+                                          return;
+                                        }
+                                        setUseCustomEditRole(false);
+                                        setEditForm((prev) => ({ ...prev, role: nextValue }));
+                                      }}
+                                    >
+                                      <option value="">Select role</option>
+                                      {trustRoleOptions.map((role) => (
+                                        <option key={role} value={role}>{role}</option>
+                                      ))}
+                                      <option value={CREATE_NEW_ROLE_VALUE}>+ Create New Role</option>
+                                    </select>
+                                    {useCustomEditRole && (
+                                      <input
+                                        placeholder="Enter new role"
+                                        value={editForm.role}
+                                        onChange={(event) => setEditForm((prev) => ({ ...prev, role: event.target.value }))}
+                                      />
+                                    )}
+                                  </>
+                                ) : (
+                                  <input
+                                    value={getProfileFieldValue(field.key)}
+                                    onChange={(event) => {
+                                      if (!isFieldEditable(field.key)) return;
+                                      setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
+                                    }}
+                                    readOnly={!isFieldEditable(field.key)}
+                                  />
+                                )}
                               </label>
                             ))}
                           </div>
@@ -1104,6 +1438,266 @@ export default function MemberProfilePage() {
             </section>
           </div>
         </div>
+
+        {showPicker && (
+          <div className="mp-modal-overlay" onClick={() => setShowPicker(false)}>
+            <div className="mp-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="mp-modal-head">
+                <div>
+                  <h3>Select Member</h3>
+                  <p>Search by name, company, mobile, or email.</p>
+                </div>
+                <button className="mp-modal-close" onClick={() => setShowPicker(false)} type="button">x</button>
+              </div>
+              <div className="mp-modal-search">
+                <input
+                  placeholder="Search by name, company, membership no, role, mobile, email, address, or status..."
+                  value={pickerSearch}
+                  onChange={(event) => {
+                    setPickerSearch(event.target.value);
+                    setPickerPage(1);
+                  }}
+                />
+                <button className="mp-modal-create-btn" onClick={openNewMemberForm} type="button">
+                  Create New Member
+                </button>
+              </div>
+              <div className="mp-modal-controls">
+                <label className="mp-modal-control">
+                  <span>Filter</span>
+                  <select
+                    value={pickerFilter}
+                    onChange={(event) => {
+                      setPickerFilter(event.target.value);
+                      setPickerPage(1);
+                    }}
+                  >
+                    <option value="all">All Members</option>
+                    <option value="my">My Members</option>
+                    <option value="others">Other Members</option>
+                  </select>
+                </label>
+                <label className="mp-modal-control">
+                  <span>Sort By</span>
+                  <select
+                    value={pickerSortBy}
+                    onChange={(event) => {
+                      setPickerSortBy(event.target.value);
+                      setPickerPage(1);
+                    }}
+                  >
+                    <option value="name_asc">Name A-Z</option>
+                    <option value="name_desc">Name Z-A</option>
+                    <option value="company_asc">Company A-Z</option>
+                    <option value="company_desc">Company Z-A</option>
+                  </select>
+                </label>
+              </div>
+              <div className="mp-modal-list">
+                {loadingDirectory && (
+                  <div className="mp-modal-empty">Loading members...</div>
+                )}
+                {sortedPickerMembers.length > 0 && (
+                  <div className={`mp-modal-section ${pickerFilter === 'others' ? 'other' : 'my'}`}>
+                    <div className="mp-modal-section-title">
+                      {pickerFilter === 'my' ? 'My Members' : pickerFilter === 'others' ? 'Other Members' : 'Members'}
+                    </div>
+                    {paginatedPickerMembers.map((member) => (
+                      <div
+                        key={member.member_id}
+                        className="mp-modal-item"
+                        onClick={() => openRegisterForm(member)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openRegisterForm(member);
+                          }
+                        }}
+                      >
+                        <div>
+                          <div className="mp-modal-title-row">
+                            <div className="mp-modal-title">{member.name}</div>
+                            <span className={`mp-modal-badge ${String(member.member_type || '').toLowerCase() === 'my' ? 'my' : 'other'}`}>
+                              {String(member.member_type || '').toLowerCase() === 'my' ? 'My Member' : 'Others'}
+                            </span>
+                          </div>
+                          <div className="mp-modal-sub">{member.company_name || 'No company'}</div>
+                          <div className="mp-modal-sub">{member.mobile || member.email || ''}</div>
+                        </div>
+                        <div className="mp-modal-actions">
+                          <button
+                            className="mp-modal-action-btn"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openRegisterForm(member);
+                            }}
+                          >
+                            Add to Trust
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {!loadingDirectory && filteredDirectoryMembers.length === 0 && (
+                  <div className="mp-modal-empty">No members found.</div>
+                )}
+                {sortedPickerMembers.length > 0 && (
+                  <div className="mp-modal-pagination">
+                    <button
+                      type="button"
+                      className="mp-page-btn"
+                      onClick={() => setPickerPage((prev) => Math.max(1, prev - 1))}
+                      disabled={safePickerPage <= 1}
+                    >
+                      Prev
+                    </button>
+                    <span className="mp-page-info">Page {safePickerPage} / {pickerTotalPages}</span>
+                    <button
+                      type="button"
+                      className="mp-page-btn"
+                      onClick={() => setPickerPage((prev) => Math.min(pickerTotalPages, prev + 1))}
+                      disabled={safePickerPage >= pickerTotalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showRegisterForm && registerCandidate && (
+          <div className="mp-modal-overlay" onClick={() => setShowRegisterForm(false)}>
+            <div className="mp-modal mp-modal-register" onClick={(event) => event.stopPropagation()}>
+              <div className="mp-modal-head">
+                <div>
+                  <h3>Register Member to Trust</h3>
+                  <p>{registerCandidate.name || 'Selected member'}</p>
+                </div>
+                <button className="mp-modal-close" onClick={() => setShowRegisterForm(false)} type="button">x</button>
+              </div>
+              <div className="mp-register-summary">
+                <div className="mp-register-chip">
+                  <span>Name</span>
+                  <strong>{registerCandidate.name || 'Member'}</strong>
+                </div>
+                <div className="mp-register-chip">
+                  <span>Company</span>
+                  <strong>{registerCandidate.company_name || 'No company'}</strong>
+                </div>
+                <div className="mp-register-chip">
+                  <span>Mobile</span>
+                  <strong>{registerCandidate.mobile || '-'}</strong>
+                </div>
+                <div className="mp-register-chip">
+                  <span>Member Type</span>
+                  <strong>{registerCandidate.member_type === 'my' ? 'My Member' : 'Others'}</strong>
+                </div>
+              </div>
+              <div className="mp-register-member-details">
+                <h4>Members Table Details</h4>
+                <div className="mp-register-member-grid">
+                  <div className="mp-register-member-item">
+                    <span>Email</span>
+                    <strong>{registerCandidate.email || '-'}</strong>
+                  </div>
+                  <div className="mp-register-member-item">
+                    <span>Resident Landline</span>
+                    <strong>{registerCandidate.resident_landline || '-'}</strong>
+                  </div>
+                  <div className="mp-register-member-item">
+                    <span>Office Landline</span>
+                    <strong>{registerCandidate.office_landline || '-'}</strong>
+                  </div>
+                  <div className="mp-register-member-item">
+                    <span>Home Address</span>
+                    <strong>{registerCandidate.address_home || '-'}</strong>
+                  </div>
+                  <div className="mp-register-member-item">
+                    <span>Office Address</span>
+                    <strong>{registerCandidate.address_office || '-'}</strong>
+                  </div>
+                </div>
+              </div>
+              <div className="mp-modal-form">
+                <label>
+                  <span>Membership Number</span>
+                  <input
+                    value={registerForm.membership_number}
+                    onChange={(event) => setRegisterForm((prev) => ({ ...prev, membership_number: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  <span>Role</span>
+                  <select
+                    value={useCustomRegisterRole ? CREATE_NEW_ROLE_VALUE : (registerForm.role || '')}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      if (nextValue === CREATE_NEW_ROLE_VALUE) {
+                        setUseCustomRegisterRole(true);
+                        setRegisterForm((prev) => ({ ...prev, role: '' }));
+                        return;
+                      }
+                      setUseCustomRegisterRole(false);
+                      setRegisterForm((prev) => ({ ...prev, role: nextValue }));
+                    }}
+                  >
+                    <option value="">Select role</option>
+                    {trustRoleOptions.map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                    <option value={CREATE_NEW_ROLE_VALUE}>+ Create New Role</option>
+                  </select>
+                  {useCustomRegisterRole && (
+                    <input
+                      placeholder="Enter new role"
+                      value={registerForm.role}
+                      onChange={(event) => setRegisterForm((prev) => ({ ...prev, role: event.target.value }))}
+                    />
+                  )}
+                </label>
+                <label>
+                  <span>Joined Date</span>
+                  <input
+                    type="date"
+                    value={registerForm.joined_date}
+                    onChange={(event) => setRegisterForm((prev) => ({ ...prev, joined_date: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  <span>Status</span>
+                  <select
+                    value={registerForm.is_active ? 'active' : 'inactive'}
+                    onChange={(event) => setRegisterForm((prev) => ({ ...prev, is_active: event.target.value === 'active' }))}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </label>
+                {registerError && <div className="mp-error-card">{registerError}</div>}
+                <div className="mp-action-group">
+                  <button className="mp-action-btn mp-action-btn-cancel" onClick={() => setShowRegisterForm(false)} type="button">
+                    Cancel
+                  </button>
+                  <button
+                    className="mp-action-btn mp-action-btn-save"
+                    onClick={() => handleRegisterExisting(registerCandidate)}
+                    type="button"
+                    disabled={registeringId === registerCandidate.member_id}
+                  >
+                    {registeringId === registerCandidate.member_id ? 'Saving...' : 'Save to Trust'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

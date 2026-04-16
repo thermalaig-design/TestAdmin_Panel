@@ -286,6 +286,26 @@
   gap: 12px;
 }
 
+.sp-form-section + .sp-form-section {
+  margin-top: 14px;
+}
+
+.sp-form-section-title {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4f46e5;
+}
+
+.sp-form-section .sp-grid {
+  border: 1px solid rgba(99, 102, 241, 0.14);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fcfdff 0%, #f7f9ff 100%);
+  padding: 12px;
+}
+
 .sp-span-2 {
   grid-column: span 2;
 }

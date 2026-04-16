@@ -407,12 +407,12 @@ async function fetchMemberRowsByIds(memberIds) {
   for (const membersTable of memberTables) {
     const idColumn = membersTable === 'members' ? 'member_id' : 'members_id';
     lastTable = membersTable;
-
-    for (const chunk of idChunks) {
-      const { data, error } = await supabase.from(membersTable).select('*').in(idColumn, chunk);
-      if (error) return { data: [], error, table: membersTable };
-      combinedRows.push(...(data || []));
-    }
+    const chunkResults = await Promise.all(
+      idChunks.map((chunk) => supabase.from(membersTable).select('*').in(idColumn, chunk))
+    );
+    const errored = chunkResults.find((result) => result.error);
+    if (errored?.error) return { data: [], error: errored.error, table: membersTable };
+    combinedRows.push(...chunkResults.flatMap((result) => result.data || []));
   }
 
   return { data: combinedRows, error: null, table: lastTable };
@@ -435,19 +435,20 @@ export async function fetchRegisteredMembersByTrust(trustId) {
   if (!trustId) return { data: [], error: null };
 
   const registeredTables = await resolveAvailableTables(REGISTERED_TABLE_CANDIDATES, 'registered');
-  const registeredRows = [];
-
-  for (const registeredTable of registeredTables) {
-    const { data, error } = await fetchAllRows(
-      supabase
-        .from(registeredTable)
-        .select('*')
-        .eq('trust_id', trustId)
-        .order('joined_date', { ascending: false, nullsFirst: false })
-    );
-    if (error) return { data: [], error };
-    registeredRows.push(...(data || []));
-  }
+  const tableResults = await Promise.all(
+    registeredTables.map((registeredTable) =>
+      fetchAllRows(
+        supabase
+          .from(registeredTable)
+          .select('*')
+          .eq('trust_id', trustId)
+          .order('joined_date', { ascending: false, nullsFirst: false })
+      )
+    )
+  );
+  const errored = tableResults.find((result) => result.error);
+  if (errored?.error) return { data: [], error: errored.error };
+  const registeredRows = tableResults.flatMap((result) => result.data || []);
 
   const memberIds = (registeredRows || []).map(getRegisteredMemberId).filter(Boolean);
   const { data: memberRows, error: memberError } = await fetchMemberRowsByIds(memberIds);
@@ -463,15 +464,14 @@ export async function fetchRegisteredMembersByTrust(trustId) {
 
 export async function fetchAllMembersDirectory(currentTrustId) {
   const memberTables = await resolveAvailableTables(MEMBER_TABLE_CANDIDATES, 'members');
-  const memberRows = [];
-
-  for (const membersTable of memberTables) {
-    const { data, error } = await fetchAllRows(
-      supabase.from(membersTable).select('*')
-    );
-    if (error) return { data: [], error };
-    memberRows.push(...(data || []));
-  }
+  const tableResults = await Promise.all(
+    memberTables.map((membersTable) =>
+      fetchAllRows(supabase.from(membersTable).select('*'))
+    )
+  );
+  const errored = tableResults.find((result) => result.error);
+  if (errored?.error) return { data: [], error: errored.error };
+  const memberRows = tableResults.flatMap((result) => result.data || []);
 
   return { data: memberRows.map((row) => normalizeMemberRow(row, currentTrustId)), error: null };
 }

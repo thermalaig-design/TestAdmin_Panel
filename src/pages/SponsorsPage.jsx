@@ -7,6 +7,7 @@ import {
   fetchSponsorFlashByTrust,
   createSponsorFlash,
   updateSponsorFlash,
+  deleteSponsorFlash,
 } from '../services/sponsorsService';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
@@ -53,6 +54,7 @@ export default function SponsorsPage() {
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
   const trustId = trust?.id || null;
+  const isCreateRoute = location.pathname === '/sponsor/create_sponsor';
 
   const [sponsors, setSponsors] = useState([]);
   const [flashMap, setFlashMap] = useState({});
@@ -158,7 +160,6 @@ export default function SponsorsPage() {
 
   useEffect(() => {
     if (selectedSponsor) {
-      const flash = flashMap[selectedSponsor.id];
       setForm({
         name: selectedSponsor.name || '',
         position: selectedSponsor.position || '',
@@ -194,10 +195,7 @@ export default function SponsorsPage() {
   };
 
   const startAdd = () => {
-    setSelectedId(null);
-    setForm(EMPTY_FORM);
-    setSaveError('');
-    setShowForm(true);
+    navigate('/sponsor/create_sponsor', { state: { userName, trust } });
   };
 
 
@@ -276,10 +274,32 @@ export default function SponsorsPage() {
     }
   };
 
-  const handleRemoveFromView = (id) => {
-    const ok = window.confirm('Remove this sponsor from the view? This will not delete it from the database.');
+  const handleRemoveFromView = async (id) => {
+    const ok = window.confirm('Remove this sponsor from sponsor flash? This will keep sponsor master data intact.');
     if (!ok) return;
-    setHiddenIds((prev) => new Set([...prev, id]));
+    const flash = flashMap[id];
+    if (!flash?.id) {
+      setHiddenIds((prev) => new Set([...prev, id]));
+      if (selectedId === id) setSelectedId(null);
+      return;
+    }
+
+    const { error: err } = await deleteSponsorFlash(flash.id);
+    if (err) {
+      setError(err.message || 'Unable to remove sponsor from sponsor flash.');
+      return;
+    }
+
+    setFlashMap((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
     if (selectedId === id) setSelectedId(null);
   };
 
@@ -331,10 +351,14 @@ export default function SponsorsPage() {
         setSaveError(err.message || 'Unable to create sponsor.');
       } else if (data) {
         setSponsors(prev => [data, ...prev]);
-        setSelectedId(data.id);
-        setShowForm(false);
-        setShowPicker(true);
-        setSearchTerm(data.name || '');
+        if (isCreateRoute) {
+          navigate('/sponsor', { state: { userName, trust } });
+        } else {
+          setSelectedId(data.id);
+          setShowForm(false);
+          setShowPicker(true);
+          setSearchTerm(data.name || '');
+        }
       }
     }
     setSaving(false);
@@ -352,14 +376,20 @@ export default function SponsorsPage() {
         <PageHeader
           title="Sponsors"
           subtitle="Manage sponsor profiles and details"
-          onBack={() => navigate('/dashboard', { state: { userName, trust } })}
+          onBack={() => {
+            if (isCreateRoute) {
+              navigate('/sponsor', { state: { userName, trust } });
+              return;
+            }
+            navigate('/dashboard', { state: { userName, trust } });
+          }}
           right={<button className="sp-add-btn" onClick={openPicker}>Add a Sponsor</button>}
         />
 
         {error && <div className="sp-error">{error}</div>}
 
-        <div className={`sp-content ${showForm ? 'form-only' : ''}`}>
-          {!showForm && (
+        <div className={`sp-content ${isCreateRoute || showForm ? 'form-only' : ''}`}>
+          {!isCreateRoute && !showForm && (
             <section className="sp-list">
             {loading && <div className="sp-loading">Loading sponsors...</div>}
 
@@ -432,7 +462,7 @@ export default function SponsorsPage() {
             </section>
           )}
 
-          {showForm && (
+          {(isCreateRoute || showForm) && (
             <section className="sp-form">
               <div className="sp-form-card">
               <div className="sp-form-title">
@@ -528,7 +558,15 @@ export default function SponsorsPage() {
               <div className="sp-form-actions">
                 <button
                   className="sp-secondary"
-                  onClick={() => { setShowForm(false); setSelectedId(null); setSaveError(''); }}
+                  onClick={() => {
+                    if (isCreateRoute) {
+                      navigate('/sponsor', { state: { userName, trust } });
+                      return;
+                    }
+                    setShowForm(false);
+                    setSelectedId(null);
+                    setSaveError('');
+                  }}
                   type="button"
                 >
                   Close

@@ -38,6 +38,8 @@ const SORT_OPTIONS = [
   { value: 'status_active', label: 'Active First' },
 ];
 const PAGE_SIZE = 10;
+const MEMBERS_CACHE_TTL_MS = 3 * 60 * 1000;
+const CREATE_NEW_ROLE_VALUE = '__create_new_role__';
 
 const initials = (value = '') =>
   value.split(' ').map((word) => word[0]).slice(0, 2).join('').toUpperCase() || 'M';
@@ -124,30 +126,70 @@ function toDirectoryMember(member = {}) {
   };
 }
 
+function getMembersCacheKey(trustId) {
+  return `members_page_cache_${trustId}`;
+}
+
+function readMembersCache(trustId) {
+  if (!trustId) return null;
+  try {
+    const raw = sessionStorage.getItem(getMembersCacheKey(trustId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.timestamp) return null;
+    if (!Array.isArray(parsed?.registeredMembers) || !Array.isArray(parsed?.directoryMembers)) return null;
+    if (Date.now() - Number(parsed.timestamp) > MEMBERS_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeMembersCache(trustId, registeredMembers = [], directoryMembers = []) {
+  if (!trustId) return;
+  try {
+    sessionStorage.setItem(
+      getMembersCacheKey(trustId),
+      JSON.stringify({
+        timestamp: Date.now(),
+        registeredMembers,
+        directoryMembers,
+      })
+    );
+  } catch {
+    // Ignore cache write failures.
+  }
+}
+
 export default function MembersPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
   const trustId = trust?.id || null;
+  const isCreateRoute = location.pathname === '/member/create_member';
+  const cachedMembers = readMembersCache(trustId);
 
-  const [registeredMembers, setRegisteredMembers] = useState([]);
-  const [directoryMembers, setDirectoryMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [registeredMembers, setRegisteredMembers] = useState(() => cachedMembers?.registeredMembers || []);
+  const [directoryMembers, setDirectoryMembers] = useState(() => cachedMembers?.directoryMembers || []);
+  const [loading, setLoading] = useState(() => !cachedMembers);
   const [error, setError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
   const [registeringId, setRegisteringId] = useState(null);
+  const [loadingDirectory, setLoadingDirectory] = useState(false);
   const [hiddenIds, setHiddenIds] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [registeredSortBy, setRegisteredSortBy] = useState('name_asc');
   const [selectedId, setSelectedId] = useState(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(isCreateRoute);
   const [showPicker, setShowPicker] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [editingRegistrationId, setEditingRegistrationId] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailId, setDetailId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [useCustomMainRole, setUseCustomMainRole] = useState(false);
+  const [useCustomRegisterRole, setUseCustomRegisterRole] = useState(false);
   const [registerForm, setRegisterForm] = useState({
     membership_number: '',
     role: '',
@@ -162,27 +204,55 @@ export default function MembersPage() {
   }, [trustId, navigate, trust, userName]);
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       if (!trustId) return;
-      setLoading(true);
       setError('');
-      const [{ data: registeredData, error: registeredError }, { data: directoryData, error: directoryError }] = await Promise.all([
-        fetchRegisteredMembersByTrust(trustId),
-        fetchAllMembersDirectory(trustId),
-      ]);
+      setLoadingDirectory(true);
+
+      const directoryPromise = fetchAllMembersDirectory(trustId);
+      const { data: registeredData, error: registeredError } = await fetchRegisteredMembersByTrust(trustId);
+      if (cancelled) return;
+
       if (registeredError) setError(registeredError.message || 'Unable to load registered members.');
-      if (directoryError) setError(directoryError.message || 'Unable to load members directory.');
-      setRegisteredMembers(registeredData || []);
-      setDirectoryMembers(directoryData || []);
+      const nextRegistered = registeredData || [];
+      setRegisteredMembers(nextRegistered);
       setLoading(false);
+
+      const { data: directoryData, error: directoryError } = await directoryPromise;
+      if (cancelled) return;
+
+      if (directoryError) setError(directoryError.message || 'Unable to load members directory.');
+      const nextDirectory = directoryData || [];
+      setDirectoryMembers(nextDirectory);
+      writeMembersCache(trustId, nextRegistered, nextDirectory);
+      setLoadingDirectory(false);
     };
     load();
+    return () => {
+      cancelled = true;
+    };
   }, [trustId]);
+
+  useEffect(() => {
+    if (!trustId) return;
+    writeMembersCache(trustId, registeredMembers, directoryMembers);
+  }, [trustId, registeredMembers, directoryMembers]);
 
   const selectedMember = useMemo(
     () => registeredMembers.find((member) => member.id === selectedId) || null,
     [registeredMembers, selectedId]
   );
+  const trustRoleOptions = useMemo(() => {
+    const uniqueRoles = new Set(
+      (registeredMembers || [])
+        .map((member) => String(member.role || '').trim())
+        .filter(Boolean)
+    );
+    return [...uniqueRoles].sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: 'base', numeric: true })
+    );
+  }, [registeredMembers]);
 
   const detailMember = useMemo(
     () => registeredMembers.find((member) => member.id === detailId) || null,
@@ -229,18 +299,20 @@ export default function MembersPage() {
   );
 
   useEffect(() => {
+    if (isCreateRoute) return;
     const params = new URLSearchParams(location.search);
     const existing = Number(params.get('page') || '1');
     if (existing === currentPage) return;
     params.set('page', String(currentPage));
     navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true, state: location.state });
-  }, [currentPage, location.pathname, location.search, location.state, navigate]);
+  }, [currentPage, isCreateRoute, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
+    if (isCreateRoute) return;
     const params = new URLSearchParams(location.search);
     params.set('page', '1');
     navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true, state: location.state });
-  }, [searchTerm, registeredSortBy]);
+  }, [isCreateRoute, location.pathname, location.state, location.search, navigate, searchTerm, registeredSortBy]);
 
   const goToPage = (page) => {
     const nextPage = Math.min(Math.max(1, page), totalPages);
@@ -265,18 +337,21 @@ export default function MembersPage() {
         office_landline: selectedMember.office_landline || '',
         is_active: selectedMember.is_active !== false,
       });
+      setUseCustomMainRole(
+        !!selectedMember.role && !trustRoleOptions.includes(String(selectedMember.role || '').trim())
+      );
     } else {
       setForm(EMPTY_FORM);
+      setUseCustomMainRole(false);
     }
-  }, [selectedMember]);
+  }, [selectedMember, trustRoleOptions]);
 
   const openNewMemberForm = () => {
-    setSelectedId(null);
-    setForm(EMPTY_FORM);
-    setSaveError('');
-    setShowForm(true);
-    setShowDetailModal(false);
     setShowPicker(false);
+    setShowRegisterForm(false);
+    setShowDetailModal(false);
+    setUseCustomMainRole(false);
+    navigate('/member/create_member', { state: { userName, trust } });
   };
 
   const openRegisterForm = (directoryMember) => {
@@ -288,6 +363,7 @@ export default function MembersPage() {
       joined_date: '',
       is_active: true,
     });
+    setUseCustomRegisterRole(false);
     setSaveError('');
     setShowRegisterForm(true);
   };
@@ -301,6 +377,9 @@ export default function MembersPage() {
       joined_date: registeredMember.joined_date || '',
       is_active: registeredMember.is_active !== false,
     });
+    setUseCustomRegisterRole(
+      !!registeredMember.role && !trustRoleOptions.includes(String(registeredMember.role || '').trim())
+    );
     setSaveError('');
     setShowDetailModal(false);
     setShowRegisterForm(true);
@@ -396,8 +475,12 @@ export default function MembersPage() {
       } else if (data) {
         setRegisteredMembers((prev) => [data, ...prev]);
         setDirectoryMembers((prev) => [toDirectoryMember(data), ...prev]);
-        setSelectedId(data.id);
-        setShowForm(false);
+        if (isCreateRoute) {
+          navigate('/member', { state: { userName, trust } });
+        } else {
+          setSelectedId(data.id);
+          setShowForm(false);
+        }
       }
     }
     setSaving(false);
@@ -439,15 +522,20 @@ export default function MembersPage() {
         <PageHeader
           title="Members"
           subtitle="Manage registered members for the current trust"
-          onBack={() => navigate('/dashboard', { state: { userName, trust } })}
-          right={<button className="sp-add-btn" onClick={openPicker}>Add a Member</button>}
+          onBack={() => {
+            if (isCreateRoute) {
+              navigate('/member', { state: { userName, trust } });
+              return;
+            }
+            navigate('/dashboard', { state: { userName, trust } });
+          }}
         />
 
         {error && <div className="sp-error">{error}</div>}
-        {saveError && !showForm && <div className="sp-error">{saveError}</div>}
+        {saveError && !(isCreateRoute || showForm) && <div className="sp-error">{saveError}</div>}
 
-        <div className={`sp-content ${showForm ? 'form-only' : ''}`}>
-          {!showForm && (
+        <div className={`sp-content ${isCreateRoute || showForm ? 'form-only' : ''}`}>
+          {!isCreateRoute && !showForm && (
             <>
               <div className="sp-modal-search">
                 <input
@@ -587,63 +675,97 @@ export default function MembersPage() {
             </>
           )}
 
-          {showForm && (
+          {(isCreateRoute || showForm) && (
             <section className="sp-form">
               <div className="sp-form-card">
                 <div className="sp-form-title">{selectedId ? 'Edit Member' : 'Create New Member'}</div>
 
-                <div className="sp-grid">
-                  <label className="sp-field">
-                    <span>Member Name *</span>
-                    <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
-                  </label>
-                  <label className="sp-field">
-                    <span>Company Name</span>
-                    <input value={form.company_name} onChange={(e) => setForm((prev) => ({ ...prev, company_name: e.target.value }))} />
-                  </label>
-                  <label className="sp-field">
-                    <span>Membership Number</span>
-                    <input value={form.membership_number} onChange={(e) => setForm((prev) => ({ ...prev, membership_number: e.target.value }))} />
-                  </label>
-                  <label className="sp-field">
-                    <span>Role</span>
-                    <input value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))} />
-                  </label>
-                  <label className="sp-field">
-                    <span>Joined Date</span>
-                    <input type="date" value={form.joined_date} onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))} />
-                  </label>
-                  <label className="sp-field">
-                    <span>Mobile</span>
-                    <input value={form.mobile} onChange={(e) => setForm((prev) => ({ ...prev, mobile: e.target.value }))} />
-                  </label>
-                  <label className="sp-field">
-                    <span>Email</span>
-                    <input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
-                  </label>
-                  <label className="sp-field">
-                    <span>Resident Landline</span>
-                    <input value={form.resident_landline} onChange={(e) => setForm((prev) => ({ ...prev, resident_landline: e.target.value }))} />
-                  </label>
-                  <label className="sp-field">
-                    <span>Office Landline</span>
-                    <input value={form.office_landline} onChange={(e) => setForm((prev) => ({ ...prev, office_landline: e.target.value }))} />
-                  </label>
-                  <label className="sp-field sp-span-2">
-                    <span>Home Address</span>
-                    <input value={form.address_home} onChange={(e) => setForm((prev) => ({ ...prev, address_home: e.target.value }))} />
-                  </label>
-                  <label className="sp-field sp-span-2">
-                    <span>Office Address</span>
-                    <input value={form.address_office} onChange={(e) => setForm((prev) => ({ ...prev, address_office: e.target.value }))} />
-                  </label>
-                  <label className="sp-field">
-                    <span>Status</span>
-                    <select value={form.is_active ? 'active' : 'inactive'} onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.value === 'active' }))}>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </label>
+                <div className="sp-form-section">
+                  <div className="sp-form-section-title">Members Table</div>
+                  <div className="sp-grid">
+                    <label className="sp-field">
+                      <span>Member Name *</span>
+                      <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
+                    </label>
+                    <label className="sp-field">
+                      <span>Company Name</span>
+                      <input value={form.company_name} onChange={(e) => setForm((prev) => ({ ...prev, company_name: e.target.value }))} />
+                    </label>
+                    <label className="sp-field">
+                      <span>Mobile</span>
+                      <input value={form.mobile} onChange={(e) => setForm((prev) => ({ ...prev, mobile: e.target.value }))} />
+                    </label>
+                    <label className="sp-field">
+                      <span>Email</span>
+                      <input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
+                    </label>
+                    <label className="sp-field">
+                      <span>Resident Landline</span>
+                      <input value={form.resident_landline} onChange={(e) => setForm((prev) => ({ ...prev, resident_landline: e.target.value }))} />
+                    </label>
+                    <label className="sp-field">
+                      <span>Office Landline</span>
+                      <input value={form.office_landline} onChange={(e) => setForm((prev) => ({ ...prev, office_landline: e.target.value }))} />
+                    </label>
+                    <label className="sp-field sp-span-2">
+                      <span>Home Address</span>
+                      <input value={form.address_home} onChange={(e) => setForm((prev) => ({ ...prev, address_home: e.target.value }))} />
+                    </label>
+                    <label className="sp-field sp-span-2">
+                      <span>Office Address</span>
+                      <input value={form.address_office} onChange={(e) => setForm((prev) => ({ ...prev, address_office: e.target.value }))} />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="sp-form-section">
+                  <div className="sp-form-section-title">Registered Members Table</div>
+                  <div className="sp-grid">
+                    <label className="sp-field">
+                      <span>Membership Number</span>
+                      <input value={form.membership_number} onChange={(e) => setForm((prev) => ({ ...prev, membership_number: e.target.value }))} />
+                    </label>
+                    <label className="sp-field">
+                      <span>Role</span>
+                      <select
+                        value={useCustomMainRole ? CREATE_NEW_ROLE_VALUE : (form.role || '')}
+                        onChange={(e) => {
+                          const nextValue = e.target.value;
+                          if (nextValue === CREATE_NEW_ROLE_VALUE) {
+                            setUseCustomMainRole(true);
+                            setForm((prev) => ({ ...prev, role: '' }));
+                            return;
+                          }
+                          setUseCustomMainRole(false);
+                          setForm((prev) => ({ ...prev, role: nextValue }));
+                        }}
+                      >
+                        <option value="">Select role</option>
+                        {trustRoleOptions.map((role) => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                        <option value={CREATE_NEW_ROLE_VALUE}>+ Create New Role</option>
+                      </select>
+                      {useCustomMainRole && (
+                        <input
+                          placeholder="Enter new role"
+                          value={form.role}
+                          onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
+                        />
+                      )}
+                    </label>
+                    <label className="sp-field">
+                      <span>Joined Date</span>
+                      <input type="date" value={form.joined_date} onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))} />
+                    </label>
+                    <label className="sp-field">
+                      <span>Status</span>
+                      <select value={form.is_active ? 'active' : 'inactive'} onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.value === 'active' }))}>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </label>
+                  </div>
                 </div>
 
                 {saveError && <div className="sp-error">{saveError}</div>}
@@ -651,7 +773,15 @@ export default function MembersPage() {
                 <div className="sp-form-actions">
                   <button
                     className="sp-secondary"
-                    onClick={() => { setShowForm(false); setSelectedId(null); setSaveError(''); }}
+                    onClick={() => {
+                      if (isCreateRoute) {
+                        navigate('/member', { state: { userName, trust } });
+                        return;
+                      }
+                      setShowForm(false);
+                      setSelectedId(null);
+                      setSaveError('');
+                    }}
                     type="button"
                   >
                     Close
@@ -665,7 +795,7 @@ export default function MembersPage() {
           )}
         </div>
 
-        {showPicker && (
+        {!isCreateRoute && showPicker && (
           <div className="sp-modal-overlay" onClick={() => setShowPicker(false)}>
             <div className="sp-modal" onClick={(e) => e.stopPropagation()}>
               <div className="sp-modal-head">
@@ -686,6 +816,9 @@ export default function MembersPage() {
                 </button>
               </div>
               <div className="sp-modal-list">
+                {loadingDirectory && (
+                  <div className="sp-modal-empty">Loading members...</div>
+                )}
                 {myDirectoryMembers.length > 0 && (
                   <div className="sp-modal-section my">
                     <div className="sp-modal-section-title">My Members</div>
@@ -756,7 +889,7 @@ export default function MembersPage() {
                   </div>
                 )}
 
-                {filteredDirectoryMembers.length === 0 && (
+                {!loadingDirectory && filteredDirectoryMembers.length === 0 && (
                   <div className="sp-modal-empty">No members found.</div>
                 )}
               </div>
@@ -789,10 +922,32 @@ export default function MembersPage() {
                 </label>
                 <label>
                   <span>Role</span>
-                  <input
-                    value={registerForm.role}
-                    onChange={(e) => setRegisterForm((prev) => ({ ...prev, role: e.target.value }))}
-                  />
+                  <select
+                    value={useCustomRegisterRole ? CREATE_NEW_ROLE_VALUE : (registerForm.role || '')}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      if (nextValue === CREATE_NEW_ROLE_VALUE) {
+                        setUseCustomRegisterRole(true);
+                        setRegisterForm((prev) => ({ ...prev, role: '' }));
+                        return;
+                      }
+                      setUseCustomRegisterRole(false);
+                      setRegisterForm((prev) => ({ ...prev, role: nextValue }));
+                    }}
+                  >
+                    <option value="">Select role</option>
+                    {trustRoleOptions.map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                    <option value={CREATE_NEW_ROLE_VALUE}>+ Create New Role</option>
+                  </select>
+                  {useCustomRegisterRole && (
+                    <input
+                      placeholder="Enter new role"
+                      value={registerForm.role}
+                      onChange={(e) => setRegisterForm((prev) => ({ ...prev, role: e.target.value }))}
+                    />
+                  )}
                 </label>
                 <label>
                   <span>Joined Date</span>

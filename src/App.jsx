@@ -32,7 +32,10 @@ function App() {
           <Route path="/trust-details" element={<TrustDetails />} />
           <Route path="/trustees"     element={<TrusteesPage />} />
           <Route path="/sponsor"      element={<SponsorsPage />} />
+          <Route path="/sponsor/create_sponsor" element={<SponsorsPage />} />
           <Route path="/members"      element={<MembersPage />} />
+          <Route path="/member"       element={<MembersPage />} />
+          <Route path="/member/create_member" element={<MembersPage />} />
           <Route path="/member-profile" element={<MemberProfilePage />} />
           <Route path="/gallery"      element={<GalleryPage />} />
           <Route path="/gallery/:folderId" element={<GalleryPage />} />

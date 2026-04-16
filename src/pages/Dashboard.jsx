@@ -96,6 +96,8 @@ const MODULE_CARDS = [
     label: 'Members',
     description: 'Manage trust members & registrations',
     route: '/members',
+    temporarilyDeactivated: true,
+    deactivationText: 'Temporarily Deactivated',
     gradient: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
     icon: (
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
@@ -645,15 +647,22 @@ export default function Dashboard() {
                 <button
                   key={card.id}
                   id={card.id}
-                  className="module-card"
+                  className={`module-card ${card.temporarilyDeactivated ? 'is-deactivated' : ''}`}
                   style={{
                     background: card.gradient,
                     animationDelay: `${i * 0.08}s`,
                   }}
-                  onClick={() => navigate(card.route, { state: { userName, trust } })}
+                  onClick={() => {
+                    if (card.temporarilyDeactivated) return;
+                    navigate(card.route, { state: { userName, trust } });
+                  }}
                   title={card.label}
+                  aria-disabled={card.temporarilyDeactivated ? 'true' : 'false'}
                 >
                   <div className="module-card-shine" />
+                  {card.temporarilyDeactivated && (
+                    <div className="module-card-deactivated-text">{card.deactivationText || 'Temporarily Deactivated'}</div>
+                  )}
                   <div className="module-icon-wrap">
                     {card.icon}
                   </div>

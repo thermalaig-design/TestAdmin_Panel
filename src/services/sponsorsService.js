@@ -71,3 +71,12 @@ export async function updateSponsorFlash(id, updates) {
 
   return { data, error };
 }
+
+export async function deleteSponsorFlash(id) {
+  const { error } = await supabase
+    .from('sponsor_flash')
+    .delete()
+    .eq('id', id);
+
+  return { error };
+}
