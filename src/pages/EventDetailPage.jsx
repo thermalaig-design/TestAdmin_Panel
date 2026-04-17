@@ -79,20 +79,17 @@ export default function EventDetailPage() {
             <article className="ev-detail-card">
               <div className="ev-card-top">
                 <span className="ev-chip">{event.status}</span>
-                <span className="ev-date">{formatDate(event.event_date)}</span>
+                <span className="ev-date">{formatDate(event.startEventDate)}</span>
               </div>
               <h2 className="ev-detail-title">{event.title}</h2>
               <p className="ev-detail-message">{event.description || 'No description added.'}</p>
               <div className="ev-detail-footer">Location: {event.location || '-'}</div>
               <div className="ev-detail-meta">
+                <div>Start Date: {formatDate(event.startEventDate)}</div>
                 <div>Start Time: {formatTime(event.start_time)}</div>
-                <div>End Time: {formatTime(event.end_time)}</div>
+                <div>End Date: {formatTime(event.endEventDate)}</div>
                 <div>Registration Required: {event.is_registration_required ? 'Yes' : 'No'}</div>
               </div>
-
-              {event.banner_image && (
-                <img className="ev-banner" src={event.banner_image} alt={event.title} />
-              )}
 
               {parsedAttachments.length > 0 && (
                 <div className="ev-attachment-list">

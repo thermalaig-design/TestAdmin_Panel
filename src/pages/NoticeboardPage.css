@@ -31,6 +31,11 @@
   color: #fff;
 }
 
+.nb-list-add-btn {
+  width: 100%;
+  margin-top: 2px;
+}
+
 .nb-secondary-btn {
   background: #e2e8f0;
   color: #0f172a;

@@ -362,6 +362,19 @@ export default function NoticeboardPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const toggleNoticeForm = () => {
+    setShowForm((prev) => {
+      const next = !prev;
+      if (!next) {
+        resetNoticeForm();
+      } else if (!editingNoticeId) {
+        setFormError('');
+        setAttachmentWarning('');
+      }
+      return next;
+    });
+  };
+
   if (!trustId) return null;
   const previewAttachments = (previewNotice?.attachments || [])
     .map((item, index) => parseAttachmentItem(item, index))
@@ -381,26 +394,6 @@ export default function NoticeboardPage() {
           title="Noticeboard"
           subtitle="Data is now fetched and inserted from the noticeboard table"
           onBack={() => navigate('/dashboard', { state: { userName, trust } })}
-          right={
-            <button
-              className="nb-add-btn"
-              onClick={() => {
-                setShowForm((prev) => {
-                  const next = !prev;
-                  if (!next) {
-                    resetNoticeForm();
-                  } else if (!editingNoticeId) {
-                    setFormError('');
-                    setAttachmentWarning('');
-                  }
-                  return next;
-                });
-              }}
-              type="button"
-            >
-              {showForm ? 'Close Form' : 'Add Notice'}
-            </button>
-          }
         />
 
         <section className="nb-content">
@@ -507,7 +500,12 @@ export default function NoticeboardPage() {
           {loading && <div className="nb-empty">Loading notices...</div>}
 
           {!loading && notices.length === 0 && (
-            <div className="nb-empty">No notice found for this trust. Create your first notice.</div>
+            <div className="nb-empty">
+              <button className="nb-add-btn nb-list-add-btn" type="button" onClick={toggleNoticeForm}>
+                {showForm ? 'Close Form' : 'Add Notice'}
+              </button>
+              <div>No notice found for this trust. Create your first notice.</div>
+            </div>
           )}
 
           {!loading && notices.length > 0 && (
@@ -543,6 +541,9 @@ export default function NoticeboardPage() {
                   value={listSearch}
                   onChange={(event) => setListSearch(event.target.value)}
                 />
+                <button className="nb-add-btn nb-list-add-btn" type="button" onClick={toggleNoticeForm}>
+                  {showForm ? 'Close Form' : 'Add Notice'}
+                </button>
 
                 <div className="nb-filter-row">
                   <label className="nb-inline-field">

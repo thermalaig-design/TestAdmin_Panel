@@ -9,12 +9,11 @@ function normalizeRow(row = {}) {
     type: row.type,
     title: row.title || '',
     description: row.description || '',
-    banner_image: row.banner_image || '',
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     location: row.location || '',
-    startEventDate: row.startEventDate || row.event_date || null,
+    startEventDate: row.startEventDate || null,
     start_time: row.start_time || null,
-    endEventDate: row.endEventDate || row.end_time || null,
+    endEventDate: row.endEventDate || null,
     is_registration_required: !!row.is_registration_required,
     status: row.status || 'active',
     created_by: row.created_by || null,
@@ -32,7 +31,8 @@ export async function fetchEventsByTrust(trustId) {
     .select('*')
     .eq('trust_id', trustId)
     .order('startEventDate', { ascending: true })
-    .order('created_at', { ascending: false });
+    .order('endEventDate', { ascending: true })
+    .order('title', { ascending: true });
 
   return { data: (data || []).map(normalizeRow), error };
 }
@@ -57,12 +57,13 @@ export async function createEvent(payload = {}) {
     trust_id: payload.trust_id,
     title: String(payload.title || '').trim(),
     description: String(payload.description || '').trim() || null,
-    banner_image: String(payload.banner_image || '').trim() || null,
     attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
     location: String(payload.location || '').trim() || null,
     startEventDate: payload.startEventDate || null,
     start_time: payload.start_time || null,
     endEventDate: payload.endEventDate || null,
+    type: payload.type || 'general',
+    status: payload.status || 'active',
     is_registration_required: !!payload.is_registration_required,
     created_by: payload.created_by || null,
   };
@@ -83,9 +84,6 @@ export async function updateEvent(eventId, updates = {}, trustId = null) {
     ...(updates.title !== undefined ? { title: String(updates.title || '').trim() } : {}),
     ...(updates.description !== undefined
       ? { description: String(updates.description || '').trim() || null }
-      : {}),
-    ...(updates.banner_image !== undefined
-      ? { banner_image: String(updates.banner_image || '').trim() || null }
       : {}),
     ...(updates.attachments !== undefined
       ? { attachments: Array.isArray(updates.attachments) ? updates.attachments : [] }
