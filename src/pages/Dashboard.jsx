@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Dashboard.css';
+import { fetchTrustDetails } from '../services/authService';
+import Sidebar from '../components/Sidebar';
 
 // ── Export reusable icon renderer component ───────────────────────────────────
 export function FeatureIconRenderer({ icon_url, size = 26, className = '' }) {
@@ -76,6 +78,20 @@ const MODULE_CARDS = [
       <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
         <path d="M16 2L29 9V23L16 30L3 23V9L16 2Z" fill="rgba(255,255,255,0.25)" stroke="white" strokeWidth="1.8" strokeLinejoin="round"/>
         <path d="M16 9L13 17H19L16 23" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'card-logo',
+    label: 'Logo',
+    description: 'Manage app name, subheading and logo',
+    route: '/trustees',
+    gradient: 'linear-gradient(135deg, #7C3AED 0%, #2563EB 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="3" width="18" height="18" rx="3" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.15)" />
+        <circle cx="8.5" cy="8.5" r="1.6" fill="white" />
+        <polyline points="21 15 16 10 5 21" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -229,21 +245,10 @@ const MODULE_CARDS = [
   },
 ];
 
-// ── Nav items ─────────────────────────────────────────────────────────────────
-const navItems = [
-  {
-    id: 'nav-dashboard',
-    label: 'Dashboard',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-        <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-        <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-        <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-      </svg>
-    ),
-  },
-];
+const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control']);
+const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust']);
+const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
+const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-noticeboard', 'card-events']);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const initials = (name = '') =>
@@ -484,24 +489,58 @@ export default function Dashboard() {
   // Data from SelectTrustPage navigation
   const { userName = 'Admin', trust = null } = location.state || {};
   const trustId = trust?.id || null;
-  const trustName = trust?.name || 'No Trust Selected';
+  const [latestTrust, setLatestTrust] = useState(null);
+  const activeTrust = latestTrust?.id === trustId ? latestTrust : trust;
+  const trustName = activeTrust?.name || trust?.name || 'No Trust Selected';
 
-  const [collapsed, setCollapsed] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const userInitials = initials(userName);
   const pageTitle = 'Dashboard';
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
+
+  const scopedModules = useMemo(() => {
+    if (currentSidebarNavKey === 'app-design') {
+      return MODULE_CARDS.filter((card) => APP_DESIGN_CARD_IDS.has(card.id));
+    }
+    if (currentSidebarNavKey === 'company-details') {
+      return MODULE_CARDS.filter((card) => COMPANY_DETAILS_CARD_IDS.has(card.id));
+    }
+    if (currentSidebarNavKey === 'home-page') {
+      return MODULE_CARDS.filter((card) => HOME_PAGE_CARD_IDS.has(card.id));
+    }
+    if (currentSidebarNavKey === 'quick-actions') {
+      return MODULE_CARDS.filter((card) => QUICK_ACTION_CARD_IDS.has(card.id));
+    }
+    return MODULE_CARDS;
+  }, [currentSidebarNavKey]);
+
   const filteredModules = useMemo(() => {
     const query = String(searchTerm || '').trim().toLowerCase();
-    if (!query) return MODULE_CARDS;
+    if (!query) return scopedModules;
 
-    return MODULE_CARDS.filter((card) => {
+    return scopedModules.filter((card) => {
       const label = String(card.label || '').toLowerCase();
       const description = String(card.description || '').toLowerCase();
       return label.includes(query) || description.includes(query);
     });
-  }, [searchTerm]);
+  }, [searchTerm, scopedModules]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!trustId) return undefined;
+
+    (async () => {
+      const { data, error } = await fetchTrustDetails(trustId);
+      if (!mounted || error || !data) return;
+      setLatestTrust(data);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [trustId]);
 
   // If no trust is linked, redirect
   useEffect(() => {
@@ -514,88 +553,20 @@ export default function Dashboard() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className={`dash-root ${collapsed ? 'sidebar-collapsed' : ''}`}>
-
-      {/* ═══════════════════════════════════════════
-          SIDEBAR
-      ═══════════════════════════════════════════ */}
-      <aside className="sidebar">
-
-        {/* Brand / Trust */}
-        <div className="sidebar-brand">
-          <div className="brand-logo">
-            <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-              <path d="M16 2L29 9V23L16 30L3 23V9L16 2Z" fill="url(#lgGrad)" />
-              <path d="M16 8L12 18H20L16 24" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              <defs>
-                <linearGradient id="lgGrad" x1="3" y1="2" x2="29" y2="30" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#6366F1" /><stop offset="1" stopColor="#8B5CF6" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          {!collapsed && (
-            <div className="brand-text">
-              <span className="brand-name" title={trustName}>{trustName}</span>
-              <span className="brand-sub">Admin Panel</span>
-            </div>
-          )}
-        </div>
-
-        {/* Collapse toggle */}
-        <button
-          className="collapse-btn"
-          onClick={() => setCollapsed(p => !p)}
-          title={collapsed ? 'Expand' : 'Collapse'}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-            {collapsed
-              ? <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              : <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            }
-          </svg>
-        </button>
-
-        {!collapsed && <div className="sidebar-section-label">MAIN MENU</div>}
-
-        {/* Nav */}
-        <nav className="sidebar-nav">
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              id={item.id}
-              className="nav-item active"
-              title={collapsed ? item.label : ''}
-              onClick={() => {
-                if (item.id === 'nav-dashboard') {
-                  navigate('/dashboard', { state: { userName, trust } });
-                }
-              }}
-            >
-              <span className="nav-icon-wrap">{item.icon}</span>
-              {!collapsed && <span className="nav-label">{item.label}</span>}
-              {!collapsed && <span className="nav-indicator" />}
-            </button>
-          ))}
-        </nav>
-
-        {/* Logout */}
-        <div className="sidebar-bottom">
-          <button
-            id="logout-btn"
-            className="sidebar-logout"
-            onClick={() => navigate('/login')}
-            title={collapsed ? 'Logout' : ''}
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            {!collapsed && <span>Logout</span>}
-          </button>
-        </div>
-      </aside>
+    <div className="dash-root">
+      <Sidebar
+        trustName={trustName}
+        onDashboard={() =>
+          navigate('/dashboard', {
+            state: {
+              userName,
+              trust: activeTrust,
+              sidebarNavKey: 'dashboard',
+            },
+          })
+        }
+        onLogout={() => navigate('/login')}
+      />
 
       {/* ═══════════════════════════════════════════
           MAIN CONTENT
@@ -651,7 +622,7 @@ export default function Dashboard() {
           <div className="trust-badge-container">
             <div 
               className="trust-badge"
-              onClick={() => navigate('/trust-details', { state: { trustId, trustName: trust?.name } })}
+              onClick={() => navigate('/trust-details', { state: { trustId, trustName: activeTrust?.name } })}
               role="button"
               tabIndex={0}
             >
@@ -664,7 +635,7 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
               </svg>
-              <span className="trust-badge-text">{trust?.name || 'No Trust'}</span>
+              <span className="trust-badge-text">{activeTrust?.name || 'No Trust'}</span>
             </div>
           </div>
 
@@ -688,7 +659,14 @@ export default function Dashboard() {
                   }}
                   onClick={() => {
                     if (card.temporarilyDeactivated) return;
-                    navigate(card.route, { state: { userName, trust } });
+                    navigate(card.route, {
+                      state: {
+                        userName,
+                        trust: activeTrust,
+                        trusteesView: card.id === 'card-logo' ? 'logo' : 'default',
+                        dashboardCardId: card.id,
+                      },
+                    });
                   }}
                   title={card.label}
                   aria-disabled={card.temporarilyDeactivated ? 'true' : 'false'}

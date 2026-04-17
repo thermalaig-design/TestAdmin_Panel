@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 
+const TRUST_COLUMNS = 'id, name, icon_url, remark, created_at, terms_content, privacy_content, template_id, legal_name, superuser_id';
+
 /**
  * Create a new trust
  */
@@ -17,10 +19,9 @@ export async function createTrust(superuserId, { name, legalName, iconUrl, remar
         remark: remark?.trim() || null,
         template_id: templateId,
         superuser_id: superuserId,
-        theme_overrides: {},
       },
     ])
-    .select()
+    .select(TRUST_COLUMNS)
     .single();
 
   return { data, error };
@@ -34,7 +35,7 @@ export async function fetchTrustDetails(trustId) {
 
   const { data, error } = await supabase
     .from('Trust')
-    .select('*')
+    .select(TRUST_COLUMNS)
     .eq('id', trustId)
     .single();
 
@@ -54,7 +55,7 @@ export async function updateTrustContent(trustId, { termsContent, privacyContent
       privacy_content: privacyContent,
     })
     .eq('id', trustId)
-    .select()
+    .select(TRUST_COLUMNS)
     .single();
 
   return { data, error };
@@ -70,7 +71,7 @@ export async function updateTrustInfo(trustId, updates) {
     .from('Trust')
     .update(updates)
     .eq('id', trustId)
-    .select()
+    .select(TRUST_COLUMNS)
     .single();
 
   return { data, error };

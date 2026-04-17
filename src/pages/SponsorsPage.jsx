@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchSponsors,
@@ -42,6 +42,8 @@ const EMPTY_FORM = {
   catalog_url: '',
   badge_label: 'OFFICIAL SPONSOR',
 };
+
+const createEmptyForm = () => ({ ...EMPTY_FORM });
 
 const initials = (value = '') =>
   value.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'S';
@@ -126,10 +128,12 @@ export default function SponsorsPage() {
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
   const trustId = trust?.id || null;
-  const isCreateRoute = location.pathname.startsWith('/sponsor/create_sponsor');
+  const forceCreateFromState = location.state?.sponsorFormMode === 'create';
+  const isCreateRoute = location.pathname.includes('/create_sponsor');
   const isEditRoute =
-    location.pathname.startsWith('/sponsor/edit_sponsor') ||
-    location.pathname.startsWith('/sponsorts/edit_sponsor');
+    location.pathname.includes('/sponsor/edit_sponsor') ||
+    location.pathname.includes('/sponsorts/edit_sponsor');
+  const isCreateMode = isCreateRoute || forceCreateFromState;
   const editSponsorIdFromRouteState = location.state?.editSponsorId || null;
 
   const [sponsors, setSponsors] = useState([]);
@@ -199,6 +203,7 @@ export default function SponsorsPage() {
     () => (selectedId ? sponsorsById.get(selectedId) || null : null),
     [sponsorsById, selectedId]
   );
+  const formMode = isCreateMode ? 'create' : ((isEditRoute || (showForm && !!selectedId)) ? 'edit' : 'create');
 
   const filteredSponsorChoices = useMemo(() => {
     const term = deferredPickerSearch.trim().toLowerCase();
@@ -237,6 +242,22 @@ export default function SponsorsPage() {
   );
 
   const totalSponsorCount = mySponsorCount + otherSponsorCount;
+
+  const ownerScopedSponsors = useMemo(() => {
+    if (ownerFilter === 'my') return visibleSponsors.filter((s) => s.trust_id === trustId);
+    if (ownerFilter === 'others') return visibleSponsors.filter((s) => s.trust_id !== trustId);
+    return visibleSponsors;
+  }, [visibleSponsors, ownerFilter, trustId]);
+
+  const activeSponsorCount = useMemo(
+    () => ownerScopedSponsors.filter((s) => flashActiveBySponsorId[s.id]).length,
+    [ownerScopedSponsors, flashActiveBySponsorId]
+  );
+
+  const inactiveSponsorCount = useMemo(
+    () => ownerScopedSponsors.filter((s) => !flashActiveBySponsorId[s.id]).length,
+    [ownerScopedSponsors, flashActiveBySponsorId]
+  );
 
   const panelSponsors = useMemo(() => {
     const term = deferredListSearch.trim().toLowerCase();
@@ -321,7 +342,19 @@ export default function SponsorsPage() {
     if (trustId) load();
   }, [trustId]);
 
+  useLayoutEffect(() => {
+    if (!isCreateMode) return;
+    setSelectedId(null);
+    setForm(createEmptyForm());
+    setSaveError('');
+    if (!showForm) setShowForm(true);
+  }, [isCreateMode, location.key, showForm]);
+
   useEffect(() => {
+    if (isCreateMode) {
+      setForm(createEmptyForm());
+      return;
+    }
     if (selectedSponsor) {
       const whatsappData = splitWhatsappForForm(selectedSponsor.whatsapp_number);
       setForm({
@@ -354,16 +387,16 @@ export default function SponsorsPage() {
         badge_label: selectedSponsor.badge_label || 'OFFICIAL SPONSOR',
       });
     } else {
-      setForm(EMPTY_FORM);
+      setForm(createEmptyForm());
     }
-  }, [selectedSponsor, flashMap]);
+  }, [selectedSponsor, flashMap, isCreateMode]);
 
   useEffect(() => {
-    if (isCreateRoute || isEditRoute || showForm) return;
+    if (isCreateMode || isEditRoute || showForm) return;
     if (!panelSponsors.length) return;
     const exists = panelSponsors.some((s) => s.id === selectedId);
     if (!exists) setSelectedId(panelSponsors[0].id);
-  }, [panelSponsors, selectedId, isCreateRoute, isEditRoute, showForm]);
+  }, [panelSponsors, selectedId, isCreateMode, isEditRoute, showForm]);
 
   useEffect(() => {
     if (!isEditRoute) return;
@@ -398,11 +431,11 @@ export default function SponsorsPage() {
   ]);
 
   useEffect(() => {
-    if (!isCreateRoute && !isEditRoute && location.pathname.startsWith('/sponsor')) {
+    if (!isCreateMode && !isEditRoute && location.pathname.includes('/sponsor')) {
       setShowForm(false);
       setSaveError('');
     }
-  }, [isCreateRoute, isEditRoute, location.pathname]);
+  }, [isCreateMode, isEditRoute, location.pathname]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -426,7 +459,13 @@ export default function SponsorsPage() {
   };
 
   const startAdd = () => {
-    navigate('/sponsor/create_sponsor', { state: { userName, trust } });
+    setSelectedId(null);
+    setForm(createEmptyForm());
+    setSaveError('');
+    setShowForm(true);
+    navigate('/sponsor/create_sponsor', {
+      state: { userName, trust, sponsorFormMode: 'create', sponsorFormNonce: Date.now() },
+    });
   };
 
   const openEditSponsor = (sponsorId) => {
@@ -546,6 +585,7 @@ export default function SponsorsPage() {
 
   const handleSave = async () => {
     setSaveError('');
+    const isEditMode = formMode === 'edit' && !!selectedId;
     if (!form.name.trim()) {
       setSaveError('Name is required.');
       return;
@@ -554,12 +594,12 @@ export default function SponsorsPage() {
       setSaveError('Company name is required.');
       return;
     }
-    if (selectedId && !canEditSponsorId(selectedId)) {
+    if (isEditMode && !canEditSponsorId(selectedId)) {
       setSaveError('You can only edit sponsors linked to your trust.');
       return;
     }
-    const selectedWhatsappCountry = getWhatsappCountry(form.whatsapp_country);
-    const countryDigits = sanitizeDigits(selectedWhatsappCountry.dialCode, 4);
+    const defaultWhatsappCountry = getWhatsappCountry(DEFAULT_WHATSAPP_COUNTRY);
+    const countryDigits = sanitizeDigits(defaultWhatsappCountry.dialCode, 4);
     const localMaxLength = Math.max(4, 15 - countryDigits.length);
     const whatsappDigits = sanitizeDigits(form.whatsapp_number, localMaxLength);
     const contactNumber2Digits = sanitizeDigits(form.contactNumber2, 15);
@@ -576,7 +616,9 @@ export default function SponsorsPage() {
       company_name: form.company_name.trim(),
       coPartner: form.coPartner.trim() || null,
       trust_id: trustId,
-      ref_no: selectedSponsor?.ref_no ?? (Math.max(0, ...sponsors.map(s => Number(s.ref_no) || 0)) + 1),
+      ref_no: isEditMode
+        ? (selectedSponsor?.ref_no ?? null)
+        : (Math.max(0, ...sponsors.map(s => Number(s.ref_no) || 0)) + 1),
       ContactNumber1: form.ContactNumber1.trim() || null,
       contactNumber2: contactNumber2Digits ? Number(contactNumber2Digits) : null,
       contactNumber3: contactNumber3Digits ? Number(contactNumber3Digits) : null,
@@ -599,7 +641,7 @@ export default function SponsorsPage() {
     };
 
     setSaving(true);
-    if (selectedId) {
+    if (isEditMode) {
       const { data, error: err } = await updateSponsor(selectedId, payload);
       if (err) {
         setSaveError(err.message || 'Unable to update sponsor.');
@@ -617,7 +659,7 @@ export default function SponsorsPage() {
         setSaveError(err.message || 'Unable to create sponsor.');
       } else if (data) {
         setSponsors(prev => [data, ...prev]);
-        if (isCreateRoute) {
+        if (isCreateMode) {
           navigate('/sponsor', { state: { userName, trust } });
         } else {
           setSelectedId(data.id);
@@ -643,7 +685,7 @@ export default function SponsorsPage() {
           title="Sponsors"
           subtitle="Manage sponsor profiles and details"
           onBack={() => {
-            if (isCreateRoute || isEditRoute) {
+            if (isCreateMode || isEditRoute) {
               setShowForm(false);
               setSaveError('');
               navigate('/sponsor', { state: { userName, trust } });
@@ -656,8 +698,8 @@ export default function SponsorsPage() {
 
         {error && <div className="sp-error">{error}</div>}
 
-        <div className={`sp-content ${isCreateRoute || isEditRoute || showForm ? 'form-only' : ''}`}>
-          {!isCreateRoute && !isEditRoute && !showForm && (
+        <div className={`sp-content ${isCreateMode || isEditRoute || showForm ? 'form-only' : ''}`}>
+          {!isCreateMode && !isEditRoute && !showForm && (
             <section className="sp-profile-layout">
               <aside className="sp-left-panel">
                 <div className="sp-left-head">
@@ -684,15 +726,32 @@ export default function SponsorsPage() {
                   </button>
                 </div>
 
-                <div className="sp-filter-row">
-                  <label className="sp-inline-field">
-                    <span>Role</span>
-                    <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                      <option value="all">All</option>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </label>
+                <div className="sp-filter-head">Role</div>
+                <div className="sp-role-tabs">
+                  <button
+                    type="button"
+                    className={`sp-role-tab ${statusFilter === 'all' ? 'active all' : ''}`}
+                    onClick={() => setStatusFilter('all')}
+                  >
+                    <span>All</span>
+                    <b>{ownerScopedSponsors.length}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className={`sp-role-tab ${statusFilter === 'active' ? 'active active' : ''}`}
+                    onClick={() => setStatusFilter('active')}
+                  >
+                    <span>Active</span>
+                    <b>{activeSponsorCount}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className={`sp-role-tab ${statusFilter === 'inactive' ? 'active inactive' : ''}`}
+                    onClick={() => setStatusFilter('inactive')}
+                  >
+                    <span>Inactive</span>
+                    <b>{inactiveSponsorCount}</b>
+                  </button>
                 </div>
 
                 <input
@@ -843,11 +902,11 @@ export default function SponsorsPage() {
             </section>
           )}
 
-          {(isCreateRoute || isEditRoute || showForm) && (
+          {(isCreateMode || isEditRoute || showForm) && (
             <section className="sp-form">
               <div className="sp-form-card">
               <div className="sp-form-title">
-                {selectedId ? 'Edit Sponsor' : 'Add Sponsor'}
+                {formMode === 'edit' ? 'Edit Sponsor' : 'Add Sponsor'}
               </div>
 
               <div className="sp-grid">
@@ -961,32 +1020,15 @@ export default function SponsorsPage() {
                 <label className="sp-field">
                   <span>WhatsApp No</span>
                   <div className="sp-whatsapp-row">
-                    <select
-                      value={form.whatsapp_country}
-                      onChange={(e) => setForm((p) => ({ ...p, whatsapp_country: e.target.value }))}
-                    >
-                      {WHATSAPP_COUNTRIES.map((country) => (
-                        <option key={country.value} value={country.value}>
-                          {country.dialCode} {country.label}
-                        </option>
-                      ))}
-                    </select>
                     <input
                       type="tel"
                       inputMode="numeric"
                       autoComplete="tel-national"
                       pattern="[0-9]*"
-                      maxLength={Math.max(4, 15 - sanitizeDigits(getWhatsappCountry(form.whatsapp_country).dialCode, 4).length)}
+                      maxLength={13}
                       placeholder="WhatsApp number"
                       value={form.whatsapp_number}
-                      onChange={(e) =>
-                        setForm((p) => {
-                          const country = getWhatsappCountry(p.whatsapp_country);
-                          const countryDigits = sanitizeDigits(country.dialCode, 4);
-                          const localMax = Math.max(4, 15 - countryDigits.length);
-                          return { ...p, whatsapp_number: sanitizeDigits(e.target.value, localMax) };
-                        })
-                      }
+                      onChange={(e) => setForm((p) => ({ ...p, whatsapp_number: sanitizeDigits(e.target.value, 13) }))}
                       onKeyDown={(e) => {
                         if (['e', 'E', '+', '-', '.'].includes(e.key)) {
                           e.preventDefault();
@@ -1031,7 +1073,7 @@ export default function SponsorsPage() {
                 <button
                   className="sp-secondary"
                   onClick={() => {
-                    if (isCreateRoute || isEditRoute) {
+                    if (isCreateMode || isEditRoute) {
                       navigate('/sponsor', { state: { userName, trust } });
                       return;
                     }

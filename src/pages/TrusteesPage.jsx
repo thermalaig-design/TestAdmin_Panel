@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchTrustDetails, updateTrustDetails } from '../services/authService';
+import Sidebar from '../components/Sidebar';
 import './TrusteesPage.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -146,6 +147,8 @@ export default function TrusteesPage() {
 
   const { userName = 'Admin', trust: trustFromState = null } = location.state || {};
   const trustId = trustFromState?.id || null;
+  const isLogoCardView =
+    location.state?.trusteesView === 'logo' || location.state?.dashboardCardId === 'card-logo';
 
   // Redirect safety
   useEffect(() => {
@@ -154,7 +157,6 @@ export default function TrusteesPage() {
 
   if (!trustId) return null;
 
-  const [collapsed,     setCollapsed]     = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [trust,         setTrust]         = useState(null);
   const [loading,       setLoading]       = useState(true);
@@ -275,82 +277,12 @@ export default function TrusteesPage() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className={`tp-root ${collapsed ? 'sidebar-collapsed' : ''}`}>
-
-      {/* ═════════════ SIDEBAR ═════════════ */}
-      <aside className="sidebar">
-
-        <div className="sidebar-brand">
-          <div className="brand-logo">
-            <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-              <path d="M16 2L29 9V23L16 30L3 23V9L16 2Z" fill="url(#tpGrad)"/>
-              <path d="M16 8L12 18H20L16 24" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              <defs>
-                <linearGradient id="tpGrad" x1="3" y1="2" x2="29" y2="30" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#6366F1"/><stop offset="1" stopColor="#8B5CF6"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          {!collapsed && (
-            <div className="brand-text">
-              <span className="brand-name" title={trustName}>{trustName}</span>
-              <span className="brand-sub">Admin Panel</span>
-            </div>
-          )}
-        </div>
-
-        <button
-          className="collapse-btn"
-          onClick={() => setCollapsed(p => !p)}
-          title={collapsed ? 'Expand' : 'Collapse'}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-            {collapsed
-              ? <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              : <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-            }
-          </svg>
-        </button>
-
-        {!collapsed && <div className="sidebar-section-label">NAVIGATION</div>}
-
-        <nav className="sidebar-nav">
-          {/* Dashboard */}
-          <button
-            className="nav-item active"
-            onClick={() => navigate('/dashboard', { state: { userName, trust: trustFromState } })}
-            title={collapsed ? 'Dashboard' : ''}
-          >
-            <span className="nav-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-                <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-                <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-                <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-              </svg>
-            </span>
-            {!collapsed && <span className="nav-label">Dashboard</span>}
-            {!collapsed && <span className="nav-indicator"/>}
-          </button>
-        </nav>
-
-        <div className="sidebar-bottom">
-          <button
-            id="logout-btn"
-            className="sidebar-logout"
-            onClick={() => navigate('/login')}
-            title={collapsed ? 'Logout' : ''}
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            {!collapsed && <span>Logout</span>}
-          </button>
-        </div>
-      </aside>
+    <div className="tp-root">
+      <Sidebar
+        trustName={trustName}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust: trust || trustFromState } })}
+        onLogout={() => navigate('/login')}
+      />
 
       {/* ═════════════ MAIN ═════════════ */}
       <main className="dash-main">
@@ -360,7 +292,7 @@ export default function TrusteesPage() {
           <div className="topbar-left">
             <button
               className="tp-back-btn"
-              onClick={() => navigate('/dashboard', { state: { userName, trust: trustFromState } })}
+              onClick={() => navigate('/dashboard', { state: { userName, trust: trust || trustFromState } })}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -459,6 +391,7 @@ export default function TrusteesPage() {
 
               {/* ── INFO GRID ── */}
               <div className="tp-info-grid">
+                {isLogoCardView && (
                 <section className="tp-info-group">
                   <div className="tp-info-group-head">
                     <h3>App Design</h3>
@@ -623,7 +556,8 @@ export default function TrusteesPage() {
                     </div>
                   </div>
                 </section>
-
+                )}
+                {!isLogoCardView && (
                 <section className="tp-info-group">
                   <div className="tp-info-group-head">
                     <h3>Company Details</h3>
@@ -672,6 +606,7 @@ export default function TrusteesPage() {
                     </div>
                   </div>
                 </section>
+                )}
 
                 {saveError && (
                   <div className="tp-save-error">{saveError}</div>
@@ -679,6 +614,7 @@ export default function TrusteesPage() {
               </div>
 
               {/* ── CONTENT SECTIONS (Terms & Privacy) ── */}
+              {!isLogoCardView && (
               <div className="tp-sections-wrap">
                 <ContentSection
                   title="Terms & Conditions"
@@ -725,6 +661,7 @@ export default function TrusteesPage() {
                   }
                 />
               </div>
+              )}
             </>
           )}
 

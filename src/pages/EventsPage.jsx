@@ -40,13 +40,21 @@ function getTimeSortValue(value) {
   return raw;
 }
 
+function isImageAttachment(item = {}) {
+  const value = String(item?.value || '').toLowerCase();
+  const name = String(item?.name || '').toLowerCase();
+  if (value.startsWith('data:image/')) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/.test(name);
+}
+
 function buildAttachmentMeta(rawItems = []) {
   const parsed = (rawItems || [])
     .map((item, index) => parseAttachmentItem(item, index))
     .filter(Boolean);
+  const firstImageUrl = parsed.find(isImageAttachment)?.value || '';
   return {
     count: parsed.length,
-    firstName: parsed[0]?.name || '-',
+    firstImageUrl,
   };
 }
 
@@ -758,7 +766,20 @@ export default function EventsPage() {
                           </div>
                           <div className="ev-profile-detail-grid">
                             <div><span>Total Attachments</span><strong>{attachmentMeta.count}</strong></div>
-                            <div><span>First Attachment</span><strong>{attachmentMeta.firstName}</strong></div>
+                            <div className="ev-detail-span-2">
+                              <span>Image Preview</span>
+                              {attachmentMeta.firstImageUrl ? (
+                                <div className="ev-attachment-preview">
+                                  <img
+                                    src={attachmentMeta.firstImageUrl}
+                                    alt={selectedEvent.title || 'Event attachment preview'}
+                                    className="ev-attachment-preview-thumb"
+                                  />
+                                </div>
+                              ) : (
+                                <strong>-</strong>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );

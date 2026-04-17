@@ -147,32 +147,64 @@ export default function GalleryPage() {
     return photos.filter((p) => p.folderId === selectedFolderId);
   }, [photos, selectedFolderId]);
 
-  const handleFile = (file) => {
-    if (!file) return;
+  const readFileAsDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Unable to read selected image.'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
     if (!selectedFolderId) {
       setError('Please select a folder before uploading.');
       return;
     }
-    if (!file.type || !file.type.startsWith('image/')) {
+
+    const imageFiles = files.filter((file) => file?.type && file.type.startsWith('image/'));
+    if (!imageFiles.length) {
       setError('Please select a valid image file.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const imageUrl = reader.result;
-      setUploading(true);
-      const { data, error: createErr } = await createGalleryPhoto({
-        imageUrl,
-        folderId: selectedFolderId,
-      });
-      if (createErr) {
-        setError(createErr.message || 'Unable to upload photo.');
-      } else if (data) {
-        setPhotos((prev) => [data, ...prev]);
+
+    setUploading(true);
+    setError('');
+
+    const uploaded = [];
+    let failed = 0;
+
+    for (const file of imageFiles) {
+      try {
+        const imageUrl = await readFileAsDataUrl(file);
+        const { data, error: createErr } = await createGalleryPhoto({
+          imageUrl,
+          folderId: selectedFolderId,
+        });
+        if (createErr) {
+          failed += 1;
+        } else if (data) {
+          uploaded.push(data);
+        }
+      } catch {
+        failed += 1;
       }
-      setUploading(false);
-    };
-    reader.readAsDataURL(file);
+    }
+
+    if (uploaded.length > 0) {
+      setPhotos((prev) => [...uploaded, ...prev]);
+    }
+
+    if (failed > 0) {
+      setError(`Uploaded ${uploaded.length}/${imageFiles.length} image(s). ${failed} failed.`);
+    } else if (files.length !== imageFiles.length) {
+      setError(`Uploaded ${uploaded.length} image(s). Non-image files were skipped.`);
+    } else {
+      setError('');
+    }
+
+    setUploading(false);
   };
 
   const handleAddFolder = async () => {
@@ -519,17 +551,21 @@ export default function GalleryPage() {
                       className={`gallery-drop ${dragOver ? 'drag' : ''}`}
                       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                       onDragLeave={() => setDragOver(false)}
-                      onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+                      onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
                     >
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => handleFile(e.target.files?.[0])}
+                        multiple
+                        onChange={(e) => {
+                          handleFiles(e.target.files);
+                          e.target.value = '';
+                        }}
                         disabled={uploading}
                       />
                       <div className="gallery-drop-inner">
-                        <span>{uploading ? 'Uploading...' : 'Drag & drop image here'}</span>
-                        <span className="gallery-drop-sub">or click to upload</span>
+                        <span>{uploading ? 'Uploading...' : 'Drag & drop images here'}</span>
+                        <span className="gallery-drop-sub">or click to upload multiple images</span>
                       </div>
                     </label>
                     <div className="gallery-upload-note">
