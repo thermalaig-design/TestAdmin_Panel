@@ -14,6 +14,10 @@ const MembersPage = lazy(() => import('./pages/MembersPage'));
 const MemberProfilePage = lazy(() => import('./pages/MemberProfilePage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const MarqueePage = lazy(() => import('./pages/MarqueePage'));
+const NoticeboardPage = lazy(() => import('./pages/NoticeboardPage'));
+const NoticeDetailPage = lazy(() => import('./pages/NoticeDetailPage'));
+const EventsPage = lazy(() => import('./pages/EventsPage'));
+const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const ThemePage = lazy(() => import('./pages/ThemePage'));
 const FeatureControlPage = lazy(() => import('./pages/FeatureControlPage'));
 const SubFeatureControlPage = lazy(() => import('./pages/SubFeatureControlPage'));
@@ -33,6 +37,8 @@ function App() {
           <Route path="/trustees"     element={<TrusteesPage />} />
           <Route path="/sponsor"      element={<SponsorsPage />} />
           <Route path="/sponsor/create_sponsor" element={<SponsorsPage />} />
+          <Route path="/sponsor/edit_sponsor" element={<SponsorsPage />} />
+          <Route path="/sponsorts/edit_sponsor" element={<SponsorsPage />} />
           <Route path="/members"      element={<MembersPage />} />
           <Route path="/member"       element={<MembersPage />} />
           <Route path="/member/create_member" element={<MembersPage />} />
@@ -40,6 +46,10 @@ function App() {
           <Route path="/gallery"      element={<GalleryPage />} />
           <Route path="/gallery/:folderId" element={<GalleryPage />} />
           <Route path="/marquee"      element={<MarqueePage />} />
+          <Route path="/noticeboard"  element={<NoticeboardPage />} />
+          <Route path="/noticeboard/:noticeId" element={<NoticeDetailPage />} />
+          <Route path="/events"       element={<EventsPage />} />
+          <Route path="/events/:eventId" element={<EventDetailPage />} />
           <Route path="/theme"        element={<ThemePage />} />
           <Route path="/feature-control" element={<FeatureControlPage />} />
           <Route path="/sub-feature-control" element={<SubFeatureControlPage />} />

@@ -458,10 +458,15 @@ export default function TrusteesPage() {
               </div>
 
               {/* ── INFO GRID ── */}
-                            <div className="tp-info-grid">
-
-                {/* App Name */}
-                <div className="tp-info-card tp-info-card-remark">
+              <div className="tp-info-grid">
+                <section className="tp-info-group">
+                  <div className="tp-info-group-head">
+                    <h3>App Design</h3>
+                    <p>App name, subheading and logo/icon settings</p>
+                  </div>
+                  <div className="tp-info-group-cards">
+                    {/* App Name */}
+                    <div className="tp-info-card tp-info-card-remark">
                   <div className="tp-info-icon" style={{ background: '#EEF2FF', color: '#6366F1' }}>
                     <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
                       <path d="M16 2L29 9V23L16 30L3 23V9L16 2Z" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round"/>
@@ -497,51 +502,10 @@ export default function TrusteesPage() {
                       </div>
                     )}
                   </div>
-                </div>
+                    </div>
 
-                {/* Legal Name */}
-                <div className="tp-info-card tp-info-card-legal">
-                  <div className="tp-info-icon" style={{ background: '#FDF4FF', color: '#9333EA' }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                      <line x1="8" y1="17" x2="14" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                  <div className="tp-info-body">
-                    <span className="tp-info-label">Legal Name</span>
-                    {!editMode.legal ? (
-                      <span className="tp-info-value tp-legal-value">{trust.legal_name || '—'}</span>
-                    ) : (
-                      <input
-                        className="tp-edit-input"
-                        value={draft.legal_name}
-                        onChange={e => setDraft(p => ({ ...p, legal_name: e.target.value }))}
-                        placeholder="Enter legal name"
-                      />
-                    )}
-                  </div>
-                  <div className="tp-info-actions">
-                    {!editMode.legal ? (
-                      <button className="tp-edit-btn" onClick={() => startEdit('legal')}>Edit</button>
-                    ) : (
-                      <div className="tp-edit-actions">
-                        <button className="tp-edit-btn ghost" onClick={cancelEdit}>Cancel</button>
-                        <button
-                          className="tp-edit-btn primary"
-                          onClick={() => saveField('legal')}
-                          disabled={savingField === 'legal'}
-                        >
-                          {savingField === 'legal' ? 'Saving...' : 'Save'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Subheading / Remark */}
-                <div className="tp-info-card">
+                    {/* Subheading / Remark */}
+                    <div className="tp-info-card">
                   <div className="tp-info-icon" style={{ background: '#ECFDF5', color: '#059669' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                       <line x1="17" y1="10" x2="3" y2="10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
@@ -580,10 +544,10 @@ export default function TrusteesPage() {
                       </div>
                     )}
                   </div>
-                </div>
+                    </div>
 
-                {/* Icon */}
-                <div className="tp-info-card">
+                    {/* Icon */}
+                    <div className="tp-info-card">
                   <div className="tp-info-icon" style={{ background: '#FFF7ED', color: '#EA580C' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                       <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.8"/>
@@ -656,7 +620,58 @@ export default function TrusteesPage() {
                       </div>
                     )}
                   </div>
-                </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="tp-info-group">
+                  <div className="tp-info-group-head">
+                    <h3>Company Details</h3>
+                    <p>Manage legal and business related details</p>
+                  </div>
+                  <div className="tp-info-group-cards">
+                    {/* Legal Name */}
+                    <div className="tp-info-card tp-info-card-legal">
+                      <div className="tp-info-icon" style={{ background: '#FDF4FF', color: '#9333EA' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                          <line x1="8" y1="17" x2="14" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <div className="tp-info-body">
+                        <span className="tp-info-label">Legal Name</span>
+                        {!editMode.legal ? (
+                          <span className="tp-info-value tp-legal-value">{trust.legal_name || '—'}</span>
+                        ) : (
+                          <input
+                            className="tp-edit-input"
+                            value={draft.legal_name}
+                            onChange={e => setDraft(p => ({ ...p, legal_name: e.target.value }))}
+                            placeholder="Enter legal name"
+                          />
+                        )}
+                      </div>
+                      <div className="tp-info-actions">
+                        {!editMode.legal ? (
+                          <button className="tp-edit-btn" onClick={() => startEdit('legal')}>Edit</button>
+                        ) : (
+                          <div className="tp-edit-actions">
+                            <button className="tp-edit-btn ghost" onClick={cancelEdit}>Cancel</button>
+                            <button
+                              className="tp-edit-btn primary"
+                              onClick={() => saveField('legal')}
+                              disabled={savingField === 'legal'}
+                            >
+                              {savingField === 'legal' ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
 
                 {saveError && (
                   <div className="tp-save-error">{saveError}</div>

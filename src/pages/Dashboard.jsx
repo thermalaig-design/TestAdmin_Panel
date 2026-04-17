@@ -137,6 +137,40 @@ const MODULE_CARDS = [
     ),
   },
   {
+    id: 'card-noticeboard',
+    label: 'Noticeboard',
+    description: 'View notices and open individual updates',
+    route: '/noticeboard',
+    gradient: 'linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="4" y="5" width="16" height="12" rx="2" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.16)" />
+        <line x1="8" y1="9" x2="16" y2="9" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="8" y1="12" x2="14" y2="12" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="10" y1="17" x2="10" y2="20" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="14" y1="17" x2="14" y2="20" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'card-events',
+    label: 'Events',
+    description: 'Manage event updates and detail pages',
+    route: '/events',
+    gradient: 'linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="4" width="18" height="17" rx="2.5" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.16)" />
+        <line x1="3" y1="9" x2="21" y2="9" stroke="white" strokeWidth="1.8" />
+        <line x1="8" y1="2.5" x2="8" y2="6" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="16" y1="2.5" x2="16" y2="6" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="8" cy="14" r="1.4" fill="white" />
+        <circle cx="12" cy="14" r="1.4" fill="white" />
+        <circle cx="16" cy="14" r="1.4" fill="white" />
+      </svg>
+    ),
+  },
+  {
     id: 'card-theme',
     label: 'Theme',
     description: 'Preview and manage visual themes',

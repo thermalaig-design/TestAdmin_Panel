@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
@@ -29,6 +29,11 @@ export default function GalleryPage() {
   const [uploading, setUploading] = useState(false);
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [activeFolderMenuId, setActiveFolderMenuId] = useState(null);
+  const [folderSearch, setFolderSearch] = useState('');
+  const [folderSort, setFolderSort] = useState('name_asc');
+  const [folderPage, setFolderPage] = useState(1);
+  const deferredFolderSearch = useDeferredValue(folderSearch);
+  const FOLDER_PAGE_SIZE = 8;
 
   useEffect(() => {
     if (!trustId) navigate('/dashboard', { replace: true, state: { userName, trust } });
@@ -52,13 +57,16 @@ export default function GalleryPage() {
       const hasRouteFolder = trustFolders.some((folder) => String(folder.id) === String(routeFolderId));
       if (hasRouteFolder) {
         setSelectedFolderId(routeFolderId);
-      } else if (!selectedFolderId && trustFolders[0]?.id) {
-        setSelectedFolderId(trustFolders[0].id);
+      } else {
+        setSelectedFolderId((prev) => {
+          if (prev && trustFolders.some((folder) => String(folder.id) === String(prev))) return prev;
+          return trustFolders[0]?.id || '';
+        });
       }
       setLoading(false);
     };
     load();
-  }, [trustId, routeFolderId, selectedFolderId]);
+  }, [trustId, routeFolderId]);
 
   useEffect(() => {
     if (routeFolderId) {
@@ -97,6 +105,42 @@ export default function GalleryPage() {
   );
 
   const showFolderDetail = Boolean(routeFolderId && selectedFolder);
+
+  const handleHeaderBack = () => {
+    if (routeFolderId) {
+      navigate('/gallery', { state: { userName, trust } });
+      return;
+    }
+    navigate('/dashboard', { state: { userName, trust } });
+  };
+
+  const filteredFolders = useMemo(() => {
+    const term = deferredFolderSearch.trim().toLowerCase();
+    let list = folders;
+    if (term) {
+      list = list.filter((folder) => String(folder.name || '').toLowerCase().includes(term));
+    }
+    const sorted = [...list].sort((left, right) =>
+      String(left.name || '').localeCompare(String(right.name || ''))
+    );
+    if (folderSort === 'name_desc') sorted.reverse();
+    return sorted;
+  }, [folders, deferredFolderSearch, folderSort]);
+
+  const folderTotalPages = Math.max(1, Math.ceil(filteredFolders.length / FOLDER_PAGE_SIZE));
+
+  const paginatedFolders = useMemo(() => {
+    const start = (folderPage - 1) * FOLDER_PAGE_SIZE;
+    return filteredFolders.slice(start, start + FOLDER_PAGE_SIZE);
+  }, [filteredFolders, folderPage]);
+
+  useEffect(() => {
+    setFolderPage(1);
+  }, [folderSearch, folderSort]);
+
+  useEffect(() => {
+    if (folderPage > folderTotalPages) setFolderPage(folderTotalPages);
+  }, [folderPage, folderTotalPages]);
 
   const filteredPhotos = useMemo(() => {
     if (!selectedFolderId) return [];
@@ -245,7 +289,7 @@ export default function GalleryPage() {
         <PageHeader
           title="Gallery"
           subtitle="Upload and manage photo albums"
-          onBack={() => navigate('/dashboard', { state: { userName, trust } })}
+          onBack={handleHeaderBack}
         />
         <div className="gallery-content">
           {error && <div className="gallery-error">{error}</div>}
@@ -287,17 +331,41 @@ export default function GalleryPage() {
                     </div>
                     <button className="gallery-add-folder" onClick={handleAddFolder} title="Create folder">+ New</button>
                   </div>
+                  <div className="gallery-folder-controls">
+                    <input
+                      type="search"
+                      className="gallery-folder-search"
+                      placeholder="Search folder..."
+                      value={folderSearch}
+                      onChange={(e) => setFolderSearch(e.target.value)}
+                    />
+                    <label className="gallery-folder-sort">
+                      <span>Sort By</span>
+                      <select
+                        value={folderSort}
+                        onChange={(e) => setFolderSort(e.target.value)}
+                      >
+                        <option value="name_asc">Folder Name A-Z</option>
+                        <option value="name_desc">Folder Name Z-A</option>
+                      </select>
+                    </label>
+                  </div>
                   {folders.length === 0 ? (
                     <div className="gallery-empty">
                       No gallery folders are available for this trust. Click `+ New` to create one.
                     </div>
+                  ) : filteredFolders.length === 0 ? (
+                    <div className="gallery-empty">
+                      No folder found for "{folderSearch}".
+                    </div>
                   ) : (
+                    <>
                     <div className="gallery-folder-list">
-                      {folders.map((folder, index) => (
+                      {paginatedFolders.map((folder, index) => (
                         <div
                           key={folder.id || folder.name}
                           className={`gallery-folder-item ${selectedFolderId === folder.id ? 'active' : ''}`}
-                          style={{ ['--accent']: `var(--folder-${(index % 6) + 1})` }}
+                          style={{ ['--accent']: `var(--folder-${(((folderPage - 1) * FOLDER_PAGE_SIZE + index) % 6) + 1})` }}
                         >
                           <div className="gallery-folder-menu-wrap">
                             <button
@@ -366,6 +434,26 @@ export default function GalleryPage() {
                         </div>
                       ))}
                     </div>
+                    {filteredFolders.length > FOLDER_PAGE_SIZE && (
+                      <div className="gallery-folder-pagination">
+                        <button
+                          type="button"
+                          onClick={() => setFolderPage((prev) => Math.max(1, prev - 1))}
+                          disabled={folderPage === 1}
+                        >
+                          Prev
+                        </button>
+                        <span>Page {folderPage} / {folderTotalPages}</span>
+                        <button
+                          type="button"
+                          onClick={() => setFolderPage((prev) => Math.min(folderTotalPages, prev + 1))}
+                          disabled={folderPage === folderTotalPages}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                    </>
                   )}
                 </section>
               </>

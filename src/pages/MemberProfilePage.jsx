@@ -522,6 +522,10 @@ export default function MemberProfilePage() {
     if (selectedExists) return selectedMemberId;
     return sortedVisibleMembers[0]?.member_id || '';
   }, [sortedVisibleMembers, selectedMemberId]);
+  const selectedMemberRecord = useMemo(
+    () => members.find((member) => String(member.member_id) === String(effectiveSelectedMemberId)) || null,
+    [members, effectiveSelectedMemberId]
+  );
   const filteredDirectoryMembers = useMemo(() => {
     return directoryMembers
       .filter((member) => !registeredMemberIds.has(String(member.member_id || '')))
@@ -614,6 +618,7 @@ export default function MemberProfilePage() {
   }, [effectiveSelectedMemberId]);
 
   const canEditProfile = profile?.is_editable === true;
+  const canEditFamily = canEditProfile || String(selectedMemberRecord?.member_type || '').toLowerCase() === 'my';
   const canEditDetails = true;
   const isFieldEditable = (key) => {
     if (!isEditing) return false;
@@ -744,14 +749,14 @@ export default function MemberProfilePage() {
   };
 
   const handleStartFamilyAdd = () => {
-    if (!canEditProfile) return;
+    if (!canEditFamily) return;
     setFamilyError('');
     setFamilyForm(buildFamilyForm());
     setIsFamilyEditing(true);
   };
 
   const handleStartFamilyEdit = (member) => {
-    if (!canEditProfile) return;
+    if (!canEditFamily) return;
     setFamilyError('');
     setFamilyForm(buildFamilyForm(member));
     setIsFamilyEditing(true);
@@ -764,7 +769,7 @@ export default function MemberProfilePage() {
   };
 
   const handleSaveFamilyMember = async () => {
-    if (!canEditProfile) return;
+    if (!canEditFamily) return;
     if (!effectiveSelectedMemberId) return;
     if (!familyForm.name.trim()) {
       setFamilyError('Family member name is required.');
@@ -811,7 +816,7 @@ export default function MemberProfilePage() {
   };
 
   const handleDeleteFamilyMember = async (familyMemberId) => {
-    if (!canEditProfile) return;
+    if (!canEditFamily) return;
     if (!familyMemberId) return;
     const ok = window.confirm('Delete this family member?');
     if (!ok) return;
@@ -1302,7 +1307,7 @@ export default function MemberProfilePage() {
                     <div className="mp-card mp-single-form-card">
                       <div className="mp-detail-head">
                         <h3>Family Members</h3>
-                        {canEditProfile && !isFamilyEditing && (
+                        {canEditFamily && !isFamilyEditing && (
                           <button type="button" className="mp-action-btn mp-action-btn-edit" onClick={handleStartFamilyAdd}>
                             Add Family Member
                           </button>
@@ -1330,7 +1335,7 @@ export default function MemberProfilePage() {
                                 {item.contact_no || '-'} {item.email ? `| ${item.email}` : ''}
                               </div>
                               {item.address && <div className="mp-family-sub">{item.address}</div>}
-                              {canEditProfile && (
+                              {canEditFamily && (
                                 <div className="mp-family-actions">
                                   <button type="button" className="mp-page-btn" onClick={() => handleStartFamilyEdit(item)}>
                                     Edit
@@ -1345,7 +1350,7 @@ export default function MemberProfilePage() {
                         </div>
                       )}
 
-                      {canEditProfile && isFamilyEditing && (
+                      {canEditFamily && isFamilyEditing && (
                         <div className="mp-family-form">
                           <div className="mp-family-form-head">
                             <h4>{familyForm.id ? 'Edit Family Member' : 'Add Family Member'}</h4>

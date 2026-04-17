@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchSponsors,
@@ -16,15 +16,28 @@ import './SponsorsPage.css';
 const EMPTY_FORM = {
   name: '',
   position: '',
+  position2: '',
   about: '',
   photo_url: '',
   company_name: '',
-  phone: '',
-  email_id: '',
+  coPartner: '',
+  ContactNumber1: '',
+  contactNumber2: '',
+  contactNumber3: '',
+  email_id1: '',
+  emailId2: '',
+  emailId3: '',
   address: '',
+  address2: '',
+  address3: '',
   city: '',
   state: '',
+  whatsapp_country: 'IN',
   whatsapp_number: '',
+  facebook: '',
+  instagram: '',
+  X: '',
+  linkedin: '',
   website_url: '',
   catalog_url: '',
   badge_label: 'OFFICIAL SPONSOR',
@@ -32,6 +45,65 @@ const EMPTY_FORM = {
 
 const initials = (value = '') =>
   value.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'S';
+
+const sanitizeDigits = (value, maxLength = 15) =>
+  String(value || '').replace(/\D/g, '').slice(0, maxLength);
+
+const WHATSAPP_COUNTRIES = [
+  { value: 'IN', label: 'India', dialCode: '+91' },
+  { value: 'AE', label: 'UAE', dialCode: '+971' },
+  { value: 'US', label: 'United States', dialCode: '+1' },
+  { value: 'GB', label: 'United Kingdom', dialCode: '+44' },
+  { value: 'CA', label: 'Canada', dialCode: '+1' },
+  { value: 'AU', label: 'Australia', dialCode: '+61' },
+  { value: 'SG', label: 'Singapore', dialCode: '+65' },
+  { value: 'SA', label: 'Saudi Arabia', dialCode: '+966' },
+  { value: 'QA', label: 'Qatar', dialCode: '+974' },
+  { value: 'KW', label: 'Kuwait', dialCode: '+965' },
+];
+
+const DEFAULT_WHATSAPP_COUNTRY = 'IN';
+
+function getWhatsappCountry(value) {
+  return (
+    WHATSAPP_COUNTRIES.find((country) => country.value === value) ||
+    WHATSAPP_COUNTRIES.find((country) => country.value === DEFAULT_WHATSAPP_COUNTRY) ||
+    WHATSAPP_COUNTRIES[0]
+  );
+}
+
+function splitWhatsappForForm(rawValue) {
+  const digits = sanitizeDigits(rawValue, 15);
+  if (!digits) return { country: DEFAULT_WHATSAPP_COUNTRY, local: '' };
+
+  const matchedCountry = [...WHATSAPP_COUNTRIES]
+    .map((country) => ({ ...country, dialDigits: sanitizeDigits(country.dialCode, 4) }))
+    .sort((a, b) => b.dialDigits.length - a.dialDigits.length)
+    .find((country) => digits.startsWith(country.dialDigits));
+
+  if (!matchedCountry) {
+    return { country: DEFAULT_WHATSAPP_COUNTRY, local: digits };
+  }
+
+  return {
+    country: matchedCountry.value,
+    local: digits.slice(matchedCountry.dialDigits.length),
+  };
+}
+
+function formatWhatsappForDisplay(rawValue) {
+  const digits = sanitizeDigits(rawValue, 15);
+  if (!digits) return '';
+
+  const matchedCountry = [...WHATSAPP_COUNTRIES]
+    .map((country) => ({ ...country, dialDigits: sanitizeDigits(country.dialCode, 4) }))
+    .sort((a, b) => b.dialDigits.length - a.dialDigits.length)
+    .find((country) => digits.startsWith(country.dialDigits));
+
+  if (!matchedCountry) return `+${digits}`;
+  const local = digits.slice(matchedCountry.dialDigits.length);
+  return `${matchedCountry.dialCode} ${local}`;
+}
 
 function isFlashActive(flash) {
   if (!flash) return false;
@@ -54,7 +126,11 @@ export default function SponsorsPage() {
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
   const trustId = trust?.id || null;
-  const isCreateRoute = location.pathname === '/sponsor/create_sponsor';
+  const isCreateRoute = location.pathname.startsWith('/sponsor/create_sponsor');
+  const isEditRoute =
+    location.pathname.startsWith('/sponsor/edit_sponsor') ||
+    location.pathname.startsWith('/sponsorts/edit_sponsor');
+  const editSponsorIdFromRouteState = location.state?.editSponsorId || null;
 
   const [sponsors, setSponsors] = useState([]);
   const [flashMap, setFlashMap] = useState({});
@@ -72,6 +148,11 @@ export default function SponsorsPage() {
   const [flashInfoSponsorId, setFlashInfoSponsorId] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailSponsorId, setDetailSponsorId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [ownerFilter, setOwnerFilter] = useState('my');
+  const [sortBy, setSortBy] = useState('name');
+  const [listSearch, setListSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [flashForm, setFlashForm] = useState({
     start_date: '',
     end_date: '',
@@ -83,26 +164,52 @@ export default function SponsorsPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const deferredListSearch = useDeferredValue(listSearch);
+  const deferredPickerSearch = useDeferredValue(searchTerm);
 
   useEffect(() => {
     if (!trustId) navigate('/dashboard', { replace: true, state: { userName, trust } });
   }, [trustId, navigate, userName, trust]);
 
+  const sponsorsById = useMemo(() => {
+    const map = new Map();
+    sponsors.forEach((sponsor) => map.set(sponsor.id, sponsor));
+    return map;
+  }, [sponsors]);
+
+  const editableSponsorIds = useMemo(() => {
+    const set = new Set();
+    sponsors.forEach((sponsor) => {
+      if (sponsor?.trust_id && trustId && sponsor.trust_id === trustId) {
+        set.add(sponsor.id);
+      }
+    });
+    return set;
+  }, [sponsors, trustId]);
+
+  const flashActiveBySponsorId = useMemo(() => {
+    const map = {};
+    sponsors.forEach((sponsor) => {
+      map[sponsor.id] = isFlashActive(flashMap[sponsor.id]);
+    });
+    return map;
+  }, [sponsors, flashMap]);
+
   const selectedSponsor = useMemo(
-    () => sponsors.find(s => s.id === selectedId) || null,
-    [sponsors, selectedId]
+    () => (selectedId ? sponsorsById.get(selectedId) || null : null),
+    [sponsorsById, selectedId]
   );
 
   const filteredSponsorChoices = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    const term = deferredPickerSearch.trim().toLowerCase();
     if (!term) return sponsors;
     return sponsors.filter((s) => {
       const name = (s.name || '').toLowerCase();
       const company = (s.company_name || '').toLowerCase();
-      const phone = String(s.phone || '').toLowerCase();
+      const phone = String(s.ContactNumber1 ?? s.phone ?? '').toLowerCase();
       return name.includes(term) || company.includes(term) || phone.includes(term);
     });
-  }, [sponsors, searchTerm]);
+  }, [sponsors, deferredPickerSearch]);
 
   const mySponsorChoices = useMemo(
     () => filteredSponsorChoices.filter(s => s.trust_id === trustId),
@@ -114,20 +221,76 @@ export default function SponsorsPage() {
     [filteredSponsorChoices, trustId]
   );
 
-  const visibleSponsors = useMemo(() => {
-    const flashIds = new Set(Object.keys(flashMap));
-    return sponsors.filter((s) => flashIds.has(String(s.id)) && !hiddenIds.has(s.id));
-  }, [sponsors, flashMap, hiddenIds]);
-
-  const detailSponsor = useMemo(
-    () => sponsors.find((s) => s.id === detailSponsorId) || null,
-    [sponsors, detailSponsorId]
+  const visibleSponsors = useMemo(
+    () => sponsors.filter((s) => !hiddenIds.has(s.id)),
+    [sponsors, hiddenIds]
   );
 
-  const canEditSponsorId = (sponsorId) => {
-    const sponsor = sponsors.find((s) => s.id === sponsorId);
-    return sponsor?.trust_id && trustId && sponsor.trust_id === trustId;
-  };
+  const mySponsorCount = useMemo(
+    () => visibleSponsors.filter((s) => s.trust_id === trustId).length,
+    [visibleSponsors, trustId]
+  );
+
+  const otherSponsorCount = useMemo(
+    () => visibleSponsors.filter((s) => s.trust_id !== trustId).length,
+    [visibleSponsors, trustId]
+  );
+
+  const totalSponsorCount = mySponsorCount + otherSponsorCount;
+
+  const panelSponsors = useMemo(() => {
+    const term = deferredListSearch.trim().toLowerCase();
+    let list = [...visibleSponsors];
+
+    if (ownerFilter === 'my') {
+      list = list.filter((s) => s.trust_id === trustId);
+    } else if (ownerFilter === 'others') {
+      list = list.filter((s) => s.trust_id !== trustId);
+    }
+
+    if (term) {
+      list = list.filter((s) => {
+        const name = (s.name || '').toLowerCase();
+        const company = (s.company_name || '').toLowerCase();
+        const phone = String(s.ContactNumber1 ?? s.phone ?? '').toLowerCase();
+        return name.includes(term) || company.includes(term) || phone.includes(term);
+      });
+    }
+
+    if (statusFilter === 'active') {
+      list = list.filter((s) => flashActiveBySponsorId[s.id]);
+    } else if (statusFilter === 'inactive') {
+      list = list.filter((s) => !flashActiveBySponsorId[s.id]);
+    }
+
+    if (sortBy === 'name') {
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else if (sortBy === 'start') {
+      list.sort((a, b) =>
+        String(flashMap[a.id]?.start_date || '').localeCompare(String(flashMap[b.id]?.start_date || ''))
+      );
+    } else if (sortBy === 'end') {
+      list.sort((a, b) =>
+        String(flashMap[a.id]?.end_date || '').localeCompare(String(flashMap[b.id]?.end_date || ''))
+      );
+    }
+
+    return list;
+  }, [visibleSponsors, ownerFilter, trustId, deferredListSearch, statusFilter, sortBy, flashMap, flashActiveBySponsorId]);
+
+  const PAGE_SIZE = 8;
+  const totalPages = Math.max(1, Math.ceil(panelSponsors.length / PAGE_SIZE));
+  const paginatedSponsors = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return panelSponsors.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [panelSponsors, currentPage]);
+
+  const detailSponsor = useMemo(
+    () => (detailSponsorId ? sponsorsById.get(detailSponsorId) || null : null),
+    [sponsorsById, detailSponsorId]
+  );
+
+  const canEditSponsorId = (sponsorId) => editableSponsorIds.has(sponsorId);
 
   const flashInfo = useMemo(
     () => (flashInfoSponsorId ? flashMap[flashInfoSponsorId] : null),
@@ -160,18 +323,32 @@ export default function SponsorsPage() {
 
   useEffect(() => {
     if (selectedSponsor) {
+      const whatsappData = splitWhatsappForForm(selectedSponsor.whatsapp_number);
       setForm({
         name: selectedSponsor.name || '',
         position: selectedSponsor.position || '',
+        position2: selectedSponsor.position2 || '',
         about: selectedSponsor.about || '',
         photo_url: selectedSponsor.photo_url || '',
         company_name: selectedSponsor.company_name || '',
-        phone: selectedSponsor.phone || '',
-        email_id: selectedSponsor.email_id || '',
+        coPartner: selectedSponsor.coPartner || '',
+        ContactNumber1: selectedSponsor.ContactNumber1 || selectedSponsor.phone || '',
+        contactNumber2: selectedSponsor.contactNumber2 != null ? String(selectedSponsor.contactNumber2) : '',
+        contactNumber3: selectedSponsor.contactNumber3 != null ? String(selectedSponsor.contactNumber3) : '',
+        email_id1: selectedSponsor.email_id1 || selectedSponsor.email_id || '',
+        emailId2: selectedSponsor.emailId2 || '',
+        emailId3: selectedSponsor.emailId3 || '',
         address: selectedSponsor.address || '',
+        address2: selectedSponsor.address2 || '',
+        address3: selectedSponsor.address3 || '',
         city: selectedSponsor.city || '',
         state: selectedSponsor.state || '',
-        whatsapp_number: selectedSponsor.whatsapp_number != null ? String(selectedSponsor.whatsapp_number) : '',
+        whatsapp_country: whatsappData.country,
+        whatsapp_number: whatsappData.local,
+        facebook: selectedSponsor.facebook || '',
+        instagram: selectedSponsor.instagram || '',
+        X: selectedSponsor.X || '',
+        linkedin: selectedSponsor.linkedin || '',
         website_url: selectedSponsor.website_url || '',
         catalog_url: selectedSponsor.catalog_url || '',
         badge_label: selectedSponsor.badge_label || 'OFFICIAL SPONSOR',
@@ -180,6 +357,60 @@ export default function SponsorsPage() {
       setForm(EMPTY_FORM);
     }
   }, [selectedSponsor, flashMap]);
+
+  useEffect(() => {
+    if (isCreateRoute || isEditRoute || showForm) return;
+    if (!panelSponsors.length) return;
+    const exists = panelSponsors.some((s) => s.id === selectedId);
+    if (!exists) setSelectedId(panelSponsors[0].id);
+  }, [panelSponsors, selectedId, isCreateRoute, isEditRoute, showForm]);
+
+  useEffect(() => {
+    if (!isEditRoute) return;
+    if (!sponsors.length) return;
+
+    const routeSponsorId =
+      editSponsorIdFromRouteState && editableSponsorIds.has(editSponsorIdFromRouteState)
+        ? editSponsorIdFromRouteState
+        : null;
+    const currentEditableId =
+      selectedId && editableSponsorIds.has(selectedId) ? selectedId : null;
+    const fallbackEditableId = sponsors.find((s) => editableSponsorIds.has(s.id))?.id || null;
+    const nextEditableId = routeSponsorId || currentEditableId || fallbackEditableId;
+
+    if (!nextEditableId) {
+      navigate('/sponsor', { replace: true, state: { userName, trust } });
+      return;
+    }
+
+    if (selectedId !== nextEditableId) setSelectedId(nextEditableId);
+    if (!showForm) setShowForm(true);
+  }, [
+    isEditRoute,
+    sponsors,
+    selectedId,
+    showForm,
+    editableSponsorIds,
+    editSponsorIdFromRouteState,
+    navigate,
+    userName,
+    trust,
+  ]);
+
+  useEffect(() => {
+    if (!isCreateRoute && !isEditRoute && location.pathname.startsWith('/sponsor')) {
+      setShowForm(false);
+      setSaveError('');
+    }
+  }, [isCreateRoute, isEditRoute, location.pathname]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [ownerFilter, statusFilter, sortBy, listSearch]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const handleFile = (file) => {
     if (!file) return;
@@ -196,6 +427,16 @@ export default function SponsorsPage() {
 
   const startAdd = () => {
     navigate('/sponsor/create_sponsor', { state: { userName, trust } });
+  };
+
+  const openEditSponsor = (sponsorId) => {
+    if (!sponsorId) return;
+    setSelectedId(sponsorId);
+    setShowForm(true);
+    setSaveError('');
+    navigate('/sponsor/edit_sponsor', {
+      state: { userName, trust, editSponsorId: sponsorId },
+    });
   };
 
 
@@ -317,20 +558,41 @@ export default function SponsorsPage() {
       setSaveError('You can only edit sponsors linked to your trust.');
       return;
     }
+    const selectedWhatsappCountry = getWhatsappCountry(form.whatsapp_country);
+    const countryDigits = sanitizeDigits(selectedWhatsappCountry.dialCode, 4);
+    const localMaxLength = Math.max(4, 15 - countryDigits.length);
+    const whatsappDigits = sanitizeDigits(form.whatsapp_number, localMaxLength);
+    const contactNumber2Digits = sanitizeDigits(form.contactNumber2, 15);
+    const contactNumber3Digits = sanitizeDigits(form.contactNumber3, 15);
+    const whatsappInternationalDigits = whatsappDigits
+      ? `${countryDigits}${whatsappDigits}`.slice(0, 15)
+      : '';
     const payload = {
       name: form.name.trim(),
       position: form.position.trim() || null,
+      position2: form.position2.trim() || null,
       about: form.about.trim() || null,
       photo_url: form.photo_url || null,
       company_name: form.company_name.trim(),
+      coPartner: form.coPartner.trim() || null,
       trust_id: trustId,
       ref_no: selectedSponsor?.ref_no ?? (Math.max(0, ...sponsors.map(s => Number(s.ref_no) || 0)) + 1),
-      phone: form.phone.trim() || null,
-      email_id: form.email_id.trim() || null,
+      ContactNumber1: form.ContactNumber1.trim() || null,
+      contactNumber2: contactNumber2Digits ? Number(contactNumber2Digits) : null,
+      contactNumber3: contactNumber3Digits ? Number(contactNumber3Digits) : null,
+      email_id1: form.email_id1.trim() || null,
+      emailId2: form.emailId2.trim() || null,
+      emailId3: form.emailId3.trim() || null,
       address: form.address.trim() || null,
+      address2: form.address2.trim() || null,
+      address3: form.address3.trim() || null,
       city: form.city.trim() || null,
       state: form.state.trim() || null,
-      whatsapp_number: form.whatsapp_number ? Number(form.whatsapp_number) : null,
+      whatsapp_number: whatsappInternationalDigits ? Number(whatsappInternationalDigits) : null,
+      facebook: form.facebook.trim() || null,
+      instagram: form.instagram.trim() || null,
+      X: form.X.trim() || null,
+      linkedin: form.linkedin.trim() || null,
       website_url: form.website_url.trim() || null,
       catalog_url: form.catalog_url.trim() || null,
       badge_label: form.badge_label.trim() || 'OFFICIAL SPONSOR',
@@ -343,7 +605,11 @@ export default function SponsorsPage() {
         setSaveError(err.message || 'Unable to update sponsor.');
       } else if (data) {
         setSponsors(prev => prev.map(s => (s.id === selectedId ? data : s)));
-        setShowForm(false);
+        if (isEditRoute) {
+          navigate('/sponsor', { state: { userName, trust } });
+        } else {
+          setShowForm(false);
+        }
       }
     } else {
       const { data, error: err } = await createSponsor(payload);
@@ -377,92 +643,207 @@ export default function SponsorsPage() {
           title="Sponsors"
           subtitle="Manage sponsor profiles and details"
           onBack={() => {
-            if (isCreateRoute) {
+            if (isCreateRoute || isEditRoute) {
+              setShowForm(false);
+              setSaveError('');
               navigate('/sponsor', { state: { userName, trust } });
               return;
             }
             navigate('/dashboard', { state: { userName, trust } });
           }}
-          right={<button className="sp-add-btn" onClick={openPicker}>Add a Sponsor</button>}
+          right={null}
         />
 
         {error && <div className="sp-error">{error}</div>}
 
-        <div className={`sp-content ${isCreateRoute || showForm ? 'form-only' : ''}`}>
-          {!isCreateRoute && !showForm && (
-            <section className="sp-list">
-            {loading && <div className="sp-loading">Loading sponsors...</div>}
-
-            {!loading && visibleSponsors.length === 0 && (
-              <div className="sp-empty">
-                <div className="sp-empty-icon">+</div>
-                <h3>No sponsors yet</h3>
-                <p>Add your first sponsor to get started.</p>
-                <button className="sp-add-btn" onClick={openPicker}>Add a Sponsor</button>
-              </div>
-            )}
-
-            {!loading && visibleSponsors.map((s) => (
-              <div
-                key={s.id}
-                className={`sp-card ${selectedId === s.id ? 'active' : ''} ${canEditSponsorId(s.id) ? 'my' : 'other'}`}
-                onClick={() => { setSelectedId(s.id); openDetail(s.id); }}
-              >
-                <div className="sp-card-avatar">
-                  {s.photo_url
-                    ? <img src={s.photo_url} alt={s.name} />
-                    : <span>{initials(s.name)}</span>
-                  }
+        <div className={`sp-content ${isCreateRoute || isEditRoute || showForm ? 'form-only' : ''}`}>
+          {!isCreateRoute && !isEditRoute && !showForm && (
+            <section className="sp-profile-layout">
+              <aside className="sp-left-panel">
+                <div className="sp-left-head">
+                  <h3>All Sponsors</h3>
+                  <span className="sp-left-count">{totalSponsorCount}</span>
                 </div>
-                <div className="sp-card-body">
-                  <div className="sp-card-title-row">
-                    <div className="sp-card-title">{s.name}</div>
-                    <span className={`sp-card-badge ${canEditSponsorId(s.id) ? 'my' : 'other'}`}>
-                      {canEditSponsorId(s.id) ? 'My' : 'Other'}
-                    </span>
-                  </div>
-                  <div className="sp-card-sub">{s.company_name}</div>
-                  {s.position && <div className="sp-card-tag">{s.position}</div>}
-                </div>
-                <div className="sp-card-actions">
+
+                <div className="sp-owner-tabs">
                   <button
-                    className={`sp-status-btn ${isFlashActive(flashMap[s.id]) ? 'active' : 'inactive'}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isFlashActive(flashMap[s.id])) openFlashInfo(s.id);
-                      else openFlashEditor(s.id);
-                    }}
-                    title={isFlashActive(flashMap[s.id]) ? 'Set inactive' : 'Set active'}
+                    type="button"
+                    className={`sp-owner-tab ${ownerFilter === 'my' ? 'active my' : ''}`}
+                    onClick={() => setOwnerFilter('my')}
                   >
-                    {isFlashActive(flashMap[s.id]) ? 'Active' : 'Inactive'}
+                    <span>My</span>
+                    <b>{mySponsorCount}</b>
                   </button>
-                  {canEditSponsorId(s.id) && (
-                    <button
-                      className="sp-icon-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedId(s.id);
-                        setShowForm(true);
-                      }}
-                      title="Edit"
-                    >
-                      Edit
-                    </button>
+                  <button
+                    type="button"
+                    className={`sp-owner-tab ${ownerFilter === 'others' ? 'active others' : ''}`}
+                    onClick={() => setOwnerFilter('others')}
+                  >
+                    <span>Others</span>
+                    <b>{otherSponsorCount}</b>
+                  </button>
+                </div>
+
+                <div className="sp-filter-row">
+                  <label className="sp-inline-field">
+                    <span>Role</span>
+                    <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                      <option value="all">All</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </label>
+                </div>
+
+                <input
+                  className="sp-left-search"
+                  placeholder="Search sponsor..."
+                  value={listSearch}
+                  onChange={(e) => setListSearch(e.target.value)}
+                />
+
+                <button className="sp-left-create-btn" onClick={startAdd} type="button">
+                  + Create New Sponsor
+                </button>
+
+                <div className="sp-filter-row">
+                  <label className="sp-inline-field">
+                    <span>Sort By</span>
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                      <option value="name">Name A-Z</option>
+                      <option value="start">Start Date</option>
+                      <option value="end">End Date</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="sp-left-list">
+                  {loading && <div className="sp-loading">Loading sponsors...</div>}
+                  {!loading && panelSponsors.length === 0 && (
+                    <div className="sp-empty">
+                      <div className="sp-empty-icon">+</div>
+                      <h3>No sponsors</h3>
+                      <p>No sponsor matched your filter.</p>
+                    </div>
                   )}
-                  <button
-                    className="sp-icon-btn danger"
-                    onClick={(e) => { e.stopPropagation(); handleRemoveFromView(s.id); }}
-                    title="Remove"
-                  >
-                    Remove
-                  </button>
+                  {!loading && paginatedSponsors.map((s) => (
+                    <button
+                      key={s.id}
+                      className={`sp-left-item ${selectedId === s.id ? 'active' : ''}`}
+                      onClick={() => setSelectedId(s.id)}
+                      type="button"
+                    >
+                      <div className="sp-left-avatar">
+                        {s.photo_url
+                          ? <img src={s.photo_url} alt={s.name} />
+                          : <span>{initials(s.name)}</span>
+                        }
+                      </div>
+                      <div className="sp-left-item-body">
+                        <div className="sp-left-item-title">{s.name}</div>
+                        <div className="sp-left-item-sub">{s.company_name || 'No company'}</div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </div>
-            ))}
+
+                {!loading && panelSponsors.length > 0 && (
+                  <div className="sp-left-pagination">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Prev
+                    </button>
+                    <span>Page {currentPage} / {totalPages}</span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </aside>
+
+              <section className="sp-right-panel">
+                {!loading && selectedSponsor && (
+                  <>
+                    <div className="sp-profile-hero">
+                      <div className="sp-profile-hero-left">
+                        <div className="sp-card-avatar lg">
+                          {selectedSponsor.photo_url
+                            ? <img src={selectedSponsor.photo_url} alt={selectedSponsor.name} />
+                            : <span>{initials(selectedSponsor.name)}</span>
+                          }
+                        </div>
+                        <div>
+                          <h3>{selectedSponsor.name}</h3>
+                          <p>{canEditSponsorId(selectedSponsor.id) ? 'My Sponsor' : 'Other Sponsor'}</p>
+                          <div className="sp-profile-hero-actions">
+                            <select
+                              className={`sp-role-select ${flashActiveBySponsorId[selectedSponsor.id] ? 'active' : 'inactive'}`}
+                              value={flashActiveBySponsorId[selectedSponsor.id] ? 'active' : 'inactive'}
+                              onChange={(e) => {
+                                const next = e.target.value;
+                                if (next === 'active') openFlashEditor(selectedSponsor.id);
+                                else if (flashActiveBySponsorId[selectedSponsor.id]) openFlashInfo(selectedSponsor.id);
+                              }}
+                            >
+                              <option value="active">Active</option>
+                              <option value="inactive">Inactive</option>
+                            </select>
+                            <button
+                              className="sp-icon-btn danger"
+                              onClick={() => handleRemoveFromView(selectedSponsor.id)}
+                              type="button"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="sp-profile-details">
+                      <div className="sp-profile-details-head">
+                        <h3>Sponsor Details</h3>
+                        <div className="sp-profile-head-actions">
+                          <button className="sp-icon-btn" onClick={() => openDetail(selectedSponsor.id)} type="button">
+                            View Details
+                          </button>
+                          {canEditSponsorId(selectedSponsor.id) && (
+                            <button
+                              className="sp-primary"
+                              onClick={() => {
+                                openEditSponsor(selectedSponsor.id);
+                              }}
+                              type="button"
+                            >
+                              Edit Details
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="sp-profile-detail-grid">
+                        <div><span>Company</span><strong>{selectedSponsor.company_name || '—'}</strong></div>
+                        <div><span>Role / Position</span><strong>{selectedSponsor.position || '—'}</strong></div>
+                        <div><span>Contact Number 1</span><strong>{selectedSponsor.ContactNumber1 || selectedSponsor.phone || '—'}</strong></div>
+                        <div><span>Email ID 1</span><strong>{selectedSponsor.email_id1 || selectedSponsor.email_id || '—'}</strong></div>
+                        <div><span>Start Date</span><strong>{flashMap[selectedSponsor.id]?.start_date || '—'}</strong></div>
+                        <div><span>End Date</span><strong>{flashMap[selectedSponsor.id]?.end_date || '—'}</strong></div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </section>
             </section>
           )}
 
-          {(isCreateRoute || showForm) && (
+          {(isCreateRoute || isEditRoute || showForm) && (
             <section className="sp-form">
               <div className="sp-form-card">
               <div className="sp-form-title">
@@ -477,6 +858,10 @@ export default function SponsorsPage() {
                 <label className="sp-field">
                   <span>Position</span>
                   <input value={form.position} onChange={e => setForm(p => ({ ...p, position: e.target.value }))} />
+                </label>
+                <label className="sp-field">
+                  <span>Position 2</span>
+                  <input value={form.position2} onChange={e => setForm(p => ({ ...p, position2: e.target.value }))} />
                 </label>
                 <label className="sp-field sp-span-2">
                   <span>About</span>
@@ -516,16 +901,54 @@ export default function SponsorsPage() {
                   <input value={form.company_name} onChange={e => setForm(p => ({ ...p, company_name: e.target.value }))} />
                 </label>
                 <label className="sp-field">
-                  <span>Phone No</span>
-                  <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} />
+                  <span>Co Partner</span>
+                  <input value={form.coPartner} onChange={e => setForm(p => ({ ...p, coPartner: e.target.value }))} />
                 </label>
                 <label className="sp-field">
-                  <span>Email ID</span>
-                  <input value={form.email_id} onChange={e => setForm(p => ({ ...p, email_id: e.target.value }))} />
+                  <span>Contact Number 1</span>
+                  <input value={form.ContactNumber1} onChange={e => setForm(p => ({ ...p, ContactNumber1: e.target.value }))} />
+                </label>
+                <label className="sp-field">
+                  <span>Contact Number 2</span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={form.contactNumber2}
+                    onChange={e => setForm(p => ({ ...p, contactNumber2: sanitizeDigits(e.target.value, 15) }))}
+                  />
+                </label>
+                <label className="sp-field">
+                  <span>Contact Number 3</span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={form.contactNumber3}
+                    onChange={e => setForm(p => ({ ...p, contactNumber3: sanitizeDigits(e.target.value, 15) }))}
+                  />
+                </label>
+                <label className="sp-field">
+                  <span>Email ID 1</span>
+                  <input value={form.email_id1} onChange={e => setForm(p => ({ ...p, email_id1: e.target.value }))} />
+                </label>
+                <label className="sp-field">
+                  <span>Email ID 2</span>
+                  <input value={form.emailId2} onChange={e => setForm(p => ({ ...p, emailId2: e.target.value }))} />
+                </label>
+                <label className="sp-field">
+                  <span>Email ID 3</span>
+                  <input value={form.emailId3} onChange={e => setForm(p => ({ ...p, emailId3: e.target.value }))} />
                 </label>
                 <label className="sp-field sp-span-2">
-                  <span>Address</span>
+                  <span>Address 1</span>
                   <input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
+                </label>
+                <label className="sp-field sp-span-2">
+                  <span>Address 2</span>
+                  <input value={form.address2} onChange={e => setForm(p => ({ ...p, address2: e.target.value }))} />
+                </label>
+                <label className="sp-field sp-span-2">
+                  <span>Address 3</span>
+                  <input value={form.address3} onChange={e => setForm(p => ({ ...p, address3: e.target.value }))} />
                 </label>
                 <label className="sp-field">
                   <span>City</span>
@@ -537,7 +960,40 @@ export default function SponsorsPage() {
                 </label>
                 <label className="sp-field">
                   <span>WhatsApp No</span>
-                  <input type="number" value={form.whatsapp_number} onChange={e => setForm(p => ({ ...p, whatsapp_number: e.target.value }))} />
+                  <div className="sp-whatsapp-row">
+                    <select
+                      value={form.whatsapp_country}
+                      onChange={(e) => setForm((p) => ({ ...p, whatsapp_country: e.target.value }))}
+                    >
+                      {WHATSAPP_COUNTRIES.map((country) => (
+                        <option key={country.value} value={country.value}>
+                          {country.dialCode} {country.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      pattern="[0-9]*"
+                      maxLength={Math.max(4, 15 - sanitizeDigits(getWhatsappCountry(form.whatsapp_country).dialCode, 4).length)}
+                      placeholder="WhatsApp number"
+                      value={form.whatsapp_number}
+                      onChange={(e) =>
+                        setForm((p) => {
+                          const country = getWhatsappCountry(p.whatsapp_country);
+                          const countryDigits = sanitizeDigits(country.dialCode, 4);
+                          const localMax = Math.max(4, 15 - countryDigits.length);
+                          return { ...p, whatsapp_number: sanitizeDigits(e.target.value, localMax) };
+                        })
+                      }
+                      onKeyDown={(e) => {
+                        if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                    />
+                  </div>
                 </label>
                 <label className="sp-field">
                   <span>Website URL</span>
@@ -546,6 +1002,22 @@ export default function SponsorsPage() {
                 <label className="sp-field">
                   <span>Catalog URL</span>
                   <input value={form.catalog_url} onChange={e => setForm(p => ({ ...p, catalog_url: e.target.value }))} />
+                </label>
+                <label className="sp-field">
+                  <span>Facebook</span>
+                  <input value={form.facebook} onChange={e => setForm(p => ({ ...p, facebook: e.target.value }))} />
+                </label>
+                <label className="sp-field">
+                  <span>Instagram</span>
+                  <input value={form.instagram} onChange={e => setForm(p => ({ ...p, instagram: e.target.value }))} />
+                </label>
+                <label className="sp-field">
+                  <span>X</span>
+                  <input value={form.X} onChange={e => setForm(p => ({ ...p, X: e.target.value }))} />
+                </label>
+                <label className="sp-field">
+                  <span>LinkedIn</span>
+                  <input value={form.linkedin} onChange={e => setForm(p => ({ ...p, linkedin: e.target.value }))} />
                 </label>
                 <label className="sp-field">
                   <span>Badge Label</span>
@@ -559,7 +1031,7 @@ export default function SponsorsPage() {
                 <button
                   className="sp-secondary"
                   onClick={() => {
-                    if (isCreateRoute) {
+                    if (isCreateRoute || isEditRoute) {
                       navigate('/sponsor', { state: { userName, trust } });
                       return;
                     }
@@ -627,7 +1099,7 @@ export default function SponsorsPage() {
                               <span className="sp-modal-badge my">My</span>
                             </div>
                             <div className="sp-modal-sub">{s.company_name || 'No company'}</div>
-                            <div className="sp-modal-sub">{s.phone || ''}</div>
+                            <div className="sp-modal-sub">{s.ContactNumber1 || s.phone || ''}</div>
                             {alreadyAdded && (
                               <div className="sp-modal-meta">
                                 <span>Start: {flash?.start_date || 'Not set'}</span>
@@ -650,8 +1122,7 @@ export default function SponsorsPage() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setShowPicker(false);
-                                  setSelectedId(s.id);
-                                  setShowForm(true);
+                                  openEditSponsor(s.id);
                                 }}
                                 title="Edit"
                               >
@@ -691,7 +1162,7 @@ export default function SponsorsPage() {
                               <span className="sp-modal-badge other">Other</span>
                             </div>
                             <div className="sp-modal-sub">{s.company_name || 'No company'}</div>
-                            <div className="sp-modal-sub">{s.phone || ''}</div>
+                            <div className="sp-modal-sub">{s.ContactNumber1 || s.phone || ''}</div>
                             {alreadyAdded && (
                               <div className="sp-modal-meta">
                                 <span>Start: {flash?.start_date || 'Not set'}</span>
@@ -822,10 +1293,13 @@ export default function SponsorsPage() {
                 </div>
                 <div className="sp-detail-info">
                   {detailSponsor.position && <div><strong>Position:</strong> {detailSponsor.position}</div>}
-                  {detailSponsor.phone && <div><strong>Phone:</strong> {detailSponsor.phone}</div>}
-                  {detailSponsor.email_id && <div><strong>Email:</strong> {detailSponsor.email_id}</div>}
+                  {(detailSponsor.ContactNumber1 || detailSponsor.phone) && <div><strong>Contact Number 1:</strong> {detailSponsor.ContactNumber1 || detailSponsor.phone}</div>}
+                  {detailSponsor.whatsapp_number && (
+                    <div><strong>WhatsApp:</strong> {formatWhatsappForDisplay(detailSponsor.whatsapp_number)}</div>
+                  )}
+                  {(detailSponsor.email_id1 || detailSponsor.email_id) && <div><strong>Email ID 1:</strong> {detailSponsor.email_id1 || detailSponsor.email_id}</div>}
                   {detailSponsor.badge_label && <div><strong>Badge:</strong> {detailSponsor.badge_label}</div>}
-                  <div><strong>Status:</strong> {isFlashActive(flashMap[detailSponsor.id]) ? 'Active' : 'Inactive'}</div>
+                  <div><strong>Status:</strong> {flashActiveBySponsorId[detailSponsor.id] ? 'Active' : 'Inactive'}</div>
                 </div>
               </div>
               <div className="sp-detail-actions">
@@ -837,8 +1311,7 @@ export default function SponsorsPage() {
                     className="sp-icon-btn"
                     onClick={() => {
                       setShowDetailModal(false);
-                      setSelectedId(detailSponsor.id);
-                      setShowForm(true);
+                      openEditSponsor(detailSponsor.id);
                     }}
                   >
                     Edit Details
