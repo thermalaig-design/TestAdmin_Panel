@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'noticeboard';
 
@@ -23,26 +24,30 @@ function normalizeRow(row = {}) {
 export async function fetchNoticeboardByTrust(trustId) {
   if (!trustId) return { data: [], error: null };
 
-  const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .select('*')
-    .eq('trust_id', trustId)
-    .order('created_at', { ascending: false });
+  return cachedQuery(`notice:list:${trustId}`, async () => {
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .eq('trust_id', trustId)
+      .order('created_at', { ascending: false });
 
-  return { data: (data || []).map(normalizeRow), error };
+    return { data: (data || []).map(normalizeRow), error };
+  }, 12000);
 }
 
 export async function fetchNoticeById(trustId, noticeId) {
   if (!trustId || !noticeId) return { data: null, error: { message: 'Missing trust or notice id.' } };
 
-  const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .select('*')
-    .eq('trust_id', trustId)
-    .eq('id', noticeId)
-    .maybeSingle();
+  return cachedQuery(`notice:item:${trustId}:${noticeId}`, async () => {
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .eq('trust_id', trustId)
+      .eq('id', noticeId)
+      .maybeSingle();
 
-  return { data: data ? normalizeRow(data) : null, error };
+    return { data: data ? normalizeRow(data) : null, error };
+  }, 12000);
 }
 
 export async function createNotice(payload = {}) {
@@ -64,6 +69,7 @@ export async function createNotice(payload = {}) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('notice:');
   return { data: data ? normalizeRow(data) : null, error };
 }
 
@@ -98,6 +104,7 @@ export async function updateNotice(noticeId, updates = {}, trustId = null) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('notice:');
   return { data: data ? normalizeRow(data) : null, error };
 }
 
@@ -114,5 +121,6 @@ export async function deleteNotice(noticeId, trustId = null) {
   }
 
   const { error } = await query;
+  if (!error) invalidateCache('notice:');
   return { error };
 }

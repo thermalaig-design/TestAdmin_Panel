@@ -6,6 +6,7 @@ import {
   createMarqueeUpdate,
   deleteMarqueeUpdate,
   fetchMarqueeUpdatesByTrust,
+  getCachedMarqueeUpdatesByTrust,
   updateMarqueeUpdate,
 } from '../services/marqueeService';
 import './MarqueePage.css';
@@ -38,9 +39,11 @@ export default function MarqueePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
-  const [updates, setUpdates] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialCached = getCachedMarqueeUpdatesByTrust(trustId);
+  const [updates, setUpdates] = useState(initialCached?.data || []);
+  const [loading, setLoading] = useState(!initialCached);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -58,7 +61,13 @@ export default function MarqueePage() {
     }
 
     const load = async () => {
-      setLoading(true);
+      const cached = getCachedMarqueeUpdatesByTrust(trustId);
+      if (cached?.data) {
+        setUpdates(cached.data);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
       setError('');
       const { data, error: fetchError } = await fetchMarqueeUpdatesByTrust(trustId);
       if (fetchError) setError(fetchError.message || 'Unable to load marquee updates.');
@@ -187,14 +196,14 @@ export default function MarqueePage() {
     <div className="marquee-root">
       <Sidebar
         trustName={trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
       <main className="marquee-main">
         <PageHeader
           title="Marquee"
           subtitle="Manage scrolling marquee announcements"
-          onBack={() => navigate('/dashboard', { state: { userName, trust } })}
+          onBack={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
           right={<button className="marquee-add-btn" onClick={openCreate}>Create Marquee</button>}
         />
 

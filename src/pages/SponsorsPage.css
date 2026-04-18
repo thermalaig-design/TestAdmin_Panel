@@ -75,9 +75,9 @@
 
 .sp-profile-layout {
   display: grid;
-  grid-template-columns: 370px 1fr;
+  grid-template-columns: 330px 1fr;
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .sp-left-panel,
@@ -89,11 +89,27 @@
   padding: 16px;
 }
 
+.sp-left-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 112px);
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  position: sticky;
+  top: 86px;
+  overflow: hidden;
+  gap: 6px;
+}
+
+.sp-right-panel {
+  min-height: calc(100vh - 112px);
+}
+
 .sp-left-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .sp-left-head h3 {
@@ -120,17 +136,18 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .sp-owner-tab {
   border: 1.5px solid rgba(99, 102, 241, 0.2);
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
   color: #374151;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
-  padding: 8px 10px;
+  min-height: 36px;
+  padding: 5px 9px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -138,9 +155,9 @@
 }
 
 .sp-owner-tab b {
-  font-size: 12px;
-  min-width: 24px;
-  height: 24px;
+  font-size: 11px;
+  min-width: 20px;
+  height: 20px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -162,19 +179,19 @@
 }
 
 .sp-filter-row {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .sp-filter-head {
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 700;
   color: #374151;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .sp-inline-field {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   font-size: 12px;
   font-weight: 700;
   color: #4b5563;
@@ -183,7 +200,7 @@
 .sp-inline-field select {
   border: 1.5px solid rgba(99, 102, 241, 0.2);
   border-radius: 12px;
-  padding: 9px 12px;
+  padding: 8px 10px;
   font-size: 14px;
   font-weight: 700;
   background: #fff;
@@ -194,31 +211,31 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .sp-role-tab {
   border: 1.5px solid rgba(99, 102, 241, 0.2);
-  border-radius: 12px;
+  border-radius: 10px;
   background: #f8faff;
   color: #475569;
-  height: 44px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
 
 .sp-role-tab b {
-  min-width: 26px;
-  height: 26px;
+  min-width: 20px;
+  height: 20px;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  font-size: 16px;
+  font-size: 11px;
   font-weight: 800;
   color: #4f46e5;
   background: #eef2ff;
@@ -246,48 +263,81 @@
   width: 100%;
   border: 1.5px solid rgba(99, 102, 241, 0.2);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   font-size: 14px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .sp-left-create-btn {
   width: 100%;
   border: none;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 48%, #7c3aed 100%);
   color: #fff;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
-  padding: 12px 14px;
-  margin-bottom: 12px;
+  min-height: 44px;
+  padding: 8px 14px;
+  margin-bottom: 0;
   cursor: pointer;
-  box-shadow: 0 12px 24px rgba(99, 102, 241, 0.25);
+  border: 1px solid rgba(99, 102, 241, 0.24);
+  box-shadow: 0 12px 22px rgba(79, 70, 229, 0.28);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease, border-color 0.18s ease;
+  margin-bottom: 8px;
+}
+
+.sp-left-create-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(79, 70, 229, 0.34);
+  filter: saturate(1.06);
+  border-color: rgba(129, 140, 248, 0.55);
+}
+
+.sp-left-create-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 9px 16px rgba(79, 70, 229, 0.24);
 }
 
 .sp-left-list {
-  max-height: 500px;
-  overflow: auto;
-  display: grid;
-  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding-right: 4px;
 }
 
+.sp-members-scroll-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .sp-left-pagination {
-  margin-top: 12px;
+  margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(99, 102, 241, 0.12);
+  background: #fff;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
 }
 
 .sp-left-pagination button {
   border: 1px solid rgba(99, 102, 241, 0.24);
-  background: #eef2ff;
+  background: #fff;
   color: #4f46e5;
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 13px;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -298,40 +348,40 @@
 }
 
 .sp-left-pagination span {
-  font-size: 13px;
+  font-size: 12px;
   color: #475569;
   font-weight: 700;
 }
 
 .sp-left-item {
   border: 1px solid rgba(99, 102, 241, 0.12);
-  background: #f9faff;
+  background: #ffffff;
   border-radius: 12px;
-  padding: 10px;
+  padding: 7px;
   display: grid;
-  grid-template-columns: 54px 1fr;
+  grid-template-columns: 34px 1fr;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   text-align: left;
   cursor: pointer;
 }
 
 .sp-left-item.active {
-  border-color: rgba(99, 102, 241, 0.35);
+  border-color: #6366f1;
   background: #eef2ff;
 }
 
 .sp-left-avatar {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   overflow: hidden;
-  background: #e0e7ff;
+  background: #dbe4ff;
   color: #4f46e5;
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: 20px;
+  font-size: 15px;
 }
 
 .sp-left-avatar img {
@@ -341,14 +391,20 @@
 }
 
 .sp-left-item-title {
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
   color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sp-left-item-sub {
-  font-size: 13px;
+  font-size: 11px;
   color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sp-profile-hero {
@@ -366,25 +422,26 @@
 }
 
 .sp-card-avatar.lg {
-  width: 82px;
-  height: 82px;
-  font-size: 28px;
-  border-radius: 20px;
+  width: 72px;
+  height: 72px;
+  font-size: 22px;
+  border-radius: 16px;
 }
 
 .sp-profile-hero-left h3 {
   margin: 0;
-  font-size: 42px;
+  font-size: 24px;
   line-height: 1;
   color: #1f2345;
   text-transform: uppercase;
+  font-weight: 800;
 }
 
 .sp-profile-hero-left p {
   margin: 8px 0 0;
   color: #667085;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .sp-profile-hero-actions {
@@ -397,9 +454,9 @@
 .sp-role-select {
   border: 1px solid rgba(16, 185, 129, 0.35);
   border-radius: 999px;
-  padding: 10px 14px;
-  font-size: 16px;
-  font-weight: 800;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
   background: #ecfdf3;
   color: #059669;
@@ -427,7 +484,7 @@
 
 .sp-profile-details-head h3 {
   margin: 0;
-  font-size: 34px;
+  font-size: 17px;
   color: #1f2345;
 }
 
@@ -459,9 +516,9 @@
 }
 
 .sp-profile-detail-grid strong {
-  font-size: 15px;
+  font-size: 13px;
   color: #111827;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .sp-list {
@@ -1136,6 +1193,15 @@
   }
   .sp-profile-layout {
     grid-template-columns: 1fr;
+  }
+  .sp-left-panel {
+    position: static;
+    min-height: auto;
+    height: auto;
+    max-height: none;
+  }
+  .sp-right-panel {
+    min-height: auto;
   }
   .sp-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));

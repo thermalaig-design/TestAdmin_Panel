@@ -25,6 +25,7 @@ export default function SubFeatureControlPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null, superuserId = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
 
   const [trustOptions, setTrustOptions] = useState(trust ? [trust] : []);
   const [selectedTrustId, setSelectedTrustId] = useState(trust?.id || '');
@@ -255,7 +256,7 @@ export default function SubFeatureControlPage() {
     <div className="fc-root">
       <Sidebar
         trustName={selectedTrust?.name || trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust: selectedTrust || trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust: selectedTrust || trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
 
@@ -263,7 +264,7 @@ export default function SubFeatureControlPage() {
         <PageHeader
           title="Sub Feature Control"
           subtitle="Manage sub feature display, order and visibility"
-          onBack={() => navigate('/dashboard', { state: { userName, trust: selectedTrust || trust } })}
+          onBack={() => navigate('/dashboard', { state: { userName, trust: selectedTrust || trust, sidebarNavKey: currentSidebarNavKey } })}
         />
 
         <section className="fc-panel">

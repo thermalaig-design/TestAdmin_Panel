@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 const FOLDERS_TABLE = 'gallery_folders';
 const PHOTOS_TABLE = 'gallery_photos';
@@ -20,25 +21,30 @@ function normalizePhotoRow(row = {}, index = 0) {
 export async function fetchGalleryFolders(trustId) {
   if (!trustId) return { data: [], error: null };
 
-  const { data, error } = await supabase
-    .from(FOLDERS_TABLE)
-    .select('*')
-    .eq('trust_id', trustId)
-    .order('created_at', { ascending: true });
+  return cachedQuery(`gallery:folders:${trustId}`, async () => {
+    const { data, error } = await supabase
+      .from(FOLDERS_TABLE)
+      .select('*')
+      .eq('trust_id', trustId)
+      .order('created_at', { ascending: true });
 
-  return { data: (data || []).map(normalizeFolderRow), error };
+    return { data: (data || []).map(normalizeFolderRow), error };
+  }, 12000);
 }
 
 export async function fetchGalleryPhotos(folderIds = []) {
   if (!folderIds.length) return { data: [], error: null };
+  const key = [...folderIds].map(String).sort().join(',');
 
-  const { data, error } = await supabase
-    .from(PHOTOS_TABLE)
-    .select('*')
-    .in('folder_id', folderIds)
-    .order('created_at', { ascending: false });
+  return cachedQuery(`gallery:photos:${key}`, async () => {
+    const { data, error } = await supabase
+      .from(PHOTOS_TABLE)
+      .select('*')
+      .in('folder_id', folderIds)
+      .order('created_at', { ascending: false });
 
-  return { data: (data || []).map(normalizePhotoRow), error };
+    return { data: (data || []).map(normalizePhotoRow), error };
+  }, 10000);
 }
 
 export async function createGalleryFolder(name, trustId) {
@@ -51,6 +57,7 @@ export async function createGalleryFolder(name, trustId) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('gallery:');
   return { data: data ? normalizeFolderRow(data, 0) : null, error };
 }
 
@@ -69,6 +76,7 @@ export async function updateGalleryFolder(folderId, updates) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('gallery:');
   return { data: data ? normalizeFolderRow(data, 0) : null, error };
 }
 
@@ -86,6 +94,7 @@ export async function createGalleryPhoto(payload) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('gallery:photos:');
   return { data: data ? normalizePhotoRow(data, 0) : null, error };
 }
 
@@ -97,6 +106,7 @@ export async function deleteGalleryPhoto(photoId) {
     .delete()
     .eq('id', photoId);
 
+  if (!error) invalidateCache('gallery:');
   return { error };
 }
 
@@ -108,5 +118,6 @@ export async function deleteGalleryFolder(folderId) {
     .delete()
     .eq('id', folderId);
 
+  if (!error) invalidateCache('gallery:');
   return { error };
 }

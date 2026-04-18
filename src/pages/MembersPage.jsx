@@ -165,6 +165,7 @@ export default function MembersPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
   const isCreateRoute = location.pathname === '/member/create_member';
   const cachedMembers = readMembersCache(trustId);
@@ -514,7 +515,7 @@ export default function MembersPage() {
     <div className="sp-root">
       <Sidebar
         trustName={trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
 
@@ -527,7 +528,7 @@ export default function MembersPage() {
               navigate('/member', { state: { userName, trust } });
               return;
             }
-            navigate('/dashboard', { state: { userName, trust } });
+            navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
           }}
         />
 

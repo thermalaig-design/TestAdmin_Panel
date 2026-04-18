@@ -304,6 +304,7 @@ export default function MemberProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
 
   const [members, setMembers] = useState([]);
@@ -952,7 +953,7 @@ export default function MemberProfilePage() {
     <div className="mp-root">
       <Sidebar
         trustName={trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
 
@@ -960,7 +961,7 @@ export default function MemberProfilePage() {
         <PageHeader
           title="Profile"
           subtitle="View Members, Registered Member, and Member Profile table data"
-          onBack={() => navigate('/dashboard', { state: { userName, trust } })}
+          onBack={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         />
 
         <div className="mp-content">
@@ -1049,45 +1050,47 @@ export default function MemberProfilePage() {
               {!loadingMembers && sortedVisibleMembers.length === 0 && (
                 <div className="mp-info-card">No members found.</div>
               )}
-              <div className="mp-members-list">
-                {paginatedMembers.map((member) => (
-                  <button
-                    key={member.member_id}
-                    className={`mp-member-item ${String(effectiveSelectedMemberId) === String(member.member_id) ? 'active' : ''}`}
-                    onClick={() => setSelectedMemberId(member.member_id || '')}
-                    type="button"
-                  >
-                    <div className="mp-member-avatar">{initials(member.name || 'Member')}</div>
-                    <div className="mp-member-meta">
-                      <div className="mp-member-name">{member.name || 'Member'}</div>
-                      <div className="mp-member-sub">
-                        {member.company_name || member.mobile || member.email || 'No details'}
+              <div className="mp-members-scroll-area">
+                <div className="mp-members-list">
+                  {paginatedMembers.map((member) => (
+                    <button
+                      key={member.member_id}
+                      className={`mp-member-item ${String(effectiveSelectedMemberId) === String(member.member_id) ? 'active' : ''}`}
+                      onClick={() => setSelectedMemberId(member.member_id || '')}
+                      type="button"
+                    >
+                      <div className="mp-member-avatar">{initials(member.name || 'Member')}</div>
+                      <div className="mp-member-meta">
+                        <div className="mp-member-name">{member.name || 'Member'}</div>
+                        <div className="mp-member-sub">
+                          {member.company_name || member.mobile || member.email || 'No details'}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              {!loadingMembers && sortedVisibleMembers.length > 0 && (
-                <div className="mp-pagination">
-                  <button
-                    type="button"
-                    className="mp-page-btn"
-                    onClick={() => setCurrentPage((prev) => Math.max(1, Math.min(prev, totalPages) - 1))}
-                    disabled={safeCurrentPage <= 1}
-                  >
-                    Prev
-                  </button>
-                  <span className="mp-page-info">Page {safeCurrentPage} / {totalPages}</span>
-                  <button
-                    type="button"
-                    className="mp-page-btn"
-                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, Math.min(prev, totalPages) + 1))}
-                    disabled={safeCurrentPage >= totalPages}
-                  >
-                    Next
-                  </button>
+                    </button>
+                  ))}
                 </div>
-              )}
+                {!loadingMembers && sortedVisibleMembers.length > 0 && (
+                  <div className="mp-pagination">
+                    <button
+                      type="button"
+                      className="mp-page-btn"
+                      onClick={() => setCurrentPage((prev) => Math.max(1, Math.min(prev, totalPages) - 1))}
+                      disabled={safeCurrentPage <= 1}
+                    >
+                      Prev
+                    </button>
+                    <span className="mp-page-info">Page {safeCurrentPage} / {totalPages}</span>
+                    <button
+                      type="button"
+                      className="mp-page-btn"
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, Math.min(prev, totalPages) + 1))}
+                      disabled={safeCurrentPage >= totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
             </aside>
 
             <section className="mp-detail-panel">
@@ -1244,7 +1247,43 @@ export default function MemberProfilePage() {
                                   </>
                                 ) : (
                                   <input
+                                    name={field.key}
+                                    type={field.key === 'joined_date' ? 'date' : 'text'}
                                     value={getProfileFieldValue(field.key)}
+                                    onClick={(event) => {
+                                      if (field.key !== 'joined_date') return;
+
+                                      const openPicker = (input) => {
+                                        if (!input || typeof input.showPicker !== 'function') return;
+                                        try {
+                                          input.showPicker();
+                                        } catch {
+                                          // Ignore when browser blocks programmatic picker open.
+                                        }
+                                      };
+
+                                      if (!isFieldEditable(field.key)) {
+                                        handleStartEdit();
+                                        window.setTimeout(() => {
+                                          const input = document.querySelector('input[name="joined_date"]');
+                                          if (!input) return;
+                                          input.focus();
+                                          openPicker(input);
+                                        }, 0);
+                                        return;
+                                      }
+
+                                      openPicker(event.currentTarget);
+                                    }}
+                                    onFocus={(event) => {
+                                      if (field.key !== 'joined_date' || !isFieldEditable(field.key)) return;
+                                      if (typeof event.currentTarget.showPicker !== 'function') return;
+                                      try {
+                                        event.currentTarget.showPicker();
+                                      } catch {
+                                        // Ignore when browser blocks programmatic picker open.
+                                      }
+                                    }}
                                     onChange={(event) => {
                                       if (!isFieldEditable(field.key)) return;
                                       setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
 import { createEvent, deleteEvent, fetchEventsByTrust, updateEvent } from '../services/eventsService';
+import { getCachedQueryValue } from '../services/requestCache';
 import { parseAttachmentItem, readFileAsDataUrl, serializeAttachmentItem } from '../utils/attachmentUtils';
 import './EventsPage.css';
 
@@ -66,10 +67,15 @@ export default function EventsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
+  const eventsCacheKey = trustId ? `events:list:${trustId}` : '';
+  const cachedEventsPayload = eventsCacheKey ? getCachedQueryValue(eventsCacheKey) : null;
+  const seededEvents = Array.isArray(cachedEventsPayload?.data) ? cachedEventsPayload.data : [];
+  const seededFromCacheRef = useRef(seededEvents.length > 0);
 
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState(seededEvents);
+  const [loading, setLoading] = useState(!seededFromCacheRef.current);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [previewEvent, setPreviewEvent] = useState(null);
@@ -96,6 +102,7 @@ export default function EventsPage() {
     location: '',
     startEventDate: '',
     start_time: '',
+    end_time: '',
     endEventDate: '',
     type: 'general',
     status: 'active',
@@ -110,6 +117,7 @@ export default function EventsPage() {
       location: '',
       startEventDate: '',
       start_time: '',
+      end_time: '',
       endEventDate: '',
       type: 'general',
       status: 'active',
@@ -126,7 +134,7 @@ export default function EventsPage() {
     }
 
     const load = async () => {
-      setLoading(true);
+      if (!seededFromCacheRef.current) setLoading(true);
       setError('');
       const { data, error: fetchError } = await fetchEventsByTrust(trustId);
       if (fetchError) {
@@ -134,6 +142,7 @@ export default function EventsPage() {
       }
       setEvents(data || []);
       setLoading(false);
+      seededFromCacheRef.current = false;
     };
 
     load();
@@ -160,14 +169,25 @@ export default function EventsPage() {
     return () => document.removeEventListener('keydown', onEsc);
   }, [previewEvent]);
 
-  const activeEvents = useMemo(
-    () => events.filter((event) => !isPausedEvent(event)),
+  const optimizedEvents = useMemo(
+    () =>
+      events.map((event) => ({
+        ...event,
+        _searchText: `${event?.title || ''} ${event?.description || ''} ${event?.location || ''}`.toLowerCase(),
+        _sortStartDate: getDateSortValue(event?.startEventDate),
+        _sortEndDate: getDateSortValue(event?.endEventDate),
+      })),
     [events]
   );
 
+  const activeEvents = useMemo(
+    () => optimizedEvents.filter((event) => !isPausedEvent(event)),
+    [optimizedEvents]
+  );
+
   const pausedEvents = useMemo(
-    () => events.filter((event) => isPausedEvent(event)),
-    [events]
+    () => optimizedEvents.filter((event) => isPausedEvent(event)),
+    [optimizedEvents]
   );
 
   const scopedEvents = useMemo(
@@ -181,19 +201,16 @@ export default function EventsPage() {
 
     if (term) {
       list = list.filter((event) => {
-        const title = String(event?.title || '').toLowerCase();
-        const description = String(event?.description || '').toLowerCase();
-        const locationValue = String(event?.location || '').toLowerCase();
-        return title.includes(term) || description.includes(term) || locationValue.includes(term);
+        return String(event?._searchText || '').includes(term);
       });
     }
 
     if (sortBy === 'name') {
       list.sort((left, right) => String(left?.title || '').localeCompare(String(right?.title || '')));
     } else if (sortBy === 'end_date') {
-      list.sort((left, right) => getTimeSortValue(left?.endEventDate).localeCompare(getTimeSortValue(right?.endEventDate)));
+      list.sort((left, right) => String(left?._sortEndDate || '').localeCompare(String(right?._sortEndDate || '')));
     } else {
-      list.sort((left, right) => getDateSortValue(left?.startEventDate).localeCompare(getDateSortValue(right?.startEventDate)));
+      list.sort((left, right) => String(left?._sortStartDate || '').localeCompare(String(right?._sortStartDate || '')));
     }
 
     return list;
@@ -257,6 +274,7 @@ export default function EventsPage() {
       location: form.location,
       startEventDate: form.startEventDate,
       start_time: form.start_time || null,
+      end_time: form.end_time || null,
       endEventDate: form.endEventDate || null,
       type: form.type,
       status: form.status,
@@ -358,6 +376,7 @@ export default function EventsPage() {
       location: event.location || '',
       startEventDate: event.startEventDate || '',
       start_time: event.start_time || '',
+      end_time: event.end_time || event.raw?.end_time || '',
       endEventDate: event.endEventDate || '',
       type: event.type || 'general',
       status: event.status || 'active',
@@ -392,7 +411,7 @@ export default function EventsPage() {
     <div className="ev-root">
       <Sidebar
         trustName={trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
 
@@ -400,7 +419,7 @@ export default function EventsPage() {
         <PageHeader
           title="Events"
           subtitle="Data is now fetched and inserted from the events table"
-          onBack={() => navigate('/dashboard', { state: { userName, trust } })}
+          onBack={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         />
 
         <section className="ev-content">
@@ -418,32 +437,44 @@ export default function EventsPage() {
                     placeholder="Enter event title"
                   />
                 </label>
-                <label>
-                  <span>Start Date *</span>
+                <div className="ev-date-field">
+                  <span>Start Date</span>
                   <input
                     type="date"
                     value={form.startEventDate}
                     onChange={(e) => setForm((prev) => ({ ...prev, startEventDate: e.target.value }))}
-                    onFocus={(e) => e.target.showPicker?.()}
                     onClick={(e) => e.target.showPicker?.()}
                   />
-                </label>
-                <label>
+                </div>
+                <div className="ev-date-field">
                   <span>End Date</span>
                   <input
-                    type="time"
+                    type="date"
                     value={form.endEventDate}
                     onChange={(e) => setForm((prev) => ({ ...prev, endEventDate: e.target.value }))}
+                    onClick={(e) => e.target.showPicker?.()}
                   />
-                </label>
-                <label>
-                  <span>Start Time</span>
-                  <input
-                    type="time"
-                    value={form.start_time}
-                    onChange={(e) => setForm((prev) => ({ ...prev, start_time: e.target.value }))}
-                  />
-                </label>
+                </div>
+                <div className="ev-time-pair ev-span-2">
+                  <div className="ev-time-field">
+                    <span>Start Time</span>
+                    <input
+                      type="time"
+                      value={form.start_time}
+                      onChange={(e) => setForm((prev) => ({ ...prev, start_time: e.target.value }))}
+                      onClick={(e) => e.target.showPicker?.()}
+                    />
+                  </div>
+                  <div className="ev-time-field">
+                    <span>End Time</span>
+                    <input
+                      type="time"
+                      value={form.end_time}
+                      onChange={(e) => setForm((prev) => ({ ...prev, end_time: e.target.value }))}
+                      onClick={(e) => e.target.showPicker?.()}
+                    />
+                  </div>
+                </div>
                 <label>
                   <span>Location</span>
                   <input
@@ -744,7 +775,8 @@ export default function EventsPage() {
                         <div><span>Type</span><strong>{selectedEvent.type || '-'}</strong></div>
                         <div><span>Start Date</span><strong>{formatDate(selectedEvent.startEventDate)}</strong></div>
                         <div><span>Start Time</span><strong>{formatTime(selectedEvent.start_time)}</strong></div>
-                        <div><span>End Date</span><strong>{formatTime(selectedEvent.endEventDate)}</strong></div>
+                        <div><span>End Time</span><strong>{formatTime(selectedEvent.end_time || selectedEvent.raw?.end_time)}</strong></div>
+                        <div><span>End Date</span><strong>{formatDate(selectedEvent.endEventDate)}</strong></div>
                         <div><span>Location</span><strong>{selectedEvent.location || '-'}</strong></div>
                         <div>
                           <span>Registration</span>
@@ -818,8 +850,9 @@ export default function EventsPage() {
                 </div>
                 <div className="ev-detail-meta">
                   <div>Start Date: {formatDate(previewEvent.startEventDate)}</div>
-                  <div>End Date: {formatTime(previewEvent.endEventDate)}</div>
+                  <div>End Date: {formatDate(previewEvent.endEventDate)}</div>
                   <div>Start Time: {formatTime(previewEvent.start_time)}</div>
+                  <div>End Time: {formatTime(previewEvent.end_time || previewEvent.raw?.end_time)}</div>
                   <div>Registration: {previewEvent.is_registration_required ? 'Required' : 'Not Required'}</div>
                 </div>
                 {previewAttachments.length > 0 && (

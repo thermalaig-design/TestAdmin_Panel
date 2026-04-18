@@ -4,6 +4,8 @@
   padding: 20px 28px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 20px;
   position: sticky;
   top: 0;
@@ -60,21 +62,26 @@
 .ph-titles {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  flex: 1;
 }
 
 .ph-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 24px;
+  font-size: clamp(22px, 2.2vw, 26px);
   font-weight: 800;
   color: #1E1F3B;
   letter-spacing: -0.3px;
   margin: 0;
+  line-height: 1.15;
+  word-break: break-word;
 }
 
 .ph-subtitle {
   font-size: 13px;
   color: #9CA3AF;
   margin: 4px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .ph-right {
@@ -84,15 +91,44 @@
   gap: 10px;
 }
 
+@media (max-width: 980px) {
+  .ph-header {
+    padding-left: 66px;
+    padding-right: 16px;
+    gap: 14px;
+  }
+}
+
 @media (max-width: 768px) {
   .ph-header {
     flex-direction: column;
     align-items: flex-start;
-    padding: 16px 18px;
+    padding: 16px 18px 16px 66px;
+    gap: 12px;
   }
 
   .ph-right {
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .ph-header {
+    padding: 12px 10px 12px 58px;
+  }
+
+  .ph-back {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .ph-title {
+    font-size: 20px;
+  }
+
+  .ph-subtitle {
+    font-size: 12px;
   }
 }

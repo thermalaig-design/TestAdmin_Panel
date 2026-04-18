@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 function digitsOnly(value = '') {
   return String(value).replace(/\D/g, '');
@@ -63,13 +64,15 @@ export async function findSuperuserByMobile(phone, countryCode = '+91') {
  * Returns { data: Trust[] | null, error }
  */
 export async function fetchLinkedTrusts(superuserId) {
-  const { data, error } = await supabase
-    .from('Trust')
-    .select('id, name, icon_url, remark, legal_name')
-    .eq('superuser_id', superuserId)
-    .order('name', { ascending: true });
+  return cachedQuery(`auth:trusts:${superuserId}`, async () => {
+    const { data, error } = await supabase
+      .from('Trust')
+      .select('id, name, icon_url, remark, legal_name')
+      .eq('superuser_id', superuserId)
+      .order('name', { ascending: true });
 
-  return { data, error };
+    return { data, error };
+  }, 30000);
 }
 
 /**
@@ -77,13 +80,15 @@ export async function fetchLinkedTrusts(superuserId) {
  * Returns { data: Trust | null, error }
  */
 export async function fetchTrustDetails(trustId) {
-  const { data, error } = await supabase
-    .from('Trust')
-    .select('id, name, icon_url, remark, legal_name, terms_content, privacy_content, created_at')
-    .eq('id', trustId)
-    .maybeSingle();
+  return cachedQuery(`auth:trust:${trustId}`, async () => {
+    const { data, error } = await supabase
+      .from('Trust')
+      .select('id, name, icon_url, remark, legal_name, terms_content, privacy_content, created_at')
+      .eq('id', trustId)
+      .maybeSingle();
 
-  return { data, error };
+    return { data, error };
+  }, 20000);
 }
 
 /**
@@ -98,6 +103,10 @@ export async function updateTrustDetails(trustId, updates = {}) {
     .select('id, name, icon_url, remark, legal_name, terms_content, privacy_content, created_at')
     .maybeSingle();
 
+  if (!error) {
+    invalidateCache(`auth:trust:${trustId}`);
+    invalidateCache('auth:trusts:');
+  }
   return { data, error };
 }
 

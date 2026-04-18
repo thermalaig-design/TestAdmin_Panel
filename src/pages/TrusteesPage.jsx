@@ -7,6 +7,15 @@ import './TrusteesPage.css';
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const initials = (name = '') =>
   name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'T';
+
+function normalizeSearchText(value = '') {
+  return String(value || '').toLowerCase();
+}
+
+function stripHtmlTags(value = '') {
+  return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function normalizeRichContent(content = '') {
   return String(content || '')
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
@@ -146,6 +155,7 @@ export default function TrusteesPage() {
   const location = useLocation();
 
   const { userName = 'Admin', trust: trustFromState = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trustFromState?.id || null;
   const isLogoCardView =
     location.state?.trusteesView === 'logo' || location.state?.dashboardCardId === 'card-logo';
@@ -158,6 +168,7 @@ export default function TrusteesPage() {
   if (!trustId) return null;
 
   const [searchFocused, setSearchFocused] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [trust,         setTrust]         = useState(null);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState(null);
@@ -190,6 +201,22 @@ export default function TrusteesPage() {
 
   const trustName = trust?.name || trustFromState?.name || 'Trust';
   const userInitials = initials(userName);
+  const searchQuery = searchTerm.trim().toLowerCase();
+  const hasSearchQuery = searchQuery.length > 0;
+  const matchesQuery = (...values) => {
+    if (!hasSearchQuery) return true;
+    return values.some((value) => normalizeSearchText(value).includes(searchQuery));
+  };
+
+  const showLogoNameCard = isLogoCardView && matchesQuery('app name', 'trust name', trust?.name);
+  const showLogoRemarkCard = isLogoCardView && matchesQuery('subheading', 'remark', trust?.remark);
+  const showLogoIconCard = isLogoCardView && matchesQuery('logo', 'icon', 'image', trust?.icon_url);
+  const showLegalCard = !isLogoCardView && matchesQuery('legal name', 'company', trust?.legal_name);
+  const showTermsSection = !isLogoCardView && matchesQuery('terms', 'conditions', stripHtmlTags(trust?.terms_content));
+  const showPrivacySection = !isLogoCardView && matchesQuery('privacy', 'policy', stripHtmlTags(trust?.privacy_content));
+  const hasSearchResults = isLogoCardView
+    ? (showLogoNameCard || showLogoRemarkCard || showLogoIconCard)
+    : (showLegalCard || showTermsSection || showPrivacySection);
 
   const startEdit = (field) => {
     setSaveError('');
@@ -280,7 +307,7 @@ export default function TrusteesPage() {
     <div className="tp-root">
       <Sidebar
         trustName={trustName}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust: trust || trustFromState } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust: trust || trustFromState, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
 
@@ -289,17 +316,17 @@ export default function TrusteesPage() {
 
         {/* Topbar */}
         <header className="dash-topbar">
-          <div className="topbar-left">
+          <div className="tp-topbar-left">
             <button
               className="tp-back-btn"
-              onClick={() => navigate('/dashboard', { state: { userName, trust: trust || trustFromState } })}
+              onClick={() => navigate('/dashboard', { state: { userName, trust: trust || trustFromState, sidebarNavKey: currentSidebarNavKey } })}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               Back
             </button>
-            <div>
+            <div className="tp-topbar-titles">
               <h1 className="page-title">Trust Details</h1>
               <p className="page-subtitle">View and manage your trust information</p>
             </div>
@@ -316,6 +343,8 @@ export default function TrusteesPage() {
                 placeholder="Search..."
                 className="search-input"
                 id="tp-search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
               />
@@ -399,6 +428,7 @@ export default function TrusteesPage() {
                   </div>
                   <div className="tp-info-group-cards">
                     {/* App Name */}
+                    {showLogoNameCard && (
                     <div className="tp-info-card tp-info-card-remark">
                   <div className="tp-info-icon" style={{ background: '#EEF2FF', color: '#6366F1' }}>
                     <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
@@ -436,8 +466,10 @@ export default function TrusteesPage() {
                     )}
                   </div>
                     </div>
+                    )}
 
                     {/* Subheading / Remark */}
+                    {showLogoRemarkCard && (
                     <div className="tp-info-card">
                   <div className="tp-info-icon" style={{ background: '#ECFDF5', color: '#059669' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -478,8 +510,10 @@ export default function TrusteesPage() {
                     )}
                   </div>
                     </div>
+                    )}
 
                     {/* Icon */}
+                    {showLogoIconCard && (
                     <div className="tp-info-card">
                   <div className="tp-info-icon" style={{ background: '#FFF7ED', color: '#EA580C' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -554,6 +588,7 @@ export default function TrusteesPage() {
                     )}
                   </div>
                     </div>
+                    )}
                   </div>
                 </section>
                 )}
@@ -565,6 +600,7 @@ export default function TrusteesPage() {
                   </div>
                   <div className="tp-info-group-cards">
                     {/* Legal Name */}
+                    {showLegalCard && (
                     <div className="tp-info-card tp-info-card-legal">
                       <div className="tp-info-icon" style={{ background: '#FDF4FF', color: '#9333EA' }}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -604,6 +640,7 @@ export default function TrusteesPage() {
                         )}
                       </div>
                     </div>
+                    )}
                   </div>
                 </section>
                 )}
@@ -616,6 +653,7 @@ export default function TrusteesPage() {
               {/* ── CONTENT SECTIONS (Terms & Privacy) ── */}
               {!isLogoCardView && (
               <div className="tp-sections-wrap">
+                {showTermsSection && (
                 <ContentSection
                   title="Terms & Conditions"
                   content={trust.terms_content}
@@ -638,7 +676,9 @@ export default function TrusteesPage() {
                     </svg>
                   }
                 />
+                )}
 
+                {showPrivacySection && (
                 <ContentSection
                   title="Privacy Policy"
                   content={trust.privacy_content}
@@ -660,7 +700,14 @@ export default function TrusteesPage() {
                     </svg>
                   }
                 />
+                )}
               </div>
+              )}
+
+              {hasSearchQuery && !hasSearchResults && (
+                <div className="tp-search-empty">
+                  No matching details found for "{searchTerm}".
+                </div>
               )}
             </>
           )}

@@ -126,12 +126,14 @@ function TrustDetails() {
     <div className="trust-details-wrapper">
       {/* Header */}
       <div className="trust-details-header">
-        <button onClick={() => navigate('/dashboard')} className="back-btn">
-          ← Back
-        </button>
-        <div>
-          <h1 className="page-title">Trust Details</h1>
-          <p className="page-subtitle">View and manage your trust information</p>
+        <div className="trust-details-hero-left">
+          <button onClick={() => navigate('/dashboard')} className="back-btn">
+            &larr; Back
+          </button>
+          <div className="trust-details-title-group">
+            <h1 className="page-title">Trust Details</h1>
+            <p className="page-subtitle">View and manage your trust information</p>
+          </div>
         </div>
       </div>
 
@@ -364,4 +366,5 @@ function TrustDetails() {
 }
 
 export default TrustDetails;
+
 

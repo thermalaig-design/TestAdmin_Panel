@@ -10,6 +10,76 @@
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  z-index: 1200;
+}
+
+.sb-mobile-trigger,
+.sb-backdrop,
+.sb-close-btn {
+  display: none;
+}
+
+.sb-mobile-trigger {
+  position: fixed;
+  left: 14px;
+  top: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.24);
+  background: linear-gradient(135deg, #ffffff, #eef2ff);
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.2);
+  padding: 10px 9px;
+  z-index: 1250;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sb-mobile-trigger span {
+  width: 100%;
+  height: 2px;
+  border-radius: 99px;
+  background: #4f46e5;
+  transform-origin: center;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.sb-mobile-trigger.is-open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.sb-mobile-trigger.is-open span:nth-child(2) {
+  opacity: 0;
+}
+
+.sb-mobile-trigger.is-open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+.sb-mobile-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(79, 70, 229, 0.28);
+}
+
+.sb-backdrop {
+  position: fixed;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 42, 0.36);
+  backdrop-filter: blur(1px);
+  z-index: 1190;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.sb-backdrop.show {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sb-brand {
@@ -36,6 +106,7 @@
   flex-direction: column;
   gap: 1px;
   min-width: 0;
+  flex: 1;
 }
 
 .sb-brand-name {
@@ -160,12 +231,84 @@
 }
 
 @media (max-width: 980px) {
+  .sb-mobile-trigger {
+    display: inline-flex;
+  }
+
+  /* Keep only one close control visible when drawer is open */
+  .sb-mobile-trigger.is-open {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(0.96);
+  }
+
+  .sb-backdrop,
+  .sb-close-btn {
+    display: block;
+  }
+
   .sb-sidebar {
-    position: static;
-    top: auto;
-    height: auto;
-    overflow-y: visible;
-    border-right: none;
-    border-bottom: 1px solid rgba(99, 102, 241, 0.08);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(84vw, 290px);
+    max-width: 290px;
+    height: 100dvh;
+    border-right: 1px solid rgba(99, 102, 241, 0.14);
+    border-bottom: none;
+    box-shadow: 8px 0 34px rgba(15, 23, 42, 0.24);
+    transform: translateX(-104%);
+    transition: transform 0.24s ease;
+    overscroll-behavior: contain;
+  }
+
+  .sb-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sb-close-btn {
+    margin-left: auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    background: #f5f7ff;
+    color: #4f46e5;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .sb-brand {
+    padding-top: 10px;
+  }
+
+  .sb-item {
+    min-height: 46px;
+  }
+
+  .sb-label {
+    font-size: 14px;
+  }
+
+  .sb-logout {
+    min-height: 44px;
+  }
+}
+
+body.sb-mobile-lock {
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .sb-mobile-trigger {
+    top: 10px;
+    left: 10px;
+  }
+
+  .sb-sidebar {
+    width: min(88vw, 300px);
   }
 }

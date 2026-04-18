@@ -36,7 +36,9 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: calc(100vh - 180px);
+  min-height: calc(100vh - 112px);
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
   position: sticky;
   top: 86px;
   overflow: hidden;
@@ -77,11 +79,11 @@
   border: 1px solid rgba(99, 102, 241, 0.24);
   border-radius: 18px;
   width: 100%;
-  min-height: 64px;
-  padding: 14px 24px;
+  min-height: 54px;
+  padding: 10px 16px;
   background: linear-gradient(135deg, #4f46e5 0%, #6366f1 48%, #7c3aed 100%);
   color: #ffffff;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1;
   cursor: pointer;
@@ -121,14 +123,14 @@
 }
 
 .mp-add-member-icon {
-  width: 24px;
-  height: 24px;
+  width: 21px;
+  height: 21px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.3);
   display: grid;
   place-items: center;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
   font-weight: 700;
 }
@@ -139,9 +141,12 @@
 }
 
 .mp-members-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .mp-sort-label {
@@ -152,6 +157,7 @@
   font-weight: 700;
   color: #4b5563;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .mp-filter-count {
@@ -169,7 +175,9 @@
 }
 
 .mp-sort-select {
-  flex: 1;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid rgba(99, 102, 241, 0.2);
   border-radius: 10px;
   padding: 8px 10px;
@@ -235,8 +243,18 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 2px;
+}
+
+.mp-members-scroll-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .mp-member-item {
@@ -296,7 +314,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 6px;
+  padding-top: 8px;
+  margin-top: auto;
+  border-top: 1px solid rgba(99, 102, 241, 0.12);
+  background: #ffffff;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
 }
 
 .mp-page-btn {
@@ -1237,7 +1261,24 @@
 
   .mp-members-panel {
     position: static;
+    top: auto;
+    min-height: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .mp-members-list {
+    min-height: 0;
     max-height: 360px;
+    overflow-y: auto;
+  }
+
+  .mp-pagination {
+    position: static;
+    bottom: auto;
+    z-index: auto;
+    margin-top: 8px;
   }
 
   .mp-form-grid {
@@ -1257,6 +1298,48 @@
 
   .mp-content {
     padding: 16px;
+  }
+
+  .mp-members-panel {
+    padding: 12px;
+    gap: 8px;
+    min-height: auto;
+    height: auto;
+    max-height: none;
+  }
+
+  .mp-members-head h3 {
+    font-size: 18px;
+  }
+
+  .mp-members-head span {
+    padding: 2px 9px;
+    font-size: 11px;
+  }
+
+  .mp-stat-chip {
+    padding: 6px 8px;
+    min-height: 34px;
+  }
+
+  .mp-members-search,
+  .mp-sort-select {
+    height: 40px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .mp-add-member-btn {
+    min-height: 46px;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: 14px;
+  }
+
+  .mp-add-member-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 13px;
   }
 
   .mp-grid {
@@ -1285,6 +1368,62 @@
 
   .mp-modal-form {
     grid-template-columns: 1fr;
+  }
+
+  .mp-members-controls {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .mp-sort-label {
+    justify-content: space-between;
+  }
+
+  .mp-members-list {
+    min-height: 0;
+    height: auto;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .mp-members-scroll-area {
+    display: flex;
+    flex-direction: column;
+    flex: initial;
+    min-height: 0;
+  }
+
+  .mp-member-item {
+    padding: 8px;
+    border-radius: 10px;
+  }
+
+  .mp-member-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    font-size: 14px;
+  }
+
+  .mp-member-name {
+    font-size: 13px;
+  }
+
+  .mp-member-sub {
+    font-size: 11px;
+  }
+
+  .mp-pagination {
+    padding-top: 6px;
+    position: static;
+    bottom: auto;
+    z-index: auto;
+  }
+
+  .mp-page-btn {
+    min-width: 56px;
+    height: 28px;
+    font-size: 12px;
   }
 
   .mp-modal-register {

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery } from './requestCache';
 
 const TABLE_CANDIDATES = ['Trustee', 'trustees', 'trustee', 'Trustees'];
 
@@ -37,26 +38,27 @@ function normalizeTrustee(row = {}, index = 0) {
  */
 export async function fetchTrustees(trustId) {
   if (!trustId) return { data: [], error: null };
+  return cachedQuery(`trustees:list:${trustId}`, async () => {
+    let lastError = null;
 
-  let lastError = null;
+    for (const table of TABLE_CANDIDATES) {
+      const { data, error } = await supabase
+        .from(table)
+        .select('*')
+        .eq('trust_id', trustId);
 
-  for (const table of TABLE_CANDIDATES) {
-    const { data, error } = await supabase
-      .from(table)
-      .select('*')
-      .eq('trust_id', trustId);
+      if (!error) {
+        const normalized = (data || []).map(normalizeTrustee);
+        return { data: normalized, error: null };
+      }
 
-    if (!error) {
-      const normalized = (data || []).map(normalizeTrustee);
-      return { data: normalized, error: null };
+      lastError = error;
+      const message = error?.message || '';
+      if (!/relation .* does not exist/i.test(message)) {
+        return { data: [], error };
+      }
     }
 
-    lastError = error;
-    const message = error?.message || '';
-    if (!/relation .* does not exist/i.test(message)) {
-      return { data: [], error };
-    }
-  }
-
-  return { data: [], error: lastError };
+    return { data: [], error: lastError };
+  }, 20000);
 }

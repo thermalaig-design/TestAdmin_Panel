@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'events';
 
@@ -26,28 +27,32 @@ function normalizeRow(row = {}) {
 export async function fetchEventsByTrust(trustId) {
   if (!trustId) return { data: [], error: null };
 
-  const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .select('*')
-    .eq('trust_id', trustId)
-    .order('startEventDate', { ascending: true })
-    .order('endEventDate', { ascending: true })
-    .order('title', { ascending: true });
+  return cachedQuery(`events:list:${trustId}`, async () => {
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .eq('trust_id', trustId)
+      .order('startEventDate', { ascending: true })
+      .order('endEventDate', { ascending: true })
+      .order('title', { ascending: true });
 
-  return { data: (data || []).map(normalizeRow), error };
+    return { data: (data || []).map(normalizeRow), error };
+  }, 12000);
 }
 
 export async function fetchEventById(trustId, eventId) {
   if (!trustId || !eventId) return { data: null, error: { message: 'Missing trust or event id.' } };
 
-  const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .select('*')
-    .eq('trust_id', trustId)
-    .eq('id', eventId)
-    .maybeSingle();
+  return cachedQuery(`events:item:${trustId}:${eventId}`, async () => {
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .eq('trust_id', trustId)
+      .eq('id', eventId)
+      .maybeSingle();
 
-  return { data: data ? normalizeRow(data) : null, error };
+    return { data: data ? normalizeRow(data) : null, error };
+  }, 12000);
 }
 
 export async function createEvent(payload = {}) {
@@ -74,6 +79,7 @@ export async function createEvent(payload = {}) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('events:');
   return { data: data ? normalizeRow(data) : null, error };
 }
 
@@ -115,6 +121,7 @@ export async function updateEvent(eventId, updates = {}, trustId = null) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('events:');
   return { data: data ? normalizeRow(data) : null, error };
 }
 
@@ -131,5 +138,6 @@ export async function deleteEvent(eventId, trustId = null) {
   }
 
   const { error } = await query;
+  if (!error) invalidateCache('events:');
   return { error };
 }

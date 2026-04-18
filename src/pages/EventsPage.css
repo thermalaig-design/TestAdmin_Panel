@@ -89,6 +89,24 @@
   gap: 6px;
 }
 
+.ev-time-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ev-time-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ev-date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .ev-form-grid span {
   font-size: 12px;
   font-weight: 600;
@@ -139,7 +157,7 @@
   background: #fff;
   border-radius: 18px;
   border: 1px solid rgba(99, 102, 241, 0.14);
-  box-shadow: 0 8px 26px rgba(51, 65, 85, 0.12);
+  box-shadow: 0 4px 14px rgba(51, 65, 85, 0.1);
 }
 
 .ev-left-panel {
@@ -157,7 +175,8 @@
 
 .ev-left-head h3 {
   margin: 0;
-  font-size: 24px;
+  font-size: 20px;
+  font-weight: 700;
   color: #1f2a44;
 }
 
@@ -167,8 +186,8 @@
   border-radius: 14px;
   display: grid;
   place-items: center;
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 700;
   color: #4f46e5;
   background: #eef2ff;
 }
@@ -188,7 +207,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: #475569;
   cursor: pointer;
 }
@@ -222,7 +241,7 @@
 
 .ev-inline-field span {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: #475569;
 }
 
@@ -232,7 +251,7 @@
   border-radius: 12px;
   border: 1px solid #cbd5e1;
   padding: 0 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .ev-left-list {
@@ -267,8 +286,8 @@
   border-radius: 12px;
   display: grid;
   place-items: center;
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 700;
   color: #4f46e5;
   background: #e0e7ff;
 }
@@ -280,8 +299,8 @@
 }
 
 .ev-left-item-title {
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 600;
   color: #1f2937;
   white-space: nowrap;
   overflow: hidden;
@@ -308,7 +327,7 @@
   border: 1px solid #c7d2fe;
   background: #f8faff;
   color: #4f46e5;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -319,7 +338,7 @@
 
 .ev-left-pagination span {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: #334155;
 }
 
@@ -352,25 +371,26 @@
   border-radius: 16px;
   display: grid;
   place-items: center;
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
   color: #4f46e5;
   background: #e0e7ff;
 }
 
 .ev-profile-hero h3 {
   margin: 0;
-  font-size: 48px;
-  line-height: 1;
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 700;
   color: #1f2a44;
   letter-spacing: -0.03em;
 }
 
 .ev-profile-hero p {
   margin: 6px 0 0;
-  font-size: 16px;
+  font-size: 14px;
   color: #64748b;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .ev-profile-hero-actions {
@@ -389,7 +409,8 @@
 
 .ev-profile-details-head h3 {
   margin: 0 0 10px;
-  font-size: 22px;
+  font-size: 18px;
+  font-weight: 700;
   color: #1f2a44;
 }
 
@@ -411,7 +432,7 @@
 .ev-profile-detail-grid span {
   font-size: 12px;
   color: #64748b;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .ev-profile-detail-grid strong {
@@ -448,7 +469,7 @@
 .ev-card,
 .ev-detail-card {
   width: 100%;
-  box-shadow: 0 8px 26px rgba(51, 65, 85, 0.12);
+  box-shadow: 0 4px 14px rgba(51, 65, 85, 0.1);
   padding: 18px;
   text-align: left;
 }
@@ -471,7 +492,7 @@
 
 .ev-chip {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
   background: rgba(79, 70, 229, 0.12);
@@ -557,7 +578,8 @@
 .ev-detail-title {
   margin: 10px 0 8px;
   color: #111827;
-  font-size: 20px;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .ev-message,
@@ -769,12 +791,16 @@
     grid-column: span 1;
   }
 
+  .ev-time-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .ev-preview-banner {
     height: 150px;
   }
 
   .ev-profile-hero h3 {
-    font-size: 34px;
+    font-size: 24px;
   }
 
   .ev-profile-detail-grid {
