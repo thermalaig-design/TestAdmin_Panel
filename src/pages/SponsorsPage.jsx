@@ -127,6 +127,7 @@ export default function SponsorsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
   const forceCreateFromState = location.state?.sponsorFormMode === 'create';
   const isCreateRoute = location.pathname.includes('/create_sponsor');
@@ -299,12 +300,13 @@ export default function SponsorsPage() {
     return list;
   }, [visibleSponsors, ownerFilter, trustId, deferredListSearch, statusFilter, sortBy, flashMap, flashActiveBySponsorId]);
 
-  const PAGE_SIZE = 8;
+  const PAGE_SIZE = 10;
   const totalPages = Math.max(1, Math.ceil(panelSponsors.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedSponsors = useMemo(() => {
-    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    const startIndex = (safeCurrentPage - 1) * PAGE_SIZE;
     return panelSponsors.slice(startIndex, startIndex + PAGE_SIZE);
-  }, [panelSponsors, currentPage]);
+  }, [panelSponsors, safeCurrentPage]);
 
   const detailSponsor = useMemo(
     () => (detailSponsorId ? sponsorsById.get(detailSponsorId) || null : null),
@@ -676,7 +678,7 @@ export default function SponsorsPage() {
     <div className="sp-root">
       <Sidebar
         trustName={trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
 
@@ -691,7 +693,7 @@ export default function SponsorsPage() {
               navigate('/sponsor', { state: { userName, trust } });
               return;
             }
-            navigate('/dashboard', { state: { userName, trust } });
+            navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
           }}
           right={null}
         />
@@ -776,55 +778,57 @@ export default function SponsorsPage() {
                   </label>
                 </div>
 
-                <div className="sp-left-list">
-                  {loading && <div className="sp-loading">Loading sponsors...</div>}
-                  {!loading && panelSponsors.length === 0 && (
-                    <div className="sp-empty">
-                      <div className="sp-empty-icon">+</div>
-                      <h3>No sponsors</h3>
-                      <p>No sponsor matched your filter.</p>
+                <div className="sp-members-scroll-area">
+                  <div className="sp-left-list">
+                    {loading && <div className="sp-loading">Loading sponsors...</div>}
+                    {!loading && panelSponsors.length === 0 && (
+                      <div className="sp-empty">
+                        <div className="sp-empty-icon">+</div>
+                        <h3>No sponsors</h3>
+                        <p>No sponsor matched your filter.</p>
+                      </div>
+                    )}
+                    {!loading && paginatedSponsors.map((s) => (
+                      <button
+                        key={s.id}
+                        className={`sp-left-item ${selectedId === s.id ? 'active' : ''}`}
+                        onClick={() => setSelectedId(s.id)}
+                        type="button"
+                      >
+                        <div className="sp-left-avatar">
+                          {s.photo_url
+                            ? <img src={s.photo_url} alt={s.name} />
+                            : <span>{initials(s.name)}</span>
+                          }
+                        </div>
+                        <div className="sp-left-item-body">
+                          <div className="sp-left-item-title">{s.name}</div>
+                          <div className="sp-left-item-sub">{s.company_name || 'No company'}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {!loading && panelSponsors.length > 0 && (
+                    <div className="sp-left-pagination">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((prev) => Math.max(1, Math.min(prev, totalPages) - 1))}
+                        disabled={safeCurrentPage <= 1}
+                      >
+                        Prev
+                      </button>
+                      <span>Page {safeCurrentPage} / {totalPages}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, Math.min(prev, totalPages) + 1))}
+                        disabled={safeCurrentPage >= totalPages}
+                      >
+                        Next
+                      </button>
                     </div>
                   )}
-                  {!loading && paginatedSponsors.map((s) => (
-                    <button
-                      key={s.id}
-                      className={`sp-left-item ${selectedId === s.id ? 'active' : ''}`}
-                      onClick={() => setSelectedId(s.id)}
-                      type="button"
-                    >
-                      <div className="sp-left-avatar">
-                        {s.photo_url
-                          ? <img src={s.photo_url} alt={s.name} />
-                          : <span>{initials(s.name)}</span>
-                        }
-                      </div>
-                      <div className="sp-left-item-body">
-                        <div className="sp-left-item-title">{s.name}</div>
-                        <div className="sp-left-item-sub">{s.company_name || 'No company'}</div>
-                      </div>
-                    </button>
-                  ))}
                 </div>
-
-                {!loading && panelSponsors.length > 0 && (
-                  <div className="sp-left-pagination">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Prev
-                    </button>
-                    <span>Page {currentPage} / {totalPages}</span>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
               </aside>
 
               <section className="sp-right-panel">

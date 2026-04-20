@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Dashboard.css';
 import { fetchTrustDetails } from '../services/authService';
+import { warmupTrustData } from '../services/warmupService';
 import Sidebar from '../components/Sidebar';
 
 // ── Export reusable icon renderer component ───────────────────────────────────
@@ -542,6 +543,31 @@ export default function Dashboard() {
     };
   }, [trustId]);
 
+  useEffect(() => {
+    if (!trustId) return undefined;
+    let cancelled = false;
+    let timeoutId = null;
+
+    const runWarmup = () => {
+      if (cancelled) return;
+      warmupTrustData(trustId);
+    };
+
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(runWarmup, { timeout: 1200 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback(idleId);
+      };
+    }
+
+    timeoutId = window.setTimeout(runWarmup, 250);
+    return () => {
+      cancelled = true;
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [trustId]);
+
   // If no trust is linked, redirect
   useEffect(() => {
     if (!trustId) {
@@ -663,6 +689,7 @@ export default function Dashboard() {
                       state: {
                         userName,
                         trust: activeTrust,
+                        sidebarNavKey: currentSidebarNavKey,
                         trusteesView: card.id === 'card-logo' ? 'logo' : 'default',
                         dashboardCardId: card.id,
                       },

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 const MASTER_FEATURE_COLUMNS = 'id, name, subname, remarks, created_at, updated_at';
 const FLAG_COLUMNS = `
@@ -54,24 +55,28 @@ function buildDefaultFeatureFlagPayload({ feature, trustId, tier, isEnabled = fa
 }
 
 export async function fetchMasterFeatures() {
-  const { data, error } = await supabase
-    .from('features')
-    .select(MASTER_FEATURE_COLUMNS)
-    .order('name', { ascending: true });
+  return cachedQuery('feature-control:master', async () => {
+    const { data, error } = await supabase
+      .from('features')
+      .select(MASTER_FEATURE_COLUMNS)
+      .order('name', { ascending: true });
 
-  return { data: data || [], error };
+    return { data: data || [], error };
+  }, 30000);
 }
 
 export async function fetchFeatureFlagsByTrustAndTier(trustId, tier) {
-  const { data, error } = await supabase
-    .from('feature_flags')
-    .select(FLAG_COLUMNS)
-    .eq('trust_id', trustId)
-    .eq('tier', tier)
-    .order('quick_order', { ascending: true, nullsFirst: false })
-    .order('display_name', { ascending: true });
+  return cachedQuery(`feature-control:flags:${trustId}:${tier}`, async () => {
+    const { data, error } = await supabase
+      .from('feature_flags')
+      .select(FLAG_COLUMNS)
+      .eq('trust_id', trustId)
+      .eq('tier', tier)
+      .order('quick_order', { ascending: true, nullsFirst: false })
+      .order('display_name', { ascending: true });
 
-  return { data: data || [], error };
+    return { data: data || [], error };
+  }, 12000);
 }
 
 export function mergeFeaturesWithFlags(masterFeatures, featureFlags, trustId, tier) {
@@ -137,6 +142,7 @@ export async function createFeatureFlagIfMissing({ feature, trustId, tier, isEna
     .single();
 
   if (!insertError) {
+    invalidateCache('feature-control:flags:');
     return { data: inserted, error: null };
   }
 
@@ -166,6 +172,7 @@ export async function updateFeatureFlagById(flagId, updates) {
     .select(FLAG_COLUMNS)
     .single();
 
+  if (!error) invalidateCache('feature-control:flags:');
   return { data, error };
 }
 

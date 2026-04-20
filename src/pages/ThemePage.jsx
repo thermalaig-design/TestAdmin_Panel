@@ -52,6 +52,7 @@ export default function ThemePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
   const [currentTrust, setCurrentTrust] = useState(trust);
   const [templates, setTemplates] = useState([]);
@@ -343,14 +344,14 @@ export default function ThemePage() {
     <div className="theme-root">
       <Sidebar
         trustName={currentTrust?.name || trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust: currentTrust || trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust: currentTrust || trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
       <main className="theme-main">
         <PageHeader
           title="Theme"
           subtitle="Manage templates and trust theme selection"
-          onBack={() => navigate('/dashboard', { state: { userName, trust: currentTrust || trust } })}
+          onBack={() => navigate('/dashboard', { state: { userName, trust: currentTrust || trust, sidebarNavKey: currentSidebarNavKey } })}
           right={<button className="theme-add-btn" onClick={() => setShowPicker(true)}>Select Theme</button>}
         />
 

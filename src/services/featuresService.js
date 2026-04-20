@@ -1,49 +1,54 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 /**
  * Fetch all feature_flags for a given trust_id, joined with features table.
  * Sorted by quick_order asc, then display_name asc.
  */
 export async function fetchFeatureFlags(trustId) {
-  const { data, error } = await supabase
-    .from('feature_flags')
-    .select(`
-      id,
-      features_id,
-      trust_id,
-      is_enabled,
-      tier,
-      name,
-      description,
-      display_name,
-      tagline,
-      icon_url,
-      route,
-      quick_order,
-      features (
+  return cachedQuery(`features:flags:${trustId}`, async () => {
+    const { data, error } = await supabase
+      .from('feature_flags')
+      .select(`
         id,
+        features_id,
+        trust_id,
+        is_enabled,
+        tier,
         name,
-        subname,
-        remarks
-      )
-    `)
-    .eq('trust_id', trustId)
-    .order('quick_order', { ascending: true, nullsFirst: false })
-    .order('display_name', { ascending: true });
+        description,
+        display_name,
+        tagline,
+        icon_url,
+        route,
+        quick_order,
+        features (
+          id,
+          name,
+          subname,
+          remarks
+        )
+      `)
+      .eq('trust_id', trustId)
+      .order('quick_order', { ascending: true, nullsFirst: false })
+      .order('display_name', { ascending: true });
 
-  return { data, error };
+    return { data, error };
+  }, 15000);
 }
 
 /**
  * Fetch ALL features (master list) — for admin "add feature" dropdown.
  */
 export async function fetchAllFeatures() {
-  const { data, error } = await supabase
-    .from('features')
-    .select('id, name, subname, remarks')
-    .order('name', { ascending: true });
+  return cachedQuery('features:all', async () => {
+    const { data, error } = await supabase
+      .from('features')
+      .select('id, name, subname, remarks')
+      .order('name', { ascending: true });
 
-  return { data, error };
+    return { data, error };
+  }, 30000);
 }
 
 /**
@@ -57,6 +62,7 @@ export async function toggleFeatureFlag(flagId, isEnabled) {
     .select()
     .single();
 
+  if (!error) invalidateCache('features:');
   return { data, error };
 }
 
@@ -71,6 +77,7 @@ export async function updateFeatureFlag(flagId, updates) {
     .select()
     .single();
 
+  if (!error) invalidateCache('features:');
   return { data, error };
 }
 
@@ -93,6 +100,7 @@ export async function addFeatureFlag({ featuresId, trustId, displayName, tagline
     .select()
     .single();
 
+  if (!error) invalidateCache('features:');
   return { data, error };
 }
 
@@ -105,6 +113,7 @@ export async function deleteFeatureFlag(flagId) {
     .delete()
     .eq('id', flagId);
 
+  if (!error) invalidateCache('features:');
   return { error };
 }
 
@@ -118,5 +127,6 @@ export async function createFeature({ name, subname, remarks }) {
     .select()
     .single();
 
+  if (!error) invalidateCache('features:');
   return { data, error };
 }

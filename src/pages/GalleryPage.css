@@ -206,7 +206,9 @@
 }
 
 .gallery-edit-folder,
-.gallery-photo-remove {
+.gallery-photo-remove,
+.gallery-rename-folder,
+.gallery-delete-folder {
   border: 1px solid rgba(91, 102, 255, 0.18);
   background: linear-gradient(135deg, #f9faff, #eef2ff);
   color: #3b46c4;
@@ -362,6 +364,12 @@
   gap: 6px;
 }
 
+.gallery-folder-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .gallery-folder-menu-item {
   width: 100%;
   padding: 10px 12px;
@@ -373,6 +381,27 @@
   font-weight: 700;
   text-align: left;
   cursor: pointer;
+}
+
+.gallery-folder-menu-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(91, 102, 255, 0.2);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4f46e5;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gallery-folder-menu-close:hover {
+  background: #eef2ff;
 }
 
 .gallery-folder-menu-item.delete {
@@ -704,6 +733,16 @@
   padding: 8px 12px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
+}
+
+.gallery-rename-folder {
+  color: #3b46c4;
+}
+
+.gallery-delete-folder {
+  color: #b42318;
+  border-color: rgba(180, 35, 24, 0.22);
+  background: linear-gradient(135deg, #fff6f6, #ffecec);
 }
 
 @media (max-width: 1100px) {

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, getCachedQueryValue, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'marquee_updates';
 
@@ -20,14 +21,21 @@ function normalizeMarqueeRow(row = {}, index = 0) {
 export async function fetchMarqueeUpdatesByTrust(trustId) {
   if (!trustId) return { data: [], error: null };
 
-  const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .select('*')
-    .eq('trust_id', trustId)
-    .order('priority', { ascending: false })
-    .order('created_at', { ascending: false });
+  return cachedQuery(`marquee:list:${trustId}`, async () => {
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .eq('trust_id', trustId)
+      .order('priority', { ascending: false })
+      .order('created_at', { ascending: false });
 
-  return { data: (data || []).map(normalizeMarqueeRow), error };
+    return { data: (data || []).map(normalizeMarqueeRow), error };
+  }, 60000);
+}
+
+export function getCachedMarqueeUpdatesByTrust(trustId) {
+  if (!trustId) return null;
+  return getCachedQueryValue(`marquee:list:${trustId}`);
 }
 
 export async function createMarqueeUpdate(payload = {}) {
@@ -48,6 +56,7 @@ export async function createMarqueeUpdate(payload = {}) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('marquee:');
   return { data: data ? normalizeMarqueeRow(data, 0) : null, error };
 }
 
@@ -71,6 +80,7 @@ export async function updateMarqueeUpdate(id, updates = {}) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('marquee:');
   return { data: data ? normalizeMarqueeRow(data, 0) : null, error };
 }
 
@@ -82,5 +92,6 @@ export async function deleteMarqueeUpdate(id) {
     .delete()
     .eq('id', id);
 
+  if (!error) invalidateCache('marquee:');
   return { error };
 }

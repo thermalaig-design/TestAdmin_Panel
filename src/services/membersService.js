@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 const REGISTERED_TABLE_CANDIDATES = ['registered_members', 'reg_members'];
 const MEMBER_TABLE_CANDIDATES = ['members', 'Members'];
@@ -11,6 +12,10 @@ let resolvedRegisteredTable = null;
 let resolvedMembersTable = null;
 let resolvedRegisteredTables = null;
 let resolvedMemberTables = null;
+
+function invalidateMemberCaches() {
+  invalidateCache('members:');
+}
 
 function pickFirst(row = {}, keys = []) {
   for (const key of keys) {
@@ -275,30 +280,31 @@ async function upsertMemberProfileByMemberId(memberId, payload = {}) {
 
 export async function fetchFamilyMembersByMemberId(memberId) {
   if (!memberId) return { data: [], error: null };
+  return cachedQuery(`members:family:${memberId}`, async () => {
+    const familyTable = await resolveTable(FAMILY_MEMBERS_TABLE_CANDIDATES, 'family_members');
+    const { data, error } = await supabase
+      .from(familyTable)
+      .select('*')
+      .eq('members_id', memberId)
+      .order('created_at', { ascending: true, nullsFirst: false });
 
-  const familyTable = await resolveTable(FAMILY_MEMBERS_TABLE_CANDIDATES, 'family_members');
-  const { data, error } = await supabase
-    .from(familyTable)
-    .select('*')
-    .eq('members_id', memberId)
-    .order('created_at', { ascending: true, nullsFirst: false });
+    if (error) {
+      // Backward compatibility for alternate key naming if schema differs
+      if (String(error?.message || '').toLowerCase().includes('members_id')) {
+        const fallback = await supabase
+          .from(familyTable)
+          .select('*')
+          .eq('member_id', memberId)
+          .order('created_at', { ascending: true, nullsFirst: false });
 
-  if (error) {
-    // Backward compatibility for alternate key naming if schema differs
-    if (String(error?.message || '').toLowerCase().includes('members_id')) {
-      const fallback = await supabase
-        .from(familyTable)
-        .select('*')
-        .eq('member_id', memberId)
-        .order('created_at', { ascending: true, nullsFirst: false });
-
-      if (fallback.error) return { data: [], error: fallback.error };
-      return { data: (fallback.data || []).map(normalizeFamilyMemberRow), error: null };
+        if (fallback.error) return { data: [], error: fallback.error };
+        return { data: (fallback.data || []).map(normalizeFamilyMemberRow), error: null };
+      }
+      return { data: [], error };
     }
-    return { data: [], error };
-  }
 
-  return { data: (data || []).map(normalizeFamilyMemberRow), error: null };
+    return { data: (data || []).map(normalizeFamilyMemberRow), error: null };
+  }, 12000);
 }
 
 export async function createFamilyMember(memberId, payload = {}) {
@@ -315,6 +321,7 @@ export async function createFamilyMember(memberId, payload = {}) {
     .single();
 
   if (error) return { data: null, error };
+  invalidateMemberCaches();
   return { data: normalizeFamilyMemberRow(data), error: null };
 }
 
@@ -334,6 +341,7 @@ export async function updateFamilyMember(familyMemberId, memberId, payload = {})
 
   const { data, error } = memberId ? await query.eq('members_id', memberId) : await query;
   if (error) return { data: null, error };
+  invalidateMemberCaches();
   return { data: normalizeFamilyMemberRow(data), error: null };
 }
 
@@ -342,6 +350,7 @@ export async function deleteFamilyMember(familyMemberId, memberId) {
   const familyTable = await resolveTable(FAMILY_MEMBERS_TABLE_CANDIDATES, 'family_members');
   const query = supabase.from(familyTable).delete().eq('id', familyMemberId);
   const { error } = memberId ? await query.eq('members_id', memberId) : await query;
+  if (!error) invalidateMemberCaches();
   return { error };
 }
 
@@ -433,50 +442,55 @@ async function fetchRegisteredRowById(id, currentTrustId) {
 
 export async function fetchRegisteredMembersByTrust(trustId) {
   if (!trustId) return { data: [], error: null };
-
-  const registeredTables = await resolveAvailableTables(REGISTERED_TABLE_CANDIDATES, 'registered');
-  const tableResults = await Promise.all(
-    registeredTables.map((registeredTable) =>
-      fetchAllRows(
-        supabase
-          .from(registeredTable)
-          .select('*')
-          .eq('trust_id', trustId)
-          .order('joined_date', { ascending: false, nullsFirst: false })
+  return cachedQuery(`members:registered-by-trust:${trustId}`, async () => {
+    const registeredTables = await resolveAvailableTables(REGISTERED_TABLE_CANDIDATES, 'registered');
+    const tableResults = await Promise.all(
+      registeredTables.map((registeredTable) =>
+        fetchAllRows(
+          supabase
+            .from(registeredTable)
+            .select('*')
+            .eq('trust_id', trustId)
+            .order('joined_date', { ascending: false, nullsFirst: false })
+        )
       )
-    )
-  );
-  const errored = tableResults.find((result) => result.error);
-  if (errored?.error) return { data: [], error: errored.error };
-  const registeredRows = tableResults.flatMap((result) => result.data || []);
+    );
+    const errored = tableResults.find((result) => result.error);
+    if (errored?.error) return { data: [], error: errored.error };
+    const registeredRows = tableResults.flatMap((result) => result.data || []);
 
-  const memberIds = (registeredRows || []).map(getRegisteredMemberId).filter(Boolean);
-  const { data: memberRows, error: memberError } = await fetchMemberRowsByIds(memberIds);
-  if (memberError) return { data: [], error: memberError };
+    const memberIds = (registeredRows || []).map(getRegisteredMemberId).filter(Boolean);
+    const { data: memberRows, error: memberError } = await fetchMemberRowsByIds(memberIds);
+    if (memberError) return { data: [], error: memberError };
 
-  const memberMap = new Map((memberRows || []).map((row) => [String(getMemberUniqueId(row)), row]));
-  const normalized = (registeredRows || []).map((row) =>
-    normalizeRegisteredRow(row, memberMap.get(String(getRegisteredMemberId(row))) || {}, trustId)
-  );
+    const memberMap = new Map((memberRows || []).map((row) => [String(getMemberUniqueId(row)), row]));
+    const normalized = (registeredRows || []).map((row) =>
+      normalizeRegisteredRow(row, memberMap.get(String(getRegisteredMemberId(row))) || {}, trustId)
+    );
 
-  return { data: normalized, error: null };
+    return { data: normalized, error: null };
+  }, 12000);
 }
 
 export async function fetchAllMembersDirectory(currentTrustId) {
-  const memberTables = await resolveAvailableTables(MEMBER_TABLE_CANDIDATES, 'members');
-  const tableResults = await Promise.all(
-    memberTables.map((membersTable) =>
-      fetchAllRows(supabase.from(membersTable).select('*'))
-    )
-  );
-  const errored = tableResults.find((result) => result.error);
-  if (errored?.error) return { data: [], error: errored.error };
-  const memberRows = tableResults.flatMap((result) => result.data || []);
+  return cachedQuery(`members:directory:all:${currentTrustId || 'all'}`, async () => {
+    const memberTables = await resolveAvailableTables(MEMBER_TABLE_CANDIDATES, 'members');
+    const tableResults = await Promise.all(
+      memberTables.map((membersTable) =>
+        fetchAllRows(supabase.from(membersTable).select('*'))
+      )
+    );
+    const errored = tableResults.find((result) => result.error);
+    if (errored?.error) return { data: [], error: errored.error };
+    const memberRows = tableResults.flatMap((result) => result.data || []);
 
-  return { data: memberRows.map((row) => normalizeMemberRow(row, currentTrustId)), error: null };
+    return { data: memberRows.map((row) => normalizeMemberRow(row, currentTrustId)), error: null };
+  }, 12000);
 }
 
 export async function fetchRegisteredMembersDirectory(currentTrustId) {
+  const cacheKey = `members:directory:registered:${currentTrustId || 'all'}`;
+  return cachedQuery(cacheKey, async () => {
   const allRows = [];
   let from = 0;
 
@@ -493,9 +507,12 @@ export async function fetchRegisteredMembersDirectory(currentTrustId) {
   }
 
   return { data: allRows, error: null };
+  }, 12000);
 }
 
 export async function fetchRegisteredMembersDirectoryPage(currentTrustId, { from = 0, to = TABLE_PAGE_SIZE - 1 } = {}) {
+  const pageKey = `members:directory:registered-page:${currentTrustId || 'all'}:${from}:${to}`;
+  return cachedQuery(pageKey, async () => {
   const registeredTable = await resolveTable(REGISTERED_TABLE_CANDIDATES, 'registered');
 
   let query = supabase
@@ -523,6 +540,7 @@ export async function fetchRegisteredMembersDirectoryPage(currentTrustId, { from
   );
 
   return { data: normalized, error: null };
+  }, 10000);
 }
 
 export async function registerExistingMember(trustId, memberId, payload = {}) {
@@ -548,6 +566,7 @@ export async function registerExistingMember(trustId, memberId, payload = {}) {
       .eq('id', existingQuery.data.id);
 
     if (error) return { data: null, error };
+    invalidateMemberCaches();
     return fetchRegisteredRowById(existingQuery.data.id, trustId);
   }
 
@@ -558,6 +577,7 @@ export async function registerExistingMember(trustId, memberId, payload = {}) {
     .single();
 
   if (error) return { data: null, error };
+  invalidateMemberCaches();
   return fetchRegisteredRowById(data.id, trustId);
 }
 
@@ -577,7 +597,9 @@ export async function createMember(trustId, payload) {
   const createdMemberId = data?.[memberIdColumn];
   if (!createdMemberId) return { data: null, error: { message: 'Member id not returned after create.' } };
 
-  return registerExistingMember(trustId, createdMemberId, payload);
+  const result = await registerExistingMember(trustId, createdMemberId, payload);
+  if (!result?.error) invalidateMemberCaches();
+  return result;
 }
 
 export async function updateRegisteredMember(registrationId, payload, currentTrustId) {
@@ -610,6 +632,7 @@ export async function updateRegisteredMember(registrationId, payload, currentTru
   const { error: memberProfileError } = await upsertMemberProfileByMemberId(memberId, payload);
   if (memberProfileError) return { data: null, error: memberProfileError };
 
+  invalidateMemberCaches();
   return fetchRegisteredRowById(registrationId, currentTrustId);
 }
 
@@ -634,6 +657,7 @@ export async function updateRegisteredMembership(registrationId, payload, curren
 
   if (error) return { data: null, error };
 
+  invalidateMemberCaches();
   return fetchRegisteredRowById(registrationId, currentTrustId);
 }
 
@@ -645,10 +669,13 @@ export async function unregisterRegisteredMember(registrationId, currentTrustId)
     .eq('id', registrationId)
     .eq('trust_id', currentTrustId);
 
+  if (!error) invalidateMemberCaches();
   return { error };
 }
 
 export async function fetchMemberProfileView({ registrationId = null, memberId = null, trustId = null } = {}) {
+  const profileKey = `members:profile:${registrationId || ''}:${memberId || ''}:${trustId || ''}`;
+  return cachedQuery(profileKey, async () => {
   const registeredTable = await resolveTable(REGISTERED_TABLE_CANDIDATES, 'registered');
   const memberIdColumn = registeredTable === 'registered_members' ? 'member_id' : 'members_id';
 
@@ -752,4 +779,5 @@ export async function fetchMemberProfileView({ registrationId = null, memberId =
     },
     error: null,
   };
+  }, 10000);
 }

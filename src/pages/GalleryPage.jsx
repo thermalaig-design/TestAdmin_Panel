@@ -18,6 +18,7 @@ export default function GalleryPage() {
   const location = useLocation();
   const { folderId: routeFolderId = '' } = useParams();
   const { userName = 'Admin', trust = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
 
   const [folders, setFolders] = useState([]);
@@ -111,7 +112,7 @@ export default function GalleryPage() {
       navigate('/gallery', { state: { userName, trust } });
       return;
     }
-    navigate('/dashboard', { state: { userName, trust } });
+    navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
   };
 
   const filteredFolders = useMemo(() => {
@@ -314,7 +315,7 @@ export default function GalleryPage() {
     <div className="gallery-root">
       <Sidebar
         trustName={trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
       <main className="gallery-main">
@@ -416,16 +417,29 @@ export default function GalleryPage() {
                             </button>
                             {activeFolderMenuId === folder.id && (
                               <div className="gallery-folder-menu">
-                                <button
-                                  type="button"
-                                  className="gallery-folder-menu-item"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRenameFolder(folder);
-                                  }}
-                                >
-                                  Rename folder
-                                </button>
+                                <div className="gallery-folder-menu-row">
+                                  <button
+                                    type="button"
+                                    className="gallery-folder-menu-item"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRenameFolder(folder);
+                                    }}
+                                  >
+                                    Rename folder
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="gallery-folder-menu-close"
+                                    aria-label="Close folder menu"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveFolderMenuId(null);
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
                                 <button
                                   type="button"
                                   className="gallery-folder-menu-item delete"
@@ -501,19 +515,30 @@ export default function GalleryPage() {
                     <div className="gallery-detail-sub">A focused card board for this album</div>
                   </div>
                   <div className="gallery-detail-actions">
+                    {isEditingFolder && selectedFolder && (
+                      <>
+                        <button
+                          className="gallery-rename-folder"
+                          onClick={() => handleRenameFolder(selectedFolder)}
+                          type="button"
+                        >
+                          Rename Folder
+                        </button>
+                        <button
+                          className="gallery-delete-folder"
+                          onClick={() => handleDeleteFolder(selectedFolder)}
+                          type="button"
+                        >
+                          Delete Folder
+                        </button>
+                      </>
+                    )}
                     <button
                       className={`gallery-edit-folder ${isEditingFolder ? 'active' : ''}`}
                       onClick={() => setIsEditingFolder((prev) => !prev)}
                       type="button"
                     >
                       {isEditingFolder ? 'Done' : 'Edit Folder'}
-                    </button>
-                    <button
-                      className="gallery-back"
-                      onClick={() => navigate('/gallery', { state: { userName, trust } })}
-                      type="button"
-                    >
-                      Back to folders
                     </button>
                   </div>
                 </div>
@@ -616,7 +641,7 @@ export default function GalleryPage() {
                               className="gallery-photo-remove"
                               onClick={() => handleDeletePhoto(photo.id)}
                             >
-                              Remove
+                              Delete photo
                             </button>
                           )}
                         </div>

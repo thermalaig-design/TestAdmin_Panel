@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 const TRUST_COLUMNS = 'id, name, icon_url, remark, created_at, terms_content, privacy_content, template_id, legal_name, superuser_id';
 
@@ -24,6 +25,7 @@ export async function createTrust(superuserId, { name, legalName, iconUrl, remar
     .select(TRUST_COLUMNS)
     .single();
 
+  if (!error) invalidateCache('trust:');
   return { data, error };
 }
 
@@ -33,13 +35,15 @@ export async function createTrust(superuserId, { name, legalName, iconUrl, remar
 export async function fetchTrustDetails(trustId) {
   if (!trustId) return { data: null, error: { message: 'No trust ID provided' } };
 
-  const { data, error } = await supabase
-    .from('Trust')
-    .select(TRUST_COLUMNS)
-    .eq('id', trustId)
-    .single();
+  return cachedQuery(`trust:details:${trustId}`, async () => {
+    const { data, error } = await supabase
+      .from('Trust')
+      .select(TRUST_COLUMNS)
+      .eq('id', trustId)
+      .single();
 
-  return { data, error };
+    return { data, error };
+  }, 20000);
 }
 
 /**
@@ -58,6 +62,7 @@ export async function updateTrustContent(trustId, { termsContent, privacyContent
     .select(TRUST_COLUMNS)
     .single();
 
+  if (!error) invalidateCache(`trust:details:${trustId}`);
   return { data, error };
 }
 
@@ -74,5 +79,6 @@ export async function updateTrustInfo(trustId, updates) {
     .select(TRUST_COLUMNS)
     .single();
 
+  if (!error) invalidateCache(`trust:details:${trustId}`);
   return { data, error };
 }

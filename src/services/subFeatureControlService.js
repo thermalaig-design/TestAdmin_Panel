@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 const MASTER_FEATURE_COLUMNS = 'id, name, subname, remarks, created_at, updated_at';
 const MASTER_SUB_FEATURE_COLUMNS = 'id, feature_id, sub_feature_name, remark, created_at, updated_at';
@@ -59,47 +60,53 @@ function buildDefaultSubFeatureFlagPayload({
 }
 
 export async function fetchMasterFeaturesForSubFeatures() {
-  const { data, error } = await supabase
-    .from('features')
-    .select(MASTER_FEATURE_COLUMNS)
-    .order('name', { ascending: true });
+  return cachedQuery('subfeature-control:master', async () => {
+    const { data, error } = await supabase
+      .from('features')
+      .select(MASTER_FEATURE_COLUMNS)
+      .order('name', { ascending: true });
 
-  return { data: data || [], error };
+    return { data: data || [], error };
+  }, 30000);
 }
 
 export async function fetchSubFeaturesByFeature(featureId) {
   if (!featureId) return { data: [], error: null };
 
-  const { data, error } = await supabase
-    .from('sub_features')
-    .select(MASTER_SUB_FEATURE_COLUMNS)
-    .eq('feature_id', featureId)
-    .order('sub_feature_name', { ascending: true });
+  return cachedQuery(`subfeature-control:list:${featureId}`, async () => {
+    const { data, error } = await supabase
+      .from('sub_features')
+      .select(MASTER_SUB_FEATURE_COLUMNS)
+      .eq('feature_id', featureId)
+      .order('sub_feature_name', { ascending: true });
 
-  return { data: data || [], error };
+    return { data: data || [], error };
+  }, 15000);
 }
 
 export async function fetchSubFeatureFlagsByTrustTierAndFeature(trustId, tier, featureId) {
   if (!trustId || !featureId) return { data: [], error: null };
 
-  const { data, error } = await supabase
-    .from('sub_feature_flags')
-    .select(`
-      ${SUB_FEATURE_FLAG_COLUMNS},
-      sub_features!inner (
-        id,
-        feature_id,
-        sub_feature_name,
-        remark
-      )
-    `)
-    .eq('trust_id', String(trustId))
-    .eq('tier', toTier(tier))
-    .eq('sub_features.feature_id', featureId)
-    .order('quick_order', { ascending: true, nullsFirst: false })
-    .order('display_name', { ascending: true });
+  return cachedQuery(`subfeature-control:flags:${trustId}:${toTier(tier)}:${featureId}`, async () => {
+    const { data, error } = await supabase
+      .from('sub_feature_flags')
+      .select(`
+        ${SUB_FEATURE_FLAG_COLUMNS},
+        sub_features!inner (
+          id,
+          feature_id,
+          sub_feature_name,
+          remark
+        )
+      `)
+      .eq('trust_id', String(trustId))
+      .eq('tier', toTier(tier))
+      .eq('sub_features.feature_id', featureId)
+      .order('quick_order', { ascending: true, nullsFirst: false })
+      .order('display_name', { ascending: true });
 
-  return { data: data || [], error };
+    return { data: data || [], error };
+  }, 12000);
 }
 
 export function mergeSubFeaturesWithFlags(masterSubFeatures, subFeatureFlags, trustId, tier) {
@@ -168,7 +175,10 @@ export async function createSubFeatureFlagIfMissing({
     .select(SUB_FEATURE_FLAG_COLUMNS)
     .single();
 
-  if (!insertError) return { data: inserted, error: null };
+  if (!insertError) {
+    invalidateCache('subfeature-control:flags:');
+    return { data: inserted, error: null };
+  }
   if (!isDuplicateError(insertError)) return { data: null, error: insertError };
 
   const { data: duplicateSafe, error: duplicateSafeError } = await fetchSubFeatureFlagByKey({
@@ -193,6 +203,7 @@ export async function updateSubFeatureFlagById(flagId, updates) {
     .select(SUB_FEATURE_FLAG_COLUMNS)
     .single();
 
+  if (!error) invalidateCache('subfeature-control:flags:');
   return { data, error };
 }
 

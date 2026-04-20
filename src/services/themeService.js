@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cachedQuery, invalidateCache } from './requestCache';
 
 const DEFAULT_HOME_LAYOUT = ['gallery', 'quickActions', 'sponsors'];
 const DEFAULT_ANIMATIONS = {
@@ -8,12 +9,14 @@ const DEFAULT_ANIMATIONS = {
 };
 
 export async function fetchTemplates() {
-  const { data, error } = await supabase
-    .from('app_templates')
-    .select('*')
-    .order('created_at', { ascending: false });
+  return cachedQuery('theme:templates', async () => {
+    const { data, error } = await supabase
+      .from('app_templates')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  return { data, error };
+    return { data, error };
+  }, 30000);
 }
 
 export async function createTemplate(payload) {
@@ -29,6 +32,7 @@ export async function createTemplate(payload) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('theme:');
   return { data, error };
 }
 
@@ -40,6 +44,7 @@ export async function updateTemplate(id, updates) {
     .select('*')
     .single();
 
+  if (!error) invalidateCache('theme:');
   return { data, error };
 }
 
@@ -56,5 +61,6 @@ export async function assignTemplateToTrust(trustId, templateId, themeOverrides 
     .select('*')
     .single();
 
+  if (!error) invalidateCache('theme:');
   return { data, error };
 }
