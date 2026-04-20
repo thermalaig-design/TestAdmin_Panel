@@ -8,6 +8,10 @@ import './EventsPage.css';
 
 const EVENT_TYPES = ['general', 'vip'];
 const EVENT_STATUSES = ['active', 'paused'];
+const DEFAULT_START_TIME = '07:00';
+const DEFAULT_END_TIME = '20:00';
+const MAX_EVENT_IMAGE_ATTACHMENTS = 3;
+const MAX_EVENT_IMAGE_SIZE_BYTES = 20 * 1024;
 
 function toUiStatus(value) {
   return String(value || '').toLowerCase() === 'active' ? 'active' : 'paused';
@@ -56,6 +60,10 @@ function isImageAttachment(item = {}) {
   return /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/.test(name);
 }
 
+function isImageFile(file) {
+  return String(file?.type || '').toLowerCase().startsWith('image/');
+}
+
 function buildAttachmentMeta(rawItems = []) {
   const parsed = (rawItems || [])
     .map((item, index) => parseAttachmentItem(item, index))
@@ -67,8 +75,38 @@ function buildAttachmentMeta(rawItems = []) {
   };
 }
 
-function isPausedEvent(event) {
-  return toUiStatus(event?.status) === 'paused';
+function parseDateValue(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  return { year, month, day };
+}
+
+function parseTimeValue(value, fallback = '00:00') {
+  const raw = String(value || fallback).trim().slice(0, 5);
+  const match = raw.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  return { hour, minute };
+}
+
+function toTimestamp(dateValue, timeValue, fallbackTime) {
+  const datePart = parseDateValue(dateValue);
+  const timePart = parseTimeValue(timeValue, fallbackTime);
+  if (!datePart || !timePart) return null;
+  return new Date(
+    datePart.year,
+    datePart.month,
+    datePart.day,
+    timePart.hour,
+    timePart.minute,
+    0,
+    0
+  ).getTime();
 }
 
 export default function EventsPage() {
@@ -93,15 +131,18 @@ export default function EventsPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
+  const [attachmentWarning, setAttachmentWarning] = useState('');
   const [selectedEventId, setSelectedEventId] = useState('');
-  const [statusTab, setStatusTab] = useState('active');
+  const [statusTab, setStatusTab] = useState('current');
+  const [typeFilter, setTypeFilter] = useState('general');
   const [listSearch, setListSearch] = useState('');
   const [sortBy, setSortBy] = useState('start_date');
   const [currentPage, setCurrentPage] = useState(1);
   const [formError, setFormError] = useState('');
   const deferredListSearch = useDeferredValue(listSearch);
   const warningTimerRef = useRef(null);
-  const EVENT_PAGE_SIZE = 8;
+  const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
+  const EVENT_PAGE_SIZE = 10;
 
   const [form, setForm] = useState({
     title: '',
@@ -109,8 +150,8 @@ export default function EventsPage() {
     attachments: [],
     location: '',
     startEventDate: '',
-    startTime: '',
-    endTime: '',
+    startTime: DEFAULT_START_TIME,
+    endTime: DEFAULT_END_TIME,
     endEventDate: '',
     type: 'general',
     status: 'active',
@@ -124,14 +165,15 @@ export default function EventsPage() {
       attachments: [],
       location: '',
       startEventDate: '',
-      startTime: '',
-      endTime: '',
+      startTime: DEFAULT_START_TIME,
+      endTime: DEFAULT_END_TIME,
       endEventDate: '',
       type: 'general',
       status: 'active',
       is_registration_required: false,
     });
     setFormError('');
+    setAttachmentWarning('');
     setEditingEventId(null);
   };
 
@@ -180,6 +222,13 @@ export default function EventsPage() {
     return () => document.removeEventListener('keydown', onEsc);
   }, [previewEvent]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowTimestamp(Date.now());
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const optimizedEvents = useMemo(
     () =>
       events.map((event) => ({
@@ -187,28 +236,57 @@ export default function EventsPage() {
         _searchText: `${event?.title || ''} ${event?.description || ''} ${event?.location || ''}`.toLowerCase(),
         _sortStartDate: getDateSortValue(event?.startEventDate),
         _sortEndDate: getDateSortValue(event?.endEventDate),
+        _startAt: toTimestamp(event?.startEventDate, event?.startTime, '00:00'),
+        _endAt: toTimestamp(
+          event?.endEventDate || event?.startEventDate,
+          event?.endTime,
+          '23:59'
+        ),
       })),
     [events]
   );
 
-  const activeEvents = useMemo(
-    () => optimizedEvents.filter((event) => !isPausedEvent(event)),
-    [optimizedEvents]
+  const pastEvents = useMemo(
+    () =>
+      optimizedEvents.filter((event) => {
+        if (event._endAt === null) return false;
+        return event._endAt < nowTimestamp;
+      }),
+    [optimizedEvents, nowTimestamp]
   );
 
-  const pausedEvents = useMemo(
-    () => optimizedEvents.filter((event) => isPausedEvent(event)),
-    [optimizedEvents]
+  const currentEvents = useMemo(
+    () =>
+      optimizedEvents.filter((event) => {
+        if (event._startAt === null || event._endAt === null) return false;
+        return event._startAt <= nowTimestamp && event._endAt >= nowTimestamp;
+      }),
+    [optimizedEvents, nowTimestamp]
+  );
+
+  const upcomingEvents = useMemo(
+    () =>
+      optimizedEvents.filter((event) => {
+        if (event._startAt === null) return false;
+        return event._startAt > nowTimestamp;
+      }),
+    [optimizedEvents, nowTimestamp]
   );
 
   const scopedEvents = useMemo(
-    () => (statusTab === 'paused' ? pausedEvents : activeEvents),
-    [statusTab, pausedEvents, activeEvents]
+    () => {
+      if (statusTab === 'past') return pastEvents;
+      if (statusTab === 'upcoming') return upcomingEvents;
+      return currentEvents;
+    },
+    [statusTab, pastEvents, currentEvents, upcomingEvents]
   );
 
   const filteredEvents = useMemo(() => {
     const term = deferredListSearch.trim().toLowerCase();
     let list = [...scopedEvents];
+
+    list = list.filter((event) => toUiType(event?.type) === typeFilter);
 
     if (term) {
       list = list.filter((event) => {
@@ -225,7 +303,33 @@ export default function EventsPage() {
     }
 
     return list;
-  }, [deferredListSearch, scopedEvents, sortBy]);
+  }, [deferredListSearch, scopedEvents, sortBy, typeFilter]);
+
+  const scopedTypeCounts = useMemo(
+    () =>
+      scopedEvents.reduce(
+        (acc, event) => {
+          if (toUiType(event?.type) === 'vip') acc.vip += 1;
+          else acc.general += 1;
+          return acc;
+        },
+        { general: 0, vip: 0 }
+      ),
+    [scopedEvents]
+  );
+
+  const filteredStatusCounts = useMemo(
+    () =>
+      filteredEvents.reduce(
+        (acc, event) => {
+          if (toUiStatus(event?.status) === 'active') acc.active += 1;
+          else acc.paused += 1;
+          return acc;
+        },
+        { active: 0, paused: 0 }
+      ),
+    [filteredEvents]
+  );
 
   const selectedEvent = useMemo(
     () => filteredEvents.find((item) => item.id === selectedEventId) || null,
@@ -244,7 +348,7 @@ export default function EventsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusTab, sortBy, listSearch]);
+  }, [statusTab, sortBy, listSearch, typeFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -366,10 +470,42 @@ export default function EventsPage() {
     if (!files.length) return;
 
     setFormError('');
+    setAttachmentWarning('');
+
+    const existingImageCount = form.attachments.filter(isImageAttachment).length;
+    const acceptedFiles = [];
+    const warningMessages = [];
+    let nextImageCount = existingImageCount;
+
+    files.forEach((file) => {
+      if (!isImageFile(file)) {
+        acceptedFiles.push(file);
+        return;
+      }
+
+      if (file.size > MAX_EVENT_IMAGE_SIZE_BYTES) {
+        warningMessages.push(`"${file.name}" skipped: image must be 20KB or less.`);
+        return;
+      }
+
+      if (nextImageCount >= MAX_EVENT_IMAGE_ATTACHMENTS) {
+        warningMessages.push(`"${file.name}" skipped: max ${MAX_EVENT_IMAGE_ATTACHMENTS} images allowed.`);
+        return;
+      }
+
+      acceptedFiles.push(file);
+      nextImageCount += 1;
+    });
+
+    if (warningMessages.length) {
+      setAttachmentWarning(warningMessages.join(' '));
+    }
+
+    if (!acceptedFiles.length) return;
     setUploadingAttachment(true);
 
     try {
-      const uploaded = await Promise.all(files.map(readFileAsDataUrl));
+      const uploaded = await Promise.all(acceptedFiles.map(readFileAsDataUrl));
       setForm((prev) => ({ ...prev, attachments: [...prev.attachments, ...uploaded] }));
     } catch (uploadError) {
       setFormError(uploadError.message || 'Unable to upload attachment.');
@@ -507,19 +643,6 @@ export default function EventsPage() {
                         ))}
                       </select>
                     </label>
-                    <label className="ev-checkbox-row ev-checkbox-field">
-                      <input
-                        type="checkbox"
-                        checked={form.is_registration_required}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            is_registration_required: e.target.checked,
-                          }))
-                        }
-                      />
-                      <span>Registration Required</span>
-                    </label>
                   </div>
                 </section>
 
@@ -589,6 +712,10 @@ export default function EventsPage() {
                   <div className="ev-form-grid ev-form-grid-2">
                     <div className="ev-span-full">
                       <span>Upload PDF, docs, photos, etc.</span>
+                      <p className="ev-attachment-limit-note">
+                        Important: You can upload up to {MAX_EVENT_IMAGE_ATTACHMENTS} images. Each image must be{' '}
+                        {Math.floor(MAX_EVENT_IMAGE_SIZE_BYTES / 1024)}KB or smaller.
+                      </p>
                       <label
                         className={`ev-attachment-dropzone ${attachmentDragOver ? 'drag' : ''}`}
                         onDragOver={(event) => {
@@ -612,6 +739,7 @@ export default function EventsPage() {
                           <span className="ev-attachment-drop-sub">or click to choose files</span>
                         </div>
                       </label>
+                      {attachmentWarning && <div className="ev-warning-inline">{attachmentWarning}</div>}
                       {form.attachments.length > 0 && (
                         <div className="ev-attachment-pill-list">
                           {form.attachments.map((item, index) => (
@@ -673,19 +801,27 @@ export default function EventsPage() {
                 <div className="ev-tabs">
                   <button
                     type="button"
-                    className={`ev-tab ${statusTab === 'active' ? 'active' : ''}`}
-                    onClick={() => setStatusTab('active')}
+                    className={`ev-tab ${statusTab === 'past' ? 'active' : ''}`}
+                    onClick={() => setStatusTab('past')}
                   >
-                    <span>Active</span>
-                    <b>{activeEvents.length}</b>
+                    <span>Past</span>
+                    <b>{pastEvents.length}</b>
                   </button>
                   <button
                     type="button"
-                    className={`ev-tab ${statusTab === 'paused' ? 'active' : ''}`}
-                    onClick={() => setStatusTab('paused')}
+                    className={`ev-tab ${statusTab === 'current' ? 'active' : ''}`}
+                    onClick={() => setStatusTab('current')}
                   >
-                    <span>Paused</span>
-                    <b>{pausedEvents.length}</b>
+                    <span>Current</span>
+                    <b>{currentEvents.length}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className={`ev-tab ${statusTab === 'upcoming' ? 'active' : ''}`}
+                    onClick={() => setStatusTab('upcoming')}
+                  >
+                    <span>Upcoming</span>
+                    <b>{upcomingEvents.length}</b>
                   </button>
                 </div>
 
@@ -695,6 +831,34 @@ export default function EventsPage() {
                   value={listSearch}
                   onChange={(event) => setListSearch(event.target.value)}
                 />
+                <div className="ev-type-tabs">
+                  <button
+                    type="button"
+                    className={`ev-type-tab ${typeFilter === 'general' ? 'active' : ''}`}
+                    onClick={() => setTypeFilter('general')}
+                  >
+                    <span>General</span>
+                    <b>{scopedTypeCounts.general}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className={`ev-type-tab ${typeFilter === 'vip' ? 'active' : ''}`}
+                    onClick={() => setTypeFilter('vip')}
+                  >
+                    <span>VIP</span>
+                    <b>{scopedTypeCounts.vip}</b>
+                  </button>
+                </div>
+                <div className="ev-status-summary">
+                  <div className="ev-status-summary-item active">
+                    <span>Active</span>
+                    <b>{filteredStatusCounts.active}</b>
+                  </div>
+                  <div className="ev-status-summary-item paused">
+                    <span>Paused</span>
+                    <b>{filteredStatusCounts.paused}</b>
+                  </div>
+                </div>
                 <button
                   className="ev-add-btn ev-list-add-btn"
                   type="button"

@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'events';
+const MAX_EVENTS_FETCH = 20;
 
 function normalizeRow(row = {}) {
   return {
@@ -36,7 +37,8 @@ export async function fetchEventsByTrust(trustId) {
       .order('startEventDate', { ascending: true })
       .order('startTime', { ascending: true })
       .order('endEventDate', { ascending: true })
-      .order('title', { ascending: true });
+      .order('title', { ascending: true })
+      .range(0, MAX_EVENTS_FETCH - 1);
 
     return { data: (data || []).map(normalizeRow), error };
   }, 12000);
