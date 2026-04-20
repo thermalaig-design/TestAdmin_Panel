@@ -1,10 +1,12 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
 import {
   fetchGalleryFolders,
   fetchGalleryPhotos,
+  fetchGalleryPhotosByFolder,
+  fetchGalleryPhotosCount,
   createGalleryFolder,
   createGalleryPhoto,
   deleteGalleryPhoto,
@@ -22,7 +24,13 @@ export default function GalleryPage() {
   const trustId = trust?.id || null;
 
   const [folders, setFolders] = useState([]);
-  const [photos, setPhotos] = useState([]);
+  const [folderCardPhotos, setFolderCardPhotos] = useState([]);
+  const [selectedFolderPhotos, setSelectedFolderPhotos] = useState([]);
+  const [totalPhotoCount, setTotalPhotoCount] = useState(0);
+  const [selectedPhotoTotal, setSelectedPhotoTotal] = useState(0);
+  const [selectedPhotoFetching, setSelectedPhotoFetching] = useState(false);
+  const [selectedPhotoInitialLoading, setSelectedPhotoInitialLoading] = useState(false);
+  const [selectedPhotoLoadSignal, setSelectedPhotoLoadSignal] = useState(0);
   const [selectedFolderId, setSelectedFolderId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,7 +42,11 @@ export default function GalleryPage() {
   const [folderSort, setFolderSort] = useState('name_asc');
   const [folderPage, setFolderPage] = useState(1);
   const deferredFolderSearch = useDeferredValue(folderSearch);
-  const FOLDER_PAGE_SIZE = 8;
+  const selectedPhotoSentinelRef = useRef(null);
+  const FOLDER_PAGE_SIZE = 6;
+  const PHOTO_BATCH_SIZE = 5;
+  const MAX_UPLOAD_COUNT = 10;
+  const MAX_IMAGE_SIZE_BYTES = 25 * 1024;
 
   useEffect(() => {
     if (!trustId) navigate('/dashboard', { replace: true, state: { userName, trust } });
@@ -50,11 +62,10 @@ export default function GalleryPage() {
 
       const trustFolders = folderData || [];
       setFolders(trustFolders);
-
       const folderIds = trustFolders.map((f) => f.id).filter(Boolean);
-      const { data: photoData, error: photoErr } = await fetchGalleryPhotos(folderIds);
-      if (photoErr) setError(photoErr.message || 'Unable to load photos.');
-      setPhotos(photoData || []);
+      const { count: totalCount, error: photoCountErr } = await fetchGalleryPhotosCount(folderIds);
+      if (photoCountErr) setError(photoCountErr.message || 'Unable to load photo count.');
+      setTotalPhotoCount(totalCount || 0);
       const hasRouteFolder = trustFolders.some((folder) => String(folder.id) === String(routeFolderId));
       if (hasRouteFolder) {
         setSelectedFolderId(routeFolderId);
@@ -84,22 +95,22 @@ export default function GalleryPage() {
 
   const photoCountByFolderId = useMemo(() => {
     const map = new Map();
-    photos.forEach((photo) => {
+    folderCardPhotos.forEach((photo) => {
       const key = photo.folderId;
       map.set(key, (map.get(key) || 0) + 1);
     });
     return map;
-  }, [photos]);
+  }, [folderCardPhotos]);
 
   const coverPhotoByFolderId = useMemo(() => {
     const map = new Map();
-    photos.forEach((photo) => {
+    folderCardPhotos.forEach((photo) => {
       if (!map.has(photo.folderId)) {
         map.set(photo.folderId, photo.url);
       }
     });
     return map;
-  }, [photos]);
+  }, [folderCardPhotos]);
   const selectedFolder = useMemo(
     () => folders.find((folder) => folder.id === selectedFolderId) || null,
     [folders, selectedFolderId]
@@ -129,11 +140,38 @@ export default function GalleryPage() {
   }, [folders, deferredFolderSearch, folderSort]);
 
   const folderTotalPages = Math.max(1, Math.ceil(filteredFolders.length / FOLDER_PAGE_SIZE));
+  const folderStartIndex = filteredFolders.length === 0 ? 0 : (folderPage - 1) * FOLDER_PAGE_SIZE + 1;
+  const folderEndIndex = Math.min(folderPage * FOLDER_PAGE_SIZE, filteredFolders.length);
 
   const paginatedFolders = useMemo(() => {
     const start = (folderPage - 1) * FOLDER_PAGE_SIZE;
     return filteredFolders.slice(start, start + FOLDER_PAGE_SIZE);
   }, [filteredFolders, folderPage]);
+
+  const folderPaginationItems = useMemo(() => {
+    if (folderTotalPages <= 1) return [];
+    if (folderTotalPages <= 7) {
+      return Array.from({ length: folderTotalPages }, (_, i) => i + 1);
+    }
+
+    if (folderPage <= 4) {
+      return [1, 2, 3, 4, 5, 'ellipsis-right', folderTotalPages];
+    }
+
+    if (folderPage >= folderTotalPages - 3) {
+      return [
+        1,
+        'ellipsis-left',
+        folderTotalPages - 4,
+        folderTotalPages - 3,
+        folderTotalPages - 2,
+        folderTotalPages - 1,
+        folderTotalPages,
+      ];
+    }
+
+    return [1, 'ellipsis-left', folderPage - 1, folderPage, folderPage + 1, 'ellipsis-right', folderTotalPages];
+  }, [folderPage, folderTotalPages]);
 
   useEffect(() => {
     setFolderPage(1);
@@ -143,10 +181,127 @@ export default function GalleryPage() {
     if (folderPage > folderTotalPages) setFolderPage(folderTotalPages);
   }, [folderPage, folderTotalPages]);
 
-  const filteredPhotos = useMemo(() => {
-    if (!selectedFolderId) return [];
-    return photos.filter((p) => p.folderId === selectedFolderId);
-  }, [photos, selectedFolderId]);
+  useEffect(() => {
+    if (!paginatedFolders.length || showFolderDetail) {
+      return;
+    }
+    let isCancelled = false;
+    const loadFolderCardPhotos = async () => {
+      const folderIds = paginatedFolders.map((folder) => folder.id).filter(Boolean);
+      const { data, error: photoErr } = await fetchGalleryPhotos(folderIds);
+      if (isCancelled) return;
+      if (photoErr) {
+        setError(photoErr.message || 'Unable to load folder photos.');
+        return;
+      }
+      setFolderCardPhotos(data || []);
+    };
+    loadFolderCardPhotos();
+    return () => {
+      isCancelled = true;
+    };
+  }, [paginatedFolders, showFolderDetail]);
+
+  useEffect(() => {
+    if (!showFolderDetail || !selectedFolderId) return;
+    let isCancelled = false;
+    setSelectedPhotoFetching(false);
+    setSelectedPhotoInitialLoading(true);
+    setSelectedPhotoLoadSignal(0);
+
+    const loadSelectedFolderPhotos = async () => {
+      const { data, count, error: photoErr } = await fetchGalleryPhotosByFolder(selectedFolderId, {
+        offset: 0,
+        limit: PHOTO_BATCH_SIZE,
+      });
+      if (isCancelled) return;
+      if (photoErr) {
+        setError(photoErr.message || 'Unable to load photos.');
+        setSelectedFolderPhotos([]);
+        setSelectedPhotoTotal(0);
+        setSelectedPhotoInitialLoading(false);
+        return;
+      }
+      setSelectedFolderPhotos(data || []);
+      setSelectedPhotoTotal(count || 0);
+      setSelectedPhotoInitialLoading(false);
+    };
+
+    loadSelectedFolderPhotos();
+    return () => {
+      isCancelled = true;
+    };
+  }, [showFolderDetail, selectedFolderId]);
+
+  useEffect(() => {
+    if (!showFolderDetail || !selectedFolderId || selectedPhotoInitialLoading) return;
+    const node = selectedPhotoSentinelRef.current;
+    if (!node) return;
+    if (selectedPhotoFetching) return;
+    if (selectedFolderPhotos.length >= selectedPhotoTotal) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setSelectedPhotoLoadSignal((prev) => prev + 1);
+        }
+      },
+      { root: null, rootMargin: '220px 0px', threshold: 0.01 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [
+    showFolderDetail,
+    selectedFolderId,
+    selectedPhotoInitialLoading,
+    selectedPhotoFetching,
+    selectedFolderPhotos.length,
+    selectedPhotoTotal,
+  ]);
+
+  useEffect(() => {
+    if (!selectedPhotoLoadSignal) return;
+    if (!showFolderDetail || !selectedFolderId) return;
+    if (selectedFolderPhotos.length >= selectedPhotoTotal || selectedPhotoFetching) return;
+
+    let isCancelled = false;
+    const loadMorePhotos = async () => {
+      setSelectedPhotoFetching(true);
+      try {
+        const offset = selectedFolderPhotos.length;
+        const { data, error: photoErr } = await fetchGalleryPhotosByFolder(selectedFolderId, {
+          offset,
+          limit: PHOTO_BATCH_SIZE,
+        });
+        if (isCancelled) return;
+        if (photoErr) {
+          setError(photoErr.message || 'Unable to load more photos.');
+          return;
+        }
+
+        if (data?.length) {
+          setSelectedFolderPhotos((prev) => {
+            const seen = new Set(prev.map((item) => item.id));
+            const next = data.filter((item) => !seen.has(item.id));
+            return [...prev, ...next];
+          });
+          return;
+        }
+
+        // Safety: when backend returns no next rows, stop infinite loading loop.
+        setSelectedPhotoTotal(selectedFolderPhotos.length);
+      } finally {
+        if (!isCancelled) {
+          setSelectedPhotoFetching(false);
+        }
+      }
+    };
+    loadMorePhotos();
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedPhotoLoadSignal, showFolderDetail, selectedFolderId, selectedPhotoTotal, selectedFolderPhotos.length, selectedPhotoFetching]);
 
   const readFileAsDataUrl = (file) =>
     new Promise((resolve, reject) => {
@@ -155,6 +310,62 @@ export default function GalleryPage() {
       reader.onerror = () => reject(new Error('Unable to read selected image.'));
       reader.readAsDataURL(file);
     });
+
+  const loadImageFromFile = (file) =>
+    new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(image);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Unable to process selected image.'));
+      };
+      image.src = objectUrl;
+    });
+
+  const canvasToBlob = (canvas, type, quality) =>
+    new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), type, quality);
+    });
+
+  const formatSizeToKb = (bytes) => `${((Number(bytes) || 0) / 1024).toFixed(2)} KB`;
+
+  const compressImageToLimit = async (file, maxBytes) => {
+    if ((file?.size || 0) <= maxBytes) {
+      const imageUrl = await readFileAsDataUrl(file);
+      return { imageUrl, sizeText: formatSizeToKb(file.size) };
+    }
+
+    const image = await loadImageFromFile(file);
+    const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
+    const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+
+    for (let scaleStep = 0; scaleStep < 9; scaleStep += 1) {
+      const scale = Math.pow(0.82, scaleStep);
+      const targetWidth = Math.max(160, Math.round(baseWidth * scale));
+      const targetHeight = Math.max(160, Math.round(baseHeight * scale));
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      context.clearRect(0, 0, targetWidth, targetHeight);
+      context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+      for (let quality = 0.82; quality >= 0.2; quality -= 0.08) {
+        const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
+        if (blob && blob.size <= maxBytes) {
+          const imageUrl = await readFileAsDataUrl(blob);
+          return { imageUrl, sizeText: formatSizeToKb(blob.size) };
+        }
+      }
+    }
+
+    return null;
+  };
 
   const handleFiles = async (fileList) => {
     const files = Array.from(fileList || []);
@@ -170,17 +381,28 @@ export default function GalleryPage() {
       return;
     }
 
+    if (imageFiles.length > MAX_UPLOAD_COUNT) {
+      setError(`You can upload maximum ${MAX_UPLOAD_COUNT} photos at a time.`);
+      return;
+    }
+
     setUploading(true);
     setError('');
 
     const uploaded = [];
     let failed = 0;
+    let sizeSkipped = 0;
 
     for (const file of imageFiles) {
       try {
-        const imageUrl = await readFileAsDataUrl(file);
+        const processed = await compressImageToLimit(file, MAX_IMAGE_SIZE_BYTES);
+        if (!processed?.imageUrl) {
+          sizeSkipped += 1;
+          continue;
+        }
         const { data, error: createErr } = await createGalleryPhoto({
-          imageUrl,
+          imageUrl: processed.imageUrl,
+          size: processed.sizeText,
           folderId: selectedFolderId,
         });
         if (createErr) {
@@ -194,13 +416,20 @@ export default function GalleryPage() {
     }
 
     if (uploaded.length > 0) {
-      setPhotos((prev) => [...uploaded, ...prev]);
+      setSelectedFolderPhotos((prev) => [...uploaded, ...prev]);
+      setSelectedPhotoTotal((prev) => prev + uploaded.length);
+      setTotalPhotoCount((prev) => prev + uploaded.length);
+      if (!showFolderDetail) {
+        setFolderCardPhotos((prev) => [...uploaded, ...prev]);
+      }
     }
 
-    if (failed > 0) {
-      setError(`Uploaded ${uploaded.length}/${imageFiles.length} image(s). ${failed} failed.`);
-    } else if (files.length !== imageFiles.length) {
-      setError(`Uploaded ${uploaded.length} image(s). Non-image files were skipped.`);
+    if (failed > 0 || sizeSkipped > 0 || files.length !== imageFiles.length) {
+      const notes = [];
+      if (failed > 0) notes.push(`${failed} failed`);
+      if (sizeSkipped > 0) notes.push(`${sizeSkipped} could not be compressed to 25KB`);
+      if (files.length !== imageFiles.length) notes.push(`${files.length - imageFiles.length} non-image skipped`);
+      setError(`Uploaded ${uploaded.length}/${imageFiles.length} image(s). ${notes.join('. ')}.`);
     } else {
       setError('');
     }
@@ -243,14 +472,17 @@ export default function GalleryPage() {
       return;
     }
 
-    setPhotos((prev) => prev.filter((photo) => photo.id !== photoId));
+    setSelectedFolderPhotos((prev) => prev.filter((photo) => photo.id !== photoId));
+    setFolderCardPhotos((prev) => prev.filter((photo) => photo.id !== photoId));
+    setSelectedPhotoTotal((prev) => Math.max(0, prev - 1));
+    setTotalPhotoCount((prev) => Math.max(0, prev - 1));
     setError('');
   };
 
   const handleDeleteFolder = async (folder) => {
     if (!folder?.id) return;
 
-    const photoCount = photoCountByFolderId.get(folder.id) || 0;
+    const photoCount = folder.id === selectedFolderId ? selectedPhotoTotal : (photoCountByFolderId.get(folder.id) || 0);
     const shouldDelete = window.confirm(
       `Are you sure you want to delete the folder "${folder.name}"?\nThis folder currently contains ${photoCount} photo${photoCount === 1 ? '' : 's'}.`
     );
@@ -263,7 +495,12 @@ export default function GalleryPage() {
     }
 
     setFolders((prev) => prev.filter((item) => item.id !== folder.id));
-    setPhotos((prev) => prev.filter((photo) => photo.folderId !== folder.id));
+    setFolderCardPhotos((prev) => prev.filter((photo) => photo.folderId !== folder.id));
+    if (folder.id === selectedFolderId) {
+      setSelectedFolderPhotos([]);
+      setSelectedPhotoTotal(0);
+    }
+    setTotalPhotoCount((prev) => Math.max(0, prev - photoCount));
     setError('');
 
     if (selectedFolderId === folder.id || routeFolderId === folder.id) {
@@ -346,11 +583,7 @@ export default function GalleryPage() {
                     </div>
                     <div className="gallery-stat-card">
                       <span className="gallery-stat-label">Photos</span>
-                      <strong>{photos.length}</strong>
-                    </div>
-                    <div className="gallery-stat-card">
-                      <span className="gallery-stat-label">Selected</span>
-                      <strong>{selectedFolder ? (photoCountByFolderId.get(selectedFolder.id) || 0) : 0}</strong>
+                      <strong>{totalPhotoCount}</strong>
                     </div>
                   </div>
                   </div>
@@ -461,7 +694,12 @@ export default function GalleryPage() {
                           >
                             <div className="gallery-folder-preview">
                               {coverPhotoByFolderId.get(folder.id) ? (
-                                <img src={coverPhotoByFolderId.get(folder.id)} alt={folder.name} />
+                                <img
+                                  src={coverPhotoByFolderId.get(folder.id)}
+                                  alt={folder.name}
+                                  loading="lazy"
+                                  decoding="async"
+                                />
                               ) : (
                                 <div className="gallery-folder-art">
                                   <div className="gallery-folder-dot" />
@@ -489,7 +727,25 @@ export default function GalleryPage() {
                         >
                           Prev
                         </button>
-                        <span>Page {folderPage} / {folderTotalPages}</span>
+                        <div className="gallery-folder-pagination-pages">
+                          {folderPaginationItems.map((item, index) =>
+                            typeof item === 'number' ? (
+                              <button
+                                key={item}
+                                type="button"
+                                className={folderPage === item ? 'active' : ''}
+                                onClick={() => setFolderPage(item)}
+                                aria-current={folderPage === item ? 'page' : undefined}
+                              >
+                                {item}
+                              </button>
+                            ) : (
+                              <span key={`${item}-${index}`} className="gallery-folder-pagination-ellipsis">
+                                ...
+                              </span>
+                            )
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => setFolderPage((prev) => Math.min(folderTotalPages, prev + 1))}
@@ -497,6 +753,9 @@ export default function GalleryPage() {
                         >
                           Next
                         </button>
+                        <span className="gallery-folder-pagination-meta">
+                          Showing {folderStartIndex}-{folderEndIndex} of {filteredFolders.length}
+                        </span>
                       </div>
                     )}
                     </>
@@ -548,7 +807,7 @@ export default function GalleryPage() {
                     <div className="gallery-spotlight-top">
                       <span className="gallery-kicker">Selected album</span>
                       <span className="gallery-spotlight-badge">
-                        {photoCountByFolderId.get(selectedFolderId) || 0} photos
+                        {selectedPhotoTotal} photos
                       </span>
                     </div>
                     <h3>{folderNameById.get(selectedFolderId)}</h3>
@@ -557,10 +816,12 @@ export default function GalleryPage() {
                       clear place.
                     </p>
                     <div className="gallery-spotlight-preview">
-                      {coverPhotoByFolderId.get(selectedFolderId) ? (
+                      {(coverPhotoByFolderId.get(selectedFolderId) || selectedFolderPhotos[0]?.url) ? (
                         <img
-                          src={coverPhotoByFolderId.get(selectedFolderId)}
+                          src={coverPhotoByFolderId.get(selectedFolderId) || selectedFolderPhotos[0]?.url}
                           alt={folderNameById.get(selectedFolderId)}
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="gallery-spotlight-empty">
@@ -594,7 +855,7 @@ export default function GalleryPage() {
                       </div>
                     </label>
                     <div className="gallery-upload-note">
-                      Uploads go to {folderNameById.get(selectedFolderId)}.
+                      Uploads go to {folderNameById.get(selectedFolderId)}. Max 10 photos, 25KB each.
                     </div>
                   </div>
                 </div>
@@ -610,23 +871,24 @@ export default function GalleryPage() {
                       </div>
                     </div>
                     <div className="gallery-photos-head-right">
-                      <div className="gallery-photos-count">{filteredPhotos.length}</div>
+                      <div className="gallery-photos-count">{selectedPhotoTotal}</div>
                     </div>
                   </div>
 
-                  {loading && <div className="gallery-loading">Loading photos...</div>}
+                  {(loading || selectedPhotoInitialLoading) && <div className="gallery-loading">Loading photos...</div>}
 
-                  {!loading && filteredPhotos.length === 0 && (
+                  {!loading && !selectedPhotoInitialLoading && selectedPhotoTotal === 0 && (
                     <div className="gallery-empty">
                       No photos yet. Drop your first image to get started.
                     </div>
                   )}
 
-                  {!loading && filteredPhotos.length > 0 && (
+                  {!loading && !selectedPhotoInitialLoading && selectedPhotoTotal > 0 && (
+                    <>
                     <div className="gallery-grid">
-                      {filteredPhotos.map((photo, index) => (
+                      {selectedFolderPhotos.map((photo, index) => (
                         <div key={photo.id} className="gallery-photo">
-                          <img src={photo.url} alt="Gallery" />
+                          <img src={photo.url} alt="Gallery" loading="lazy" decoding="async" />
                           <div className="gallery-photo-overlay">
                             <div className="gallery-photo-index">
                               {String(index + 1).padStart(2, '0')}
@@ -647,6 +909,22 @@ export default function GalleryPage() {
                         </div>
                       ))}
                     </div>
+                    {selectedFolderPhotos.length < selectedPhotoTotal && (
+                      <div ref={selectedPhotoSentinelRef} className="gallery-photo-load-sentinel">
+                        {selectedPhotoFetching ? (
+                          <span className="gallery-photo-load-indicator">
+                            <span className="gallery-photo-spinner" aria-hidden="true" />
+                            Loading next 5 images...
+                          </span>
+                        ) : (
+                          'Scroll down to load more images'
+                        )}
+                      </div>
+                    )}
+                    {selectedFolderPhotos.length >= selectedPhotoTotal && selectedPhotoTotal > 0 && (
+                      <div className="gallery-photo-load-sentinel done">All images loaded</div>
+                    )}
+                    </>
                   )}
                 </div>
               </section>

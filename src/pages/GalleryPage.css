@@ -290,6 +290,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -310,10 +311,35 @@
   cursor: not-allowed;
 }
 
-.gallery-folder-pagination span {
+.gallery-folder-pagination-pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gallery-folder-pagination-pages button {
+  min-width: 36px;
+  width: 36px;
+  padding: 0;
+}
+
+.gallery-folder-pagination-pages button.active {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 8px 16px rgba(79, 70, 229, 0.22);
+}
+
+.gallery-folder-pagination-ellipsis,
+.gallery-folder-pagination-meta {
   font-size: 12px;
   font-weight: 700;
   color: #4b5563;
+}
+
+.gallery-folder-pagination-meta {
+  font-weight: 600;
+  margin-left: 2px;
 }
 
 .gallery-folder-item {
@@ -733,6 +759,48 @@
   padding: 8px 12px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
+}
+
+.gallery-photo-load-sentinel {
+  margin-top: 14px;
+  min-height: 44px;
+  border: 1px dashed rgba(91, 102, 255, 0.2);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #f8faff;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gallery-photo-load-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gallery-photo-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(79, 70, 229, 0.2);
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: gallery-spin 0.7s linear infinite;
+}
+
+@keyframes gallery-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gallery-photo-load-sentinel.done {
+  border-style: solid;
+  opacity: 0.85;
 }
 
 .gallery-rename-folder {

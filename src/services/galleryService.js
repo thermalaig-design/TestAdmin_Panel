@@ -15,7 +15,8 @@ function normalizePhotoRow(row = {}, index = 0) {
   const url = row.public_url || row.storage_path || '';
   const folderId = row.folder_id || null;
   const createdAt = row.created_at || null;
-  return { id, url, folderId, createdAt, raw: row };
+  const size = row.size || null;
+  return { id, url, folderId, createdAt, size, raw: row };
 }
 
 export async function fetchGalleryFolders(trustId) {
@@ -29,7 +30,7 @@ export async function fetchGalleryFolders(trustId) {
       .order('created_at', { ascending: true });
 
     return { data: (data || []).map(normalizeFolderRow), error };
-  }, 12000);
+  }, 300000);
 }
 
 export async function fetchGalleryPhotos(folderIds = []) {
@@ -44,7 +45,39 @@ export async function fetchGalleryPhotos(folderIds = []) {
       .order('created_at', { ascending: false });
 
     return { data: (data || []).map(normalizePhotoRow), error };
-  }, 10000);
+  }, 300000);
+}
+
+export async function fetchGalleryPhotosByFolder(folderId, options = {}) {
+  if (!folderId) return { data: [], count: 0, error: null };
+  const offset = Number.isFinite(options.offset) ? Math.max(0, options.offset) : 0;
+  const limit = Number.isFinite(options.limit) ? Math.max(1, options.limit) : 20;
+  const key = `gallery:photos:folder:${folderId}:${offset}:${limit}`;
+
+  return cachedQuery(key, async () => {
+    const { data, count, error } = await supabase
+      .from(PHOTOS_TABLE)
+      .select('*', { count: 'exact' })
+      .eq('folder_id', folderId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    return { data: (data || []).map(normalizePhotoRow), count: count || 0, error };
+  }, 300000);
+}
+
+export async function fetchGalleryPhotosCount(folderIds = []) {
+  if (!folderIds.length) return { count: 0, error: null };
+  const key = [...folderIds].map(String).sort().join(',');
+
+  return cachedQuery(`gallery:photos:count:${key}`, async () => {
+    const { count, error } = await supabase
+      .from(PHOTOS_TABLE)
+      .select('id', { count: 'exact', head: true })
+      .in('folder_id', folderIds);
+
+    return { count: count || 0, error };
+  }, 300000);
 }
 
 export async function createGalleryFolder(name, trustId) {
@@ -86,6 +119,7 @@ export async function createGalleryPhoto(payload) {
     public_url: payload.imageUrl,
     folder_id: payload.folderId || null,
     uploaded_by: payload.uploadedBy || null,
+    size: payload.size || null,
   };
 
   const { data, error } = await supabase
