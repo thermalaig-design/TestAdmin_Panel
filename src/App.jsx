@@ -47,8 +47,12 @@ function App() {
           <Route path="/gallery/:folderId" element={<GalleryPage />} />
           <Route path="/marquee"      element={<MarqueePage />} />
           <Route path="/noticeboard"  element={<NoticeboardPage />} />
+          <Route path="/noticeboard/create_notice" element={<NoticeboardPage />} />
+          <Route path="/noticeboard/edit_details" element={<NoticeboardPage />} />
           <Route path="/noticeboard/:noticeId" element={<NoticeDetailPage />} />
           <Route path="/events"       element={<EventsPage />} />
+          <Route path="/events/create_event" element={<EventsPage />} />
+          <Route path="/events/edit_details" element={<EventsPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
           <Route path="/theme"        element={<ThemePage />} />
           <Route path="/feature-control" element={<FeatureControlPage />} />

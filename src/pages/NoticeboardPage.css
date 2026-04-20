@@ -65,6 +65,27 @@
   margin-bottom: 16px;
 }
 
+.nb-form-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.nb-form-section {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.nb-section-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #334155;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 .nb-form-card h3 {
   margin: 0 0 12px;
   font-size: 18px;
@@ -75,6 +96,10 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.nb-form-grid.nb-form-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .nb-form-grid label {
@@ -106,6 +131,10 @@
 
 .nb-span-2 {
   grid-column: span 2;
+}
+
+.nb-span-full {
+  grid-column: 1 / -1;
 }
 
 .nb-form-actions {
@@ -228,6 +257,25 @@
   max-height: 420px;
   overflow: auto;
   padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #c7c3f7 transparent;
+}
+
+.nb-left-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.nb-left-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nb-left-list::-webkit-scrollbar-thumb {
+  background: #c7c3f7;
+  border-radius: 999px;
+}
+
+.nb-left-list::-webkit-scrollbar-thumb:hover {
+  background: #b5b0f3;
 }
 
 .nb-left-item {

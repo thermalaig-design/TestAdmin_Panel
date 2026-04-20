@@ -1866,26 +1866,77 @@
 }
 
 @media (max-width: 900px) {
-  .sidebar { width: 200px; }
+  .dash-root { flex-direction: column; }
+  .dash-main {
+    height: auto;
+    min-height: 0;
+    overflow-y: visible;
+  }
   .qp-grid, .qp-loading { grid-template-columns: repeat(2, 1fr); }
   .features-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   .trust-info-panel { max-width: 100%; }
   .modules-grid { grid-template-columns: repeat(2, 1fr); }
+  .dash-topbar {
+    flex-wrap: wrap;
+    padding: 14px 18px;
+  }
+  .topbar-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .search-box {
+    flex: 1;
+    min-width: 0;
+  }
+  .search-input {
+    width: 100%;
+    min-width: 0;
+  }
+  .dash-content { padding: 18px; }
 }
 
 @media (max-width: 768px) {
-  .sidebar { display: none; }
-  .dash-topbar { padding: 14px 18px; }
-  .dash-content { padding: 18px; }
+  .dash-root { min-height: 100dvh; }
+  .dash-topbar { gap: 10px; }
+  .topbar-left {
+    width: 100%;
+  }
+  .page-subtitle {
+    font-size: 12px;
+  }
+  .search-kbd {
+    display: none;
+  }
   .qp-grid, .qp-loading { grid-template-columns: repeat(2, 1fr); }
   .features-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
   .trust-info-card { flex-wrap: wrap; }
   .trust-switch-btn { width: 100%; justify-content: center; }
   .modules-grid { grid-template-columns: 1fr; gap: 12px; }
   .module-card { min-height: 90px; padding: 18px 16px; }
+  .features-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .module-card-label {
+    font-size: 17px;
+  }
 }
 
 @media (max-width: 480px) {
+  .dash-topbar {
+    padding: 12px 12px;
+  }
+  .dash-content {
+    padding: 12px;
+  }
+  .topbar-right {
+    gap: 8px;
+  }
+  .search-box {
+    padding: 7px 10px;
+    border-radius: 10px;
+  }
   .qp-grid, .qp-loading { grid-template-columns: 1fr; }
   .features-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
   .profile-card { flex-direction: column; text-align: center; }
@@ -1894,6 +1945,19 @@
   .feature-card { min-height: 160px; padding: 18px 12px; }
   .features-title { font-size: 18px; }
   .modules-grid { gap: 10px; }
+  .module-card {
+    gap: 12px;
+    min-height: 84px;
+    padding: 14px;
+    border-radius: 16px;
+  }
   .module-card-label { font-size: 16px; }
+  .module-card-desc {
+    font-size: 11.5px;
+  }
+  .module-card-arrow {
+    width: 32px;
+    height: 32px;
+  }
   .module-icon-wrap { width: 52px; height: 52px; }
 }

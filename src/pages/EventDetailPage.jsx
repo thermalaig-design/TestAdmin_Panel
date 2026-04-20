@@ -86,8 +86,9 @@ export default function EventDetailPage() {
               <div className="ev-detail-footer">Location: {event.location || '-'}</div>
               <div className="ev-detail-meta">
                 <div>Start Date: {formatDate(event.startEventDate)}</div>
-                <div>Start Time: {formatTime(event.start_time)}</div>
-                <div>End Date: {formatTime(event.endEventDate)}</div>
+                <div>Start Time: {formatTime(event.startTime)}</div>
+                <div>End Time: {formatTime(event.endTime)}</div>
+                <div>End Date: {formatDate(event.endEventDate)}</div>
                 <div>Registration Required: {event.is_registration_required ? 'Yes' : 'No'}</div>
               </div>
 

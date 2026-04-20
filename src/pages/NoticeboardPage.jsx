@@ -66,11 +66,15 @@ export default function NoticeboardPage() {
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
   const trustId = trust?.id || null;
+  const isCreateRoute = location.pathname === '/noticeboard/create_notice';
+  const isEditRoute = location.pathname === '/noticeboard/edit_details';
+  const isFormRoute = isCreateRoute || isEditRoute;
+  const routeEditNoticeId =
+    location.state?.editNoticeId || new URLSearchParams(location.search).get('id') || '';
 
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showForm, setShowForm] = useState(false);
   const [previewNotice, setPreviewNotice] = useState(null);
   const [editingNoticeId, setEditingNoticeId] = useState(null);
   const [activeNoticeMenuId, setActiveNoticeMenuId] = useState(null);
@@ -101,6 +105,10 @@ export default function NoticeboardPage() {
     setFormError('');
     setAttachmentWarning('');
     setEditingNoticeId(null);
+  };
+
+  const goToNoticeboardList = () => {
+    navigate('/noticeboard', { replace: true, state: { userName, trust } });
   };
 
   useEffect(() => {
@@ -185,6 +193,11 @@ export default function NoticeboardPage() {
     return list;
   }, [scopedNotices, deferredListSearch, sortBy]);
 
+  const selectedNotice = useMemo(
+    () => filteredNotices.find((item) => item.id === selectedNoticeId) || null,
+    [filteredNotices, selectedNoticeId]
+  );
+
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredNotices.length / NOTICE_PAGE_SIZE)),
     [filteredNotices.length]
@@ -193,12 +206,7 @@ export default function NoticeboardPage() {
   const paginatedNotices = useMemo(() => {
     const start = (currentPage - 1) * NOTICE_PAGE_SIZE;
     return filteredNotices.slice(start, start + NOTICE_PAGE_SIZE);
-  }, [filteredNotices, currentPage, NOTICE_PAGE_SIZE]);
-
-  const selectedNotice = useMemo(
-    () => filteredNotices.find((item) => item.id === selectedNoticeId) || null,
-    [filteredNotices, selectedNoticeId]
-  );
+  }, [currentPage, filteredNotices]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -209,7 +217,7 @@ export default function NoticeboardPage() {
   }, [currentPage, totalPages]);
 
   useEffect(() => {
-    if (loading || showForm) return;
+    if (loading || isFormRoute) return;
     if (!filteredNotices.length) {
       setSelectedNoticeId('');
       return;
@@ -218,7 +226,44 @@ export default function NoticeboardPage() {
     if (!exists) {
       setSelectedNoticeId(filteredNotices[0].id);
     }
-  }, [filteredNotices, selectedNoticeId, loading, showForm]);
+  }, [filteredNotices, selectedNoticeId, loading, isFormRoute]);
+
+  useEffect(() => {
+    if (!isFormRoute) return;
+
+    if (isCreateRoute) {
+      resetNoticeForm();
+      return;
+    }
+
+    if (!isEditRoute) return;
+    const targetId = String(routeEditNoticeId || selectedNoticeId || '');
+    if (!targetId) return;
+    const notice = notices.find((item) => String(item.id) === targetId);
+    if (!notice) return;
+
+    const parsedAttachments = (notice.attachments || [])
+      .map((item, index) => parseAttachmentItem(item, index))
+      .filter(Boolean);
+
+    setForm({
+      name: notice.name || '',
+      description: notice.description || '',
+      attachments: parsedAttachments,
+      start_date: notice.start_date || '',
+      end_date: notice.end_date || '',
+    });
+    setEditingNoticeId(notice.id);
+    setFormError('');
+    setAttachmentWarning('');
+  }, [
+    isFormRoute,
+    isCreateRoute,
+    isEditRoute,
+    routeEditNoticeId,
+    selectedNoticeId,
+    notices,
+  ]);
 
   const handleCreate = async () => {
     setFormError('');
@@ -260,7 +305,11 @@ export default function NoticeboardPage() {
     }
 
     resetNoticeForm();
-    setShowForm(false);
+    if (isFormRoute) {
+      setSaving(false);
+      goToNoticeboardList();
+      return;
+    }
     setSaving(false);
   };
 
@@ -357,21 +406,9 @@ export default function NoticeboardPage() {
     setEditingNoticeId(notice.id);
     setFormError('');
     setAttachmentWarning('');
-    setShowForm(true);
     setActiveNoticeMenuId(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const toggleNoticeForm = () => {
-    setShowForm((prev) => {
-      const next = !prev;
-      if (!next) {
-        resetNoticeForm();
-      } else if (!editingNoticeId) {
-        setFormError('');
-        setAttachmentWarning('');
-      }
-      return next;
+    navigate(`/noticeboard/edit_details?id=${notice.id}`, {
+      state: { userName, trust, editNoticeId: notice.id },
     });
   };
 
@@ -393,98 +430,121 @@ export default function NoticeboardPage() {
         <PageHeader
           title="Noticeboard"
           subtitle="Data is now fetched and inserted from the noticeboard table"
-          onBack={() => navigate('/dashboard', { state: { userName, trust } })}
+          onBack={() => {
+            if (isFormRoute) {
+              goToNoticeboardList();
+              return;
+            }
+            navigate('/dashboard', { state: { userName, trust } });
+          }}
         />
 
         <section className="nb-content">
           {error && <div className="nb-error">{error}</div>}
 
-          {showForm && (
+          {isFormRoute && (
             <div className="nb-form-card">
               <h3>{editingNoticeId ? 'Edit Notice' : 'Create Notice'}</h3>
-              <div className="nb-form-grid">
-                <label>
-                  <span>Name *</span>
-                  <input
-                    value={form.name}
-                    onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter notice title"
-                  />
-                </label>
-                <label>
-                  <span>Start Date</span>
-                  <input
-                    type="date"
-                    value={form.start_date}
-                    onChange={(e) => setForm((prev) => ({ ...prev, start_date: e.target.value }))}
-                    onFocus={(e) => e.target.showPicker?.()}
-                    onClick={(e) => e.target.showPicker?.()}
-                  />
-                </label>
-                <label>
-                  <span>End Date</span>
-                  <input
-                    type="date"
-                    value={form.end_date}
-                    onChange={(e) => setForm((prev) => ({ ...prev, end_date: e.target.value }))}
-                    onFocus={(e) => e.target.showPicker?.()}
-                    onClick={(e) => e.target.showPicker?.()}
-                  />
-                </label>
-                <label className="nb-span-2">
-                  <span>Description</span>
-                  <textarea
-                    rows="4"
-                    value={form.description}
-                    onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="Enter notice description"
-                  />
-                </label>
-                <div className="nb-span-2">
-                  <span>Attachments (upload PDF, docs, photos, etc.)</span>
-                  <label
-                    className={`nb-attachment-dropzone ${attachmentDragOver ? 'drag' : ''}`}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setAttachmentDragOver(true);
-                    }}
-                    onDragLeave={() => setAttachmentDragOver(false)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      setAttachmentDragOver(false);
-                      handleAttachmentFile(event.dataTransfer.files);
-                    }}
-                  >
-                    <input
-                      type="file"
-                      multiple
-                      onChange={handleAttachmentInputChange}
-                    />
-                    <div className="nb-attachment-drop-inner">
-                      <span>{uploadingAttachment ? 'Uploading...' : 'Drag & drop files here'}</span>
-                      <span className="nb-attachment-drop-sub">or click to choose files</span>
-                    </div>
-                  </label>
-                  {attachmentWarning && <div className="nb-warning-inline">{attachmentWarning}</div>}
-                  {form.attachments.length > 0 && (
-                    <div className="nb-attachment-pill-list">
-                      {form.attachments.map((item, index) => (
-                        <div key={`${item.name}-${index}`} className="nb-attachment-pill">
-                          <span className="nb-attachment-pill-name">{item.name}</span>
-                          <button type="button" onClick={() => removeAttachment(index)}>Remove</button>
+              <div className="nb-form-layout">
+                <section className="nb-form-section">
+                  <h4 className="nb-section-title">Basic Info</h4>
+                  <div className="nb-form-grid nb-form-grid-2">
+                    <label>
+                      <span>Name *</span>
+                      <input
+                        value={form.name}
+                        onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                        placeholder="Enter notice title"
+                      />
+                    </label>
+                    <label>
+                      <span>Start Date</span>
+                      <input
+                        type="date"
+                        value={form.start_date}
+                        onChange={(e) => setForm((prev) => ({ ...prev, start_date: e.target.value }))}
+                        onFocus={(e) => e.target.showPicker?.()}
+                        onClick={(e) => e.target.showPicker?.()}
+                      />
+                    </label>
+                    <label>
+                      <span>End Date</span>
+                      <input
+                        type="date"
+                        value={form.end_date}
+                        onChange={(e) => setForm((prev) => ({ ...prev, end_date: e.target.value }))}
+                        onFocus={(e) => e.target.showPicker?.()}
+                        onClick={(e) => e.target.showPicker?.()}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="nb-form-section">
+                  <h4 className="nb-section-title">Description</h4>
+                  <div className="nb-form-grid nb-form-grid-2">
+                    <label className="nb-span-full">
+                      <span>Description</span>
+                      <textarea
+                        rows="4"
+                        value={form.description}
+                        onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                        placeholder="Enter notice description"
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="nb-form-section">
+                  <h4 className="nb-section-title">Attachments</h4>
+                  <div className="nb-form-grid nb-form-grid-2">
+                    <div className="nb-span-full">
+                      <span>Upload PDF, docs, photos, etc.</span>
+                      <label
+                        className={`nb-attachment-dropzone ${attachmentDragOver ? 'drag' : ''}`}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          setAttachmentDragOver(true);
+                        }}
+                        onDragLeave={() => setAttachmentDragOver(false)}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          setAttachmentDragOver(false);
+                          handleAttachmentFile(event.dataTransfer.files);
+                        }}
+                      >
+                        <input
+                          type="file"
+                          multiple
+                          onChange={handleAttachmentInputChange}
+                        />
+                        <div className="nb-attachment-drop-inner">
+                          <span>{uploadingAttachment ? 'Uploading...' : 'Drag & drop files here'}</span>
+                          <span className="nb-attachment-drop-sub">or click to choose files</span>
                         </div>
-                      ))}
+                      </label>
+                      {attachmentWarning && <div className="nb-warning-inline">{attachmentWarning}</div>}
+                      {form.attachments.length > 0 && (
+                        <div className="nb-attachment-pill-list">
+                          {form.attachments.map((item, index) => (
+                            <div key={`${item.name}-${index}`} className="nb-attachment-pill">
+                              <span className="nb-attachment-pill-name">{item.name}</span>
+                              <button type="button" onClick={() => removeAttachment(index)}>Remove</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                </section>
               </div>
               {formError && <div className="nb-error">{formError}</div>}
               <div className="nb-form-actions">
                 <button
                   className="nb-secondary-btn"
                   onClick={() => {
-                    setShowForm(false);
                     resetNoticeForm();
+                    goToNoticeboardList();
                   }}
                   type="button"
                 >
@@ -497,18 +557,22 @@ export default function NoticeboardPage() {
             </div>
           )}
 
-          {loading && <div className="nb-empty">Loading notices...</div>}
+          {!isFormRoute && loading && <div className="nb-empty">Loading notices...</div>}
 
-          {!loading && notices.length === 0 && (
+          {!isFormRoute && !loading && notices.length === 0 && (
             <div className="nb-empty">
-              <button className="nb-add-btn nb-list-add-btn" type="button" onClick={toggleNoticeForm}>
-                {showForm ? 'Close Form' : 'Add Notice'}
+              <button
+                className="nb-add-btn nb-list-add-btn"
+                type="button"
+                onClick={() => navigate('/noticeboard/create_notice', { state: { userName, trust } })}
+              >
+                Add Notice
               </button>
               <div>No notice found for this trust. Create your first notice.</div>
             </div>
           )}
 
-          {!loading && notices.length > 0 && (
+          {!isFormRoute && !loading && notices.length > 0 && (
             <section className="nb-profile-layout">
               <aside className="nb-left-panel">
                 <div className="nb-left-head">
@@ -541,8 +605,12 @@ export default function NoticeboardPage() {
                   value={listSearch}
                   onChange={(event) => setListSearch(event.target.value)}
                 />
-                <button className="nb-add-btn nb-list-add-btn" type="button" onClick={toggleNoticeForm}>
-                  {showForm ? 'Close Form' : 'Add Notice'}
+                <button
+                  className="nb-add-btn nb-list-add-btn"
+                  type="button"
+                  onClick={() => navigate('/noticeboard/create_notice', { state: { userName, trust } })}
+                >
+                  Add Notice
                 </button>
 
                 <div className="nb-filter-row">
@@ -597,6 +665,7 @@ export default function NoticeboardPage() {
                     </button>
                   </div>
                 )}
+
               </aside>
 
               <section className="nb-right-panel">

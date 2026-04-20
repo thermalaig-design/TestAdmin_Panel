@@ -12,7 +12,8 @@ function normalizeRow(row = {}) {
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     location: row.location || '',
     startEventDate: row.startEventDate || null,
-    start_time: row.start_time || null,
+    startTime: row.startTime ?? row.start_time ?? null,
+    endTime: row.endTime ?? row.end_time ?? null,
     endEventDate: row.endEventDate || null,
     is_registration_required: !!row.is_registration_required,
     status: row.status || 'active',
@@ -31,6 +32,7 @@ export async function fetchEventsByTrust(trustId) {
     .select('*')
     .eq('trust_id', trustId)
     .order('startEventDate', { ascending: true })
+    .order('startTime', { ascending: true })
     .order('endEventDate', { ascending: true })
     .order('title', { ascending: true });
 
@@ -60,7 +62,8 @@ export async function createEvent(payload = {}) {
     attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
     location: String(payload.location || '').trim() || null,
     startEventDate: payload.startEventDate || null,
-    start_time: payload.start_time || null,
+    startTime: payload.startTime || null,
+    endTime: payload.endTime || null,
     endEventDate: payload.endEventDate || null,
     type: payload.type || 'general',
     status: payload.status || 'active',
@@ -92,7 +95,8 @@ export async function updateEvent(eventId, updates = {}, trustId = null) {
       ? { location: String(updates.location || '').trim() || null }
       : {}),
     ...(updates.startEventDate !== undefined ? { startEventDate: updates.startEventDate || null } : {}),
-    ...(updates.start_time !== undefined ? { start_time: updates.start_time || null } : {}),
+    ...(updates.startTime !== undefined ? { startTime: updates.startTime || null } : {}),
+    ...(updates.endTime !== undefined ? { endTime: updates.endTime || null } : {}),
     ...(updates.endEventDate !== undefined ? { endEventDate: updates.endEventDate || null } : {}),
     ...(updates.is_registration_required !== undefined
       ? { is_registration_required: !!updates.is_registration_required }
