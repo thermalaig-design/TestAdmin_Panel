@@ -28,25 +28,15 @@ function normalizeRow(row = {}) {
 export async function fetchEventsByTrust(trustId) {
   if (!trustId) return { data: [], error: null };
 
-<<<<<<< HEAD
-  const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .select('*')
-    .eq('trust_id', trustId)
-    .order('startEventDate', { ascending: true })
-    .order('startTime', { ascending: true })
-    .order('endEventDate', { ascending: true })
-    .order('title', { ascending: true });
-=======
   return cachedQuery(`events:list:${trustId}`, async () => {
     const { data, error } = await supabase
       .from(TABLE_NAME)
       .select('*')
       .eq('trust_id', trustId)
       .order('startEventDate', { ascending: true })
+      .order('startTime', { ascending: true })
       .order('endEventDate', { ascending: true })
       .order('title', { ascending: true });
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
 
     return { data: (data || []).map(normalizeRow), error };
   }, 12000);

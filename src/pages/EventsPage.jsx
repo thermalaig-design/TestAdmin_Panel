@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
 import { createEvent, deleteEvent, fetchEventsByTrust, updateEvent } from '../services/eventsService';
-import { getCachedQueryValue } from '../services/requestCache';
 import { parseAttachmentItem, readFileAsDataUrl, serializeAttachmentItem } from '../utils/attachmentUtils';
 import './EventsPage.css';
 
@@ -78,21 +77,14 @@ export default function EventsPage() {
   const { userName = 'Admin', trust = null } = location.state || {};
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
-<<<<<<< HEAD
   const isCreateRoute = location.pathname === '/events/create_event';
   const isEditRoute = location.pathname === '/events/edit_details';
   const isFormRoute = isCreateRoute || isEditRoute;
   const routeEditEventId =
     location.state?.editEventId || new URLSearchParams(location.search).get('id') || '';
-=======
-  const eventsCacheKey = trustId ? `events:list:${trustId}` : '';
-  const cachedEventsPayload = eventsCacheKey ? getCachedQueryValue(eventsCacheKey) : null;
-  const seededEvents = Array.isArray(cachedEventsPayload?.data) ? cachedEventsPayload.data : [];
-  const seededFromCacheRef = useRef(seededEvents.length > 0);
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
 
-  const [events, setEvents] = useState(seededEvents);
-  const [loading, setLoading] = useState(!seededFromCacheRef.current);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [previewEvent, setPreviewEvent] = useState(null);
   const [editingEventId, setEditingEventId] = useState(null);
@@ -117,13 +109,8 @@ export default function EventsPage() {
     attachments: [],
     location: '',
     startEventDate: '',
-<<<<<<< HEAD
     startTime: '',
     endTime: '',
-=======
-    start_time: '',
-    end_time: '',
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
     endEventDate: '',
     type: 'general',
     status: 'active',
@@ -137,13 +124,8 @@ export default function EventsPage() {
       attachments: [],
       location: '',
       startEventDate: '',
-<<<<<<< HEAD
       startTime: '',
       endTime: '',
-=======
-      start_time: '',
-      end_time: '',
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
       endEventDate: '',
       type: 'general',
       status: 'active',
@@ -164,7 +146,7 @@ export default function EventsPage() {
     }
 
     const load = async () => {
-      if (!seededFromCacheRef.current) setLoading(true);
+      setLoading(true);
       setError('');
       const { data, error: fetchError } = await fetchEventsByTrust(trustId);
       if (fetchError) {
@@ -172,7 +154,6 @@ export default function EventsPage() {
       }
       setEvents(data || []);
       setLoading(false);
-      seededFromCacheRef.current = false;
     };
 
     load();
@@ -238,11 +219,7 @@ export default function EventsPage() {
     if (sortBy === 'name') {
       list.sort((left, right) => String(left?.title || '').localeCompare(String(right?.title || '')));
     } else if (sortBy === 'end_date') {
-<<<<<<< HEAD
       list.sort((left, right) => getDateSortValue(left?.endEventDate).localeCompare(getDateSortValue(right?.endEventDate)));
-=======
-      list.sort((left, right) => String(left?._sortEndDate || '').localeCompare(String(right?._sortEndDate || '')));
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
     } else {
       list.sort((left, right) => String(left?._sortStartDate || '').localeCompare(String(right?._sortStartDate || '')));
     }
@@ -349,13 +326,8 @@ export default function EventsPage() {
       attachments: form.attachments.map(serializeAttachmentItem).filter(Boolean),
       location: form.location,
       startEventDate: form.startEventDate,
-<<<<<<< HEAD
       startTime: form.startTime || null,
       endTime: form.endTime || null,
-=======
-      start_time: form.start_time || null,
-      end_time: form.end_time || null,
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
       endEventDate: form.endEventDate || null,
       type: form.type,
       status: toDbStatus(form.status),
@@ -450,29 +422,6 @@ export default function EventsPage() {
   };
 
   const handleEditEventDetails = (event) => {
-<<<<<<< HEAD
-=======
-    const parsedAttachments = (event.attachments || [])
-      .map((item, index) => parseAttachmentItem(item, index))
-      .filter(Boolean);
-
-    setForm({
-      title: event.title || '',
-      description: event.description || '',
-      attachments: parsedAttachments,
-      location: event.location || '',
-      startEventDate: event.startEventDate || '',
-      start_time: event.start_time || '',
-      end_time: event.end_time || event.raw?.end_time || '',
-      endEventDate: event.endEventDate || '',
-      type: event.type || 'general',
-      status: event.status || 'active',
-      is_registration_required: !!event.is_registration_required,
-    });
-    setEditingEventId(event.id);
-    setFormError('');
-    setShowForm(true);
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
     setActiveEventMenuId(null);
     navigate(`/events/edit_details?id=${event.id}`, {
       state: { userName, trust, editEventId: event.id },
@@ -497,7 +446,6 @@ export default function EventsPage() {
         <PageHeader
           title="Events"
           subtitle="Data is now fetched and inserted from the events table"
-<<<<<<< HEAD
           onBack={() => {
             if (isFormRoute) {
               goToEventsList();
@@ -505,9 +453,6 @@ export default function EventsPage() {
             }
             navigate('/dashboard', { state: { userName, trust } });
           }}
-=======
-          onBack={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
         />
 
         <section className="ev-content">
@@ -516,7 +461,6 @@ export default function EventsPage() {
           {isFormRoute && (
             <div className="ev-form-card">
               <h3>{editingEventId ? 'Edit Event' : 'Create Event'}</h3>
-<<<<<<< HEAD
               <div className="ev-form-layout">
                 <section className="ev-form-section">
                   <h4 className="ev-section-title">Basic Info</h4>
@@ -666,142 +610,6 @@ export default function EventsPage() {
                         <div className="ev-attachment-drop-inner">
                           <span>{uploadingAttachment ? 'Uploading...' : 'Drag & drop files here'}</span>
                           <span className="ev-attachment-drop-sub">or click to choose files</span>
-=======
-              <div className="ev-form-grid">
-                <label>
-                  <span>Event Name *</span>
-                  <input
-                    value={form.title}
-                    onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                    placeholder="Enter event title"
-                  />
-                </label>
-                <div className="ev-date-field">
-                  <span>Start Date</span>
-                  <input
-                    type="date"
-                    value={form.startEventDate}
-                    onChange={(e) => setForm((prev) => ({ ...prev, startEventDate: e.target.value }))}
-                    onClick={(e) => e.target.showPicker?.()}
-                  />
-                </div>
-                <div className="ev-date-field">
-                  <span>End Date</span>
-                  <input
-                    type="date"
-                    value={form.endEventDate}
-                    onChange={(e) => setForm((prev) => ({ ...prev, endEventDate: e.target.value }))}
-                    onClick={(e) => e.target.showPicker?.()}
-                  />
-                </div>
-                <div className="ev-time-pair ev-span-2">
-                  <div className="ev-time-field">
-                    <span>Start Time</span>
-                    <input
-                      type="time"
-                      value={form.start_time}
-                      onChange={(e) => setForm((prev) => ({ ...prev, start_time: e.target.value }))}
-                      onClick={(e) => e.target.showPicker?.()}
-                    />
-                  </div>
-                  <div className="ev-time-field">
-                    <span>End Time</span>
-                    <input
-                      type="time"
-                      value={form.end_time}
-                      onChange={(e) => setForm((prev) => ({ ...prev, end_time: e.target.value }))}
-                      onClick={(e) => e.target.showPicker?.()}
-                    />
-                  </div>
-                </div>
-                <label>
-                  <span>Location</span>
-                  <input
-                    value={form.location}
-                    onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
-                    placeholder="Venue / address"
-                  />
-                </label>
-                <label>
-                  <span>Type</span>
-                  <select
-                    value={form.type}
-                    onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-                  >
-                    {EVENT_TYPES.map((typeValue) => (
-                      <option key={typeValue} value={typeValue}>
-                        {typeValue}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Status</span>
-                  <select
-                    value={form.status}
-                    onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
-                  >
-                    {EVENT_STATUSES.map((statusValue) => (
-                      <option key={statusValue} value={statusValue}>
-                        {statusValue}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="ev-checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={form.is_registration_required}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        is_registration_required: e.target.checked,
-                      }))
-                    }
-                  />
-                  <span>Registration Required</span>
-                </label>
-                <label className="ev-span-2">
-                  <span>Description</span>
-                  <textarea
-                    rows="4"
-                    value={form.description}
-                    onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="Enter event description"
-                  />
-                </label>
-                <div className="ev-span-2">
-                  <span>Attachments (upload PDF, docs, photos, etc.)</span>
-                  <label
-                    className={`ev-attachment-dropzone ${attachmentDragOver ? 'drag' : ''}`}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setAttachmentDragOver(true);
-                    }}
-                    onDragLeave={() => setAttachmentDragOver(false)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      setAttachmentDragOver(false);
-                      handleAttachmentFile(event.dataTransfer.files);
-                    }}
-                  >
-                    <input
-                      type="file"
-                      multiple
-                      onChange={handleAttachmentInputChange}
-                    />
-                    <div className="ev-attachment-drop-inner">
-                      <span>{uploadingAttachment ? 'Uploading...' : 'Drag & drop files here'}</span>
-                      <span className="ev-attachment-drop-sub">or click to choose files</span>
-                    </div>
-                  </label>
-                  {form.attachments.length > 0 && (
-                    <div className="ev-attachment-pill-list">
-                      {form.attachments.map((item, index) => (
-                        <div key={`${item.name}-${index}`} className="ev-attachment-pill">
-                          <span className="ev-attachment-pill-name">{item.name}</span>
-                          <button type="button" onClick={() => removeAttachment(index)}>Remove</button>
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
                         </div>
                       </label>
                       {form.attachments.length > 0 && (
@@ -1033,13 +841,8 @@ export default function EventsPage() {
                         <div><span>Status</span><strong>{toUiStatus(selectedEvent.status)}</strong></div>
                         <div><span>Type</span><strong>{formatTypeLabel(selectedEvent.type)}</strong></div>
                         <div><span>Start Date</span><strong>{formatDate(selectedEvent.startEventDate)}</strong></div>
-<<<<<<< HEAD
                         <div><span>Start Time</span><strong>{formatTime(selectedEvent.startTime)}</strong></div>
                         <div><span>End Time</span><strong>{formatTime(selectedEvent.endTime)}</strong></div>
-=======
-                        <div><span>Start Time</span><strong>{formatTime(selectedEvent.start_time)}</strong></div>
-                        <div><span>End Time</span><strong>{formatTime(selectedEvent.end_time || selectedEvent.raw?.end_time)}</strong></div>
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
                         <div><span>End Date</span><strong>{formatDate(selectedEvent.endEventDate)}</strong></div>
                         <div><span>Location</span><strong>{selectedEvent.location || '-'}</strong></div>
                         <div>
@@ -1115,13 +918,8 @@ export default function EventsPage() {
                 <div className="ev-detail-meta">
                   <div>Start Date: {formatDate(previewEvent.startEventDate)}</div>
                   <div>End Date: {formatDate(previewEvent.endEventDate)}</div>
-<<<<<<< HEAD
                   <div>Start Time: {formatTime(previewEvent.startTime)}</div>
                   <div>End Time: {formatTime(previewEvent.endTime)}</div>
-=======
-                  <div>Start Time: {formatTime(previewEvent.start_time)}</div>
-                  <div>End Time: {formatTime(previewEvent.end_time || previewEvent.raw?.end_time)}</div>
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
                   <div>Registration: {previewEvent.is_registration_required ? 'Required' : 'Not Required'}</div>
                 </div>
                 {previewAttachments.length > 0 && (

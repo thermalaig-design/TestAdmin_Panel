@@ -431,7 +431,6 @@ export default function NoticeboardPage() {
         <PageHeader
           title="Noticeboard"
           subtitle="Data is now fetched and inserted from the noticeboard table"
-<<<<<<< HEAD
           onBack={() => {
             if (isFormRoute) {
               goToNoticeboardList();
@@ -439,9 +438,6 @@ export default function NoticeboardPage() {
             }
             navigate('/dashboard', { state: { userName, trust } });
           }}
-=======
-          onBack={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
->>>>>>> 460fd08ae9ed2923fd767592c500944915584bf0
         />
 
         <section className="nb-content">
