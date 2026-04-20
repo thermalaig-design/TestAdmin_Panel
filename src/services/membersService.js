@@ -5,6 +5,7 @@ const REGISTERED_TABLE_CANDIDATES = ['registered_members', 'reg_members'];
 const MEMBER_TABLE_CANDIDATES = ['members', 'Members'];
 const MEMBER_PROFILE_TABLE_CANDIDATES = ['member_profiles'];
 const FAMILY_MEMBERS_TABLE_CANDIDATES = ['family_members'];
+const OTHER_MEMBERSHIPS_TABLE_CANDIDATES = ['other_memberships'];
 const MEMBER_FETCH_CHUNK_SIZE = 100;
 const TABLE_PAGE_SIZE = 1000;
 
@@ -223,6 +224,22 @@ function normalizeFamilyMemberRow(row = {}) {
   };
 }
 
+function normalizeOtherMembershipRow(row = {}) {
+  return {
+    id: pickFirst(row, ['id']),
+    member_id: pickFirst(row, ['member_id']),
+    member_name: pickFirst(row, ['member_name']) || '',
+    member_phone: pickFirst(row, ['member_phone']) || '',
+    trust_id: pickFirst(row, ['trust_id']),
+    organisation_name: pickFirst(row, ['organisation_name']) || '',
+    membership_no: pickFirst(row, ['membership_no']) || '',
+    membership_type: pickFirst(row, ['membership_type']) || '',
+    is_active: pickFirst(row, ['is_active']) !== false,
+    remark: pickFirst(row, ['remark']) || '',
+    created_at: pickFirst(row, ['created_at']) || null,
+  };
+}
+
 function buildFamilyMemberPayload(payload = {}, memberId) {
   const parsedAge =
     payload.age === '' || payload.age === null || payload.age === undefined
@@ -304,6 +321,23 @@ export async function fetchFamilyMembersByMemberId(memberId) {
     }
 
     return { data: (data || []).map(normalizeFamilyMemberRow), error: null };
+  }, 12000);
+}
+
+export async function fetchOtherMembershipsByMemberId(memberId) {
+  if (!memberId) return { data: [], error: null };
+  const cacheKey = `members:other-memberships:${memberId}`;
+
+  return cachedQuery(cacheKey, async () => {
+    const table = await resolveTable(OTHER_MEMBERSHIPS_TABLE_CANDIDATES, 'other_memberships');
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .eq('member_id', memberId)
+      .order('created_at', { ascending: false, nullsFirst: false });
+
+    if (error) return { data: [], error };
+    return { data: (data || []).map(normalizeOtherMembershipRow), error: null };
   }, 12000);
 }
 

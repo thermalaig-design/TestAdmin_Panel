@@ -8,6 +8,7 @@ import {
   fetchAllMembersDirectory,
   fetchFamilyMembersByMemberId,
   fetchMemberProfileView,
+  fetchOtherMembershipsByMemberId,
   fetchRegisteredMembersDirectory,
   registerExistingMember,
   unregisterRegisteredMember,
@@ -330,6 +331,8 @@ export default function MemberProfilePage() {
   const [photoDragOver, setPhotoDragOver] = useState(false);
   const [familyMembers, setFamilyMembers] = useState([]);
   const [loadingFamily, setLoadingFamily] = useState(false);
+  const [otherMemberships, setOtherMemberships] = useState([]);
+  const [loadingOtherMemberships, setLoadingOtherMemberships] = useState(false);
   const [familyForm, setFamilyForm] = useState(() => buildFamilyForm());
   const [isFamilyEditing, setIsFamilyEditing] = useState(false);
   const [familySaving, setFamilySaving] = useState(false);
@@ -349,6 +352,7 @@ export default function MemberProfilePage() {
   const [useCustomRegisterRole, setUseCustomRegisterRole] = useState(false);
   const [registerError, setRegisterError] = useState('');
   const [familyError, setFamilyError] = useState('');
+  const [otherMembershipError, setOtherMembershipError] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -553,6 +557,13 @@ export default function MemberProfilePage() {
     const start = (safePickerPage - 1) * PICKER_PAGE_SIZE;
     return sortedPickerMembers.slice(start, start + PICKER_PAGE_SIZE);
   }, [safePickerPage, sortedPickerMembers]);
+  const visibleOtherMemberships = useMemo(
+    () =>
+      (otherMemberships || []).filter(
+        (item) => String(item?.member_id || '') === String(effectiveSelectedMemberId || '')
+      ),
+    [otherMemberships, effectiveSelectedMemberId]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -613,6 +624,34 @@ export default function MemberProfilePage() {
     };
 
     loadFamilyMembers();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSelectedMemberId, selectedMemberRecord?.mobile, selectedMemberRecord?.name]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadOtherMemberships = async () => {
+      if (!effectiveSelectedMemberId) {
+        setOtherMemberships([]);
+        return;
+      }
+
+      setLoadingOtherMemberships(true);
+      setOtherMembershipError('');
+      const { data, error: fetchError } = await fetchOtherMembershipsByMemberId(effectiveSelectedMemberId);
+      if (cancelled) return;
+
+      if (fetchError) {
+        setOtherMembershipError(fetchError.message || 'Unable to load other memberships.');
+        setOtherMemberships([]);
+      } else {
+        setOtherMemberships(data || []);
+      }
+      setLoadingOtherMemberships(false);
+    };
+
+    loadOtherMemberships();
     return () => {
       cancelled = true;
     };
@@ -1470,6 +1509,42 @@ export default function MemberProfilePage() {
                               {familySaving ? 'Saving...' : familyForm.id ? 'Update Family Member' : 'Save Family Member'}
                             </button>
                           </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mp-card mp-single-form-card">
+                      <div className="mp-detail-head">
+                        <h3>Other Memberships</h3>
+                        <span className="mp-view-only-badge">View only</span>
+                      </div>
+
+                      {otherMembershipError && <div className="mp-error-card">{otherMembershipError}</div>}
+
+                      {!loadingOtherMemberships && visibleOtherMemberships.length === 0 && (
+                        <div className="mp-info-card">No other memberships found.</div>
+                      )}
+
+                      {!loadingOtherMemberships && visibleOtherMemberships.length > 0 && (
+                        <div className="mp-family-list">
+                          {visibleOtherMemberships.map((item) => (
+                            <div key={item.id} className="mp-family-item">
+                              <div className="mp-family-row-head">
+                                <div className="mp-family-title">{item.organisation_name || 'Organisation'}</div>
+                                <span className="mp-family-relation">{item.membership_type || 'Membership'}</span>
+                              </div>
+                              <div className="mp-family-sub mp-family-chip-row">
+                                <span className="mp-family-chip">No: {item.membership_no || '-'}</span>
+                                <span className={`mp-family-chip ${item.is_active ? 'mp-chip-active' : 'mp-chip-inactive'}`}>
+                                  {item.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                              <div className="mp-family-sub">
+                                {item.member_name || '-'} {item.member_phone ? `| ${item.member_phone}` : ''}
+                              </div>
+                              {item.remark && <div className="mp-family-sub">{item.remark}</div>}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>

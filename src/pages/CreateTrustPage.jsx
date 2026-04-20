@@ -18,6 +18,8 @@ export default function CreateTrustPage() {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [generalError, setGeneralError] = useState('');
+  const [iconFile, setIconFile] = useState(null);
+  const [iconPreviewUrl, setIconPreviewUrl] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -31,6 +33,19 @@ export default function CreateTrustPage() {
         [name]: '',
       }));
     }
+  };
+
+  const handleIconFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+    if (!file.type || !file.type.startsWith('image/')) {
+      setGeneralError('Please select a valid image file for trust icon.');
+      e.target.value = '';
+      return;
+    }
+    setGeneralError('');
+    setIconFile(file);
+    setIconPreviewUrl(URL.createObjectURL(file));
   };
 
   const validateForm = () => {
@@ -57,6 +72,7 @@ export default function CreateTrustPage() {
       name: formData.name,
       legalName: formData.legalName,
       iconUrl: formData.iconUrl,
+      iconFile,
       remark: formData.remark,
     });
 
@@ -161,6 +177,23 @@ export default function CreateTrustPage() {
               />
             </div>
 
+            {/* Trust Icon Upload - Optional */}
+            <div className="ct-field">
+              <label className="ct-label">Upload Trust Icon (Optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="ct-input"
+                onChange={handleIconFileChange}
+              />
+              {iconPreviewUrl && (
+                <div className="ct-icon-preview">
+                  <img src={iconPreviewUrl} alt="Trust icon preview" />
+                  <span>{iconFile?.name || 'Selected image'}</span>
+                </div>
+              )}
+            </div>
+
             {/* Icon URL - Optional */}
             <div className="ct-field">
               <label className="ct-label">Icon/Logo URL (Optional)</label>
@@ -173,7 +206,7 @@ export default function CreateTrustPage() {
                 onChange={handleChange}
                 autoComplete="off"
               />
-              <p className="ct-field-hint">You can use emoji, URL, or SVG markup</p>
+              <p className="ct-field-hint">If file is selected, uploaded trust icon URL will be used.</p>
             </div>
 
             {/* Remark - Optional */}

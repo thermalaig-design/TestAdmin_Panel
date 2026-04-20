@@ -42,6 +42,7 @@ export default function GalleryPage() {
   const [folderSort, setFolderSort] = useState('name_asc');
   const [folderPage, setFolderPage] = useState(1);
   const deferredFolderSearch = useDeferredValue(folderSearch);
+  const currentMemberId = location.state?.selectedMemberId || null;
   const selectedPhotoSentinelRef = useRef(null);
   const FOLDER_PAGE_SIZE = 6;
   const PHOTO_BATCH_SIZE = 5;
@@ -303,14 +304,6 @@ export default function GalleryPage() {
     };
   }, [selectedPhotoLoadSignal, showFolderDetail, selectedFolderId, selectedPhotoTotal, selectedFolderPhotos.length, selectedPhotoFetching]);
 
-  const readFileAsDataUrl = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(new Error('Unable to read selected image.'));
-      reader.readAsDataURL(file);
-    });
-
   const loadImageFromFile = (file) =>
     new Promise((resolve, reject) => {
       const objectUrl = URL.createObjectURL(file);
@@ -335,8 +328,7 @@ export default function GalleryPage() {
 
   const compressImageToLimit = async (file, maxBytes) => {
     if ((file?.size || 0) <= maxBytes) {
-      const imageUrl = await readFileAsDataUrl(file);
-      return { imageUrl, sizeText: formatSizeToKb(file.size) };
+      return { file, sizeText: formatSizeToKb(file.size) };
     }
 
     const image = await loadImageFromFile(file);
@@ -358,8 +350,7 @@ export default function GalleryPage() {
       for (let quality = 0.82; quality >= 0.2; quality -= 0.08) {
         const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
         if (blob && blob.size <= maxBytes) {
-          const imageUrl = await readFileAsDataUrl(blob);
-          return { imageUrl, sizeText: formatSizeToKb(blob.size) };
+          return { file: blob, sizeText: formatSizeToKb(blob.size) };
         }
       }
     }
@@ -396,12 +387,13 @@ export default function GalleryPage() {
     for (const file of imageFiles) {
       try {
         const processed = await compressImageToLimit(file, MAX_IMAGE_SIZE_BYTES);
-        if (!processed?.imageUrl) {
+        if (!processed?.file) {
           sizeSkipped += 1;
           continue;
         }
         const { data, error: createErr } = await createGalleryPhoto({
-          imageUrl: processed.imageUrl,
+          file: processed.file,
+          uploadedBy: currentMemberId,
           size: processed.sizeText,
           folderId: selectedFolderId,
         });

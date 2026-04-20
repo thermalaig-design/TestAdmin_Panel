@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchTrustDetails, updateTrustDetails } from '../services/authService';
+import { uploadTrustIcon } from '../services/trustService';
 import Sidebar from '../components/Sidebar';
 import './TrusteesPage.css';
 
@@ -177,6 +178,7 @@ export default function TrusteesPage() {
   const [savingField,   setSavingField]   = useState('');
   const [saveError,     setSaveError]     = useState('');
   const [dragOver,      setDragOver]      = useState(false);
+  const [logoFile,      setLogoFile]      = useState(null);
   const [editingContent, setEditingContent] = useState(null);
   const [contentDraft,   setContentDraft]   = useState({ terms_content: '', privacy_content: '' });
   const [contentSaving,  setContentSaving]  = useState(false);
@@ -220,6 +222,7 @@ export default function TrusteesPage() {
 
   const startEdit = (field) => {
     setSaveError('');
+    if (field === 'logo') setLogoFile(null);
     setEditMode({ name: false, legal: false, remark: false, logo: false, [field]: true });
     setDraft({
       name: trust?.name || '',
@@ -233,6 +236,7 @@ export default function TrusteesPage() {
     setEditMode({ name: false, legal: false, remark: false, logo: false });
     setSaveError('');
     setDragOver(false);
+    setLogoFile(null);
   };
 
   const handleLogoFile = (file) => {
@@ -246,6 +250,7 @@ export default function TrusteesPage() {
       setDraft(prev => ({ ...prev, icon_url: reader.result }));
     };
     reader.readAsDataURL(file);
+    setLogoFile(file);
   };
 
   const saveField = async (field) => {
@@ -257,7 +262,19 @@ export default function TrusteesPage() {
     if (field === 'name') updates.name = draft.name.trim();
     if (field === 'legal') updates.legal_name = draft.legal_name.trim();
     if (field === 'remark') updates.remark = draft.remark.trim();
-    if (field === 'logo') updates.icon_url = draft.icon_url || '';
+    if (field === 'logo') {
+      if (logoFile) {
+        const { data: uploadData, error: uploadError } = await uploadTrustIcon(logoFile, { ownerId: trustId });
+        if (uploadError) {
+          setSaveError(uploadError.message || 'Unable to upload trust icon.');
+          setSavingField('');
+          return;
+        }
+        updates.icon_url = uploadData?.publicUrl || '';
+      } else {
+        updates.icon_url = draft.icon_url || '';
+      }
+    }
 
     const { data, error: err } = await updateTrustDetails(trustId, updates);
     if (err) {
