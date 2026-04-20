@@ -251,6 +251,14 @@ const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
 const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-noticeboard', 'card-events']);
 
+const NAV_SECTION_TITLES = {
+  dashboard: 'Dashboard',
+  'company-details': 'Company Details',
+  'app-design': 'App Design',
+  'home-page': 'Home Page',
+  'quick-actions': 'Quick Actions',
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const initials = (name = '') =>
   name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'A';
@@ -498,8 +506,8 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
 
   const userInitials = initials(userName);
-  const pageTitle = 'Dashboard';
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
+  const pageTitle = NAV_SECTION_TITLES[currentSidebarNavKey] || 'Dashboard';
 
   const scopedModules = useMemo(() => {
     if (currentSidebarNavKey === 'app-design') {

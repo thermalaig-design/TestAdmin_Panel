@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'noticeboard';
+const MAX_NOTICE_FETCH = 20;
 
 function normalizeRow(row = {}) {
   return {
@@ -29,7 +30,8 @@ export async function fetchNoticeboardByTrust(trustId) {
       .from(TABLE_NAME)
       .select('*')
       .eq('trust_id', trustId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(0, MAX_NOTICE_FETCH - 1);
 
     return { data: (data || []).map(normalizeRow), error };
   }, 12000);
@@ -55,11 +57,13 @@ export async function createNotice(payload = {}) {
 
   const row = {
     trust_id: payload.trust_id,
+    type: payload.type || 'gen',
     name: String(payload.name || '').trim(),
     description: String(payload.description || '').trim() || null,
     attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
     start_date: payload.start_date || null,
     end_date: payload.end_date || null,
+    status: payload.status || 'active',
     created_by: payload.created_by || null,
   };
 

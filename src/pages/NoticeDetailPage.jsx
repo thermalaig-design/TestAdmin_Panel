@@ -18,6 +18,7 @@ export default function NoticeDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
 
   const [notice, setNotice] = useState(null);
@@ -26,7 +27,7 @@ export default function NoticeDetailPage() {
 
   useEffect(() => {
     if (!trustId) {
-      navigate('/dashboard', { replace: true, state: { userName, trust } });
+      navigate('/dashboard', { replace: true, state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
       return;
     }
 
@@ -42,7 +43,7 @@ export default function NoticeDetailPage() {
     };
 
     load();
-  }, [navigate, noticeId, trustId, userName, trust]);
+  }, [navigate, noticeId, trustId, userName, trust, currentSidebarNavKey]);
 
   if (!trustId) return null;
   const parsedAttachments = (notice?.attachments || [])
@@ -53,7 +54,7 @@ export default function NoticeDetailPage() {
     <div className="nb-root">
       <Sidebar
         trustName={trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
 
@@ -61,7 +62,7 @@ export default function NoticeDetailPage() {
         <PageHeader
           title="Notice Details"
           subtitle="Loaded from noticeboard table"
-          onBack={() => navigate('/noticeboard', { state: { userName, trust } })}
+          onBack={() => navigate('/noticeboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         />
 
         <section className="nb-content">

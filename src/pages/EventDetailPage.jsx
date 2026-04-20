@@ -23,6 +23,7 @@ export default function EventDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
 
   const [event, setEvent] = useState(null);
@@ -31,7 +32,7 @@ export default function EventDetailPage() {
 
   useEffect(() => {
     if (!trustId) {
-      navigate('/dashboard', { replace: true, state: { userName, trust } });
+      navigate('/dashboard', { replace: true, state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
       return;
     }
 
@@ -47,7 +48,7 @@ export default function EventDetailPage() {
     };
 
     load();
-  }, [eventId, navigate, trustId, userName, trust]);
+  }, [eventId, navigate, trustId, userName, trust, currentSidebarNavKey]);
 
   if (!trustId) return null;
 
@@ -59,7 +60,7 @@ export default function EventDetailPage() {
     <div className="ev-root">
       <Sidebar
         trustName={trust?.name || 'Trust'}
-        onDashboard={() => navigate('/dashboard', { state: { userName, trust } })}
+        onDashboard={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         onLogout={() => navigate('/login')}
       />
 
@@ -67,7 +68,7 @@ export default function EventDetailPage() {
         <PageHeader
           title="Event Details"
           subtitle="Loaded from events table"
-          onBack={() => navigate('/events', { state: { userName, trust } })}
+          onBack={() => navigate('/events', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         />
 
         <section className="ev-content">

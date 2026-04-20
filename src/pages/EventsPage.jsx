@@ -178,12 +178,12 @@ export default function EventsPage() {
   };
 
   const goToEventsList = () => {
-    navigate('/events', { replace: true, state: { userName, trust } });
+    navigate('/events', { replace: true, state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
   };
 
   useEffect(() => {
     if (!trustId) {
-      navigate('/dashboard', { replace: true, state: { userName, trust } });
+      navigate('/dashboard', { replace: true, state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
       return;
     }
 
@@ -199,7 +199,7 @@ export default function EventsPage() {
     };
 
     load();
-  }, [navigate, trustId, userName, trust]);
+  }, [navigate, trustId, userName, trust, currentSidebarNavKey]);
 
   useEffect(() => {
     const closeMenu = () => setActiveEventMenuId(null);
@@ -560,7 +560,7 @@ export default function EventsPage() {
   const handleEditEventDetails = (event) => {
     setActiveEventMenuId(null);
     navigate(`/events/edit_details?id=${event.id}`, {
-      state: { userName, trust, editEventId: event.id },
+      state: { userName, trust, editEventId: event.id, sidebarNavKey: currentSidebarNavKey },
     });
   };
 
@@ -587,7 +587,7 @@ export default function EventsPage() {
               goToEventsList();
               return;
             }
-            navigate('/dashboard', { state: { userName, trust } });
+            navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
           }}
         />
 
@@ -782,7 +782,7 @@ export default function EventsPage() {
               <button
                 className="ev-add-btn ev-list-add-btn"
                 type="button"
-                onClick={() => navigate('/events/create_event', { state: { userName, trust } })}
+                onClick={() => navigate('/events/create_event', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
               >
                 Add Event
               </button>
@@ -862,7 +862,7 @@ export default function EventsPage() {
                 <button
                   className="ev-add-btn ev-list-add-btn"
                   type="button"
-                  onClick={() => navigate('/events/create_event', { state: { userName, trust } })}
+                  onClick={() => navigate('/events/create_event', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
                 >
                   Add Event
                 </button>

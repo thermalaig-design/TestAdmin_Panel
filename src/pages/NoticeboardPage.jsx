@@ -6,6 +6,27 @@ import { createNotice, deleteNotice, fetchNoticeboardByTrust, updateNotice } fro
 import { parseAttachmentItem, readFileAsDataUrl, serializeAttachmentItem } from '../utils/attachmentUtils';
 import './NoticeboardPage.css';
 
+const MAX_NOTICE_IMAGE_ATTACHMENTS = 3;
+const MAX_NOTICE_IMAGE_SIZE_BYTES = 20 * 1024;
+const NOTICE_TYPE_OPTIONS = ['general', 'vip'];
+const NOTICE_STATUS_OPTIONS = ['active', 'paused'];
+
+function toUiFormType(value) {
+  return String(value || '').toLowerCase() === 'vip' ? 'vip' : 'general';
+}
+
+function toDbType(value) {
+  return String(value || '').toLowerCase() === 'vip' ? 'vip' : 'gen';
+}
+
+function toUiFormStatus(value) {
+  return isPausedStatus(value) ? 'paused' : 'active';
+}
+
+function toDbStatus(value) {
+  return String(value || '').toLowerCase() === 'paused' ? 'inactive' : 'active';
+}
+
 function formatDate(value) {
   if (!value) return '-';
   const date = new Date(value);
@@ -28,37 +49,64 @@ function buildAttachmentMeta(rawItems = []) {
   const parsed = (rawItems || [])
     .map((item, index) => parseAttachmentItem(item, index))
     .filter(Boolean);
-  const imageCount = parsed.filter(isImageAttachment).length;
-  const firstImageUrl = parsed.find(isImageAttachment)?.value || '';
+  const imageItems = parsed.filter(isImageAttachment);
+  const imageCount = imageItems.length;
+  const imageUrls = imageItems.map((item) => item.value).filter(Boolean);
+  const firstImageUrl = imageUrls[0] || '';
   return {
     count: parsed.length,
     imageCount,
+    imageUrls,
     hasImage: imageCount > 0,
     firstName: parsed[0]?.name || '',
     firstImageUrl,
   };
 }
 
-function toLocalDateKey(date = new Date()) {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+function toUiType(value) {
+  return String(value || '').toLowerCase() === 'vip' ? 'vip' : 'general';
 }
 
-function getDateKey(value) {
-  if (!value) return '';
-  const raw = String(value).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return '';
-  return toLocalDateKey(date);
+function isPausedStatus(value) {
+  const normalized = String(value || '').toLowerCase();
+  return normalized === 'inactive' || normalized === 'paused' || normalized === 'archived';
 }
 
-function isPassedNotice(notice) {
-  const endKey = getDateKey(notice?.end_date);
-  if (!endKey) return false;
-  return endKey < toLocalDateKey(new Date());
+function formatStatusLabel(value) {
+  if (String(value || '').toLowerCase() === 'archived') return 'archived';
+  return isPausedStatus(value) ? 'paused' : 'active';
+}
+
+function formatTypeLabel(value) {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'vip') return 'VIP';
+  if (normalized === 'gen' || normalized === 'general') return 'general';
+  return normalized || '-';
+}
+
+function parseDateValue(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  return { year, month, day };
+}
+
+function toDayTimestamp(dateValue, boundary = 'start') {
+  const datePart = parseDateValue(dateValue);
+  if (!datePart) return null;
+  const isEnd = boundary === 'end';
+  return new Date(
+    datePart.year,
+    datePart.month,
+    datePart.day,
+    isEnd ? 23 : 0,
+    isEnd ? 59 : 0,
+    isEnd ? 59 : 0,
+    isEnd ? 999 : 0
+  ).getTime();
 }
 
 export default function NoticeboardPage() {
@@ -85,16 +133,20 @@ export default function NoticeboardPage() {
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
   const [attachmentWarning, setAttachmentWarning] = useState('');
   const [selectedNoticeId, setSelectedNoticeId] = useState('');
-  const [statusTab, setStatusTab] = useState('active');
+  const [statusTab, setStatusTab] = useState('current');
+  const [typeFilter, setTypeFilter] = useState('general');
   const [listSearch, setListSearch] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [currentPage, setCurrentPage] = useState(1);
   const [formError, setFormError] = useState('');
+  const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
   const warningTimerRef = useRef(null);
   const deferredListSearch = useDeferredValue(listSearch);
-  const NOTICE_PAGE_SIZE = 8;
+  const NOTICE_PAGE_SIZE = 10;
   const [form, setForm] = useState({
     name: '',
+    type: 'general',
+    status: 'active',
     description: '',
     attachments: [],
     start_date: '',
@@ -102,19 +154,27 @@ export default function NoticeboardPage() {
   });
 
   const resetNoticeForm = () => {
-    setForm({ name: '', description: '', attachments: [], start_date: '', end_date: '' });
+    setForm({
+      name: '',
+      type: 'general',
+      status: 'active',
+      description: '',
+      attachments: [],
+      start_date: '',
+      end_date: '',
+    });
     setFormError('');
     setAttachmentWarning('');
     setEditingNoticeId(null);
   };
 
   const goToNoticeboardList = () => {
-    navigate('/noticeboard', { replace: true, state: { userName, trust } });
+    navigate('/noticeboard', { replace: true, state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
   };
 
   useEffect(() => {
     if (!trustId) {
-      navigate('/dashboard', { replace: true, state: { userName, trust } });
+      navigate('/dashboard', { replace: true, state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
       return;
     }
 
@@ -130,7 +190,7 @@ export default function NoticeboardPage() {
     };
 
     load();
-  }, [navigate, trustId, userName, trust]);
+  }, [navigate, trustId, userName, trust, currentSidebarNavKey]);
 
   useEffect(() => {
     const closeMenu = () => setActiveNoticeMenuId(null);
@@ -155,24 +215,72 @@ export default function NoticeboardPage() {
     return () => document.removeEventListener('keydown', onEsc);
   }, [previewNotice]);
 
-  const activeNotices = useMemo(
-    () => notices.filter((notice) => !isPassedNotice(notice)),
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowTimestamp(Date.now());
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const optimizedNotices = useMemo(
+    () =>
+      notices.map((notice) => {
+        const startAt = toDayTimestamp(notice?.start_date, 'start');
+        const endAt = toDayTimestamp(notice?.end_date || notice?.start_date, 'end');
+        return {
+          ...notice,
+          _startAt: startAt,
+          _endAt: endAt,
+        };
+      }),
     [notices]
   );
 
-  const passedNotices = useMemo(
-    () => notices.filter((notice) => isPassedNotice(notice)),
-    [notices]
+  const pastNotices = useMemo(
+    () =>
+      optimizedNotices.filter((notice) => {
+        if (notice._endAt === null) return false;
+        return notice._endAt < nowTimestamp;
+      }),
+    [optimizedNotices, nowTimestamp]
+  );
+
+  const currentNotices = useMemo(
+    () =>
+      optimizedNotices.filter((notice) => {
+        const { _startAt, _endAt } = notice;
+        if (_startAt === null && _endAt === null) return true;
+        if (_startAt === null) return _endAt >= nowTimestamp;
+        if (_endAt === null) return _startAt <= nowTimestamp;
+        return _startAt <= nowTimestamp && _endAt >= nowTimestamp;
+      }),
+    [optimizedNotices, nowTimestamp]
+  );
+
+  const upcomingNotices = useMemo(
+    () =>
+      optimizedNotices.filter((notice) => {
+        if (notice._startAt === null) return false;
+        return notice._startAt > nowTimestamp;
+      }),
+    [optimizedNotices, nowTimestamp]
   );
 
   const scopedNotices = useMemo(
-    () => (statusTab === 'passed' ? passedNotices : activeNotices),
-    [statusTab, passedNotices, activeNotices]
+    () => {
+      if (statusTab === 'past') return pastNotices;
+      if (statusTab === 'upcoming') return upcomingNotices;
+      return currentNotices;
+    },
+    [statusTab, pastNotices, currentNotices, upcomingNotices]
   );
 
   const filteredNotices = useMemo(() => {
     const term = deferredListSearch.trim().toLowerCase();
     let list = [...scopedNotices];
+
+    list = list.filter((notice) => toUiType(notice?.type) === typeFilter);
+
     if (term) {
       list = list.filter((notice) => {
         const name = String(notice?.name || '').toLowerCase();
@@ -192,7 +300,33 @@ export default function NoticeboardPage() {
       );
     }
     return list;
-  }, [scopedNotices, deferredListSearch, sortBy]);
+  }, [scopedNotices, deferredListSearch, sortBy, typeFilter]);
+
+  const scopedTypeCounts = useMemo(
+    () =>
+      scopedNotices.reduce(
+        (acc, notice) => {
+          if (toUiType(notice?.type) === 'vip') acc.vip += 1;
+          else acc.general += 1;
+          return acc;
+        },
+        { general: 0, vip: 0 }
+      ),
+    [scopedNotices]
+  );
+
+  const filteredStatusCounts = useMemo(
+    () =>
+      filteredNotices.reduce(
+        (acc, notice) => {
+          if (isPausedStatus(notice?.status)) acc.paused += 1;
+          else acc.active += 1;
+          return acc;
+        },
+        { active: 0, paused: 0 }
+      ),
+    [filteredNotices]
+  );
 
   const selectedNotice = useMemo(
     () => filteredNotices.find((item) => item.id === selectedNoticeId) || null,
@@ -211,7 +345,7 @@ export default function NoticeboardPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusTab, sortBy, listSearch]);
+  }, [statusTab, sortBy, listSearch, typeFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -249,6 +383,8 @@ export default function NoticeboardPage() {
 
     setForm({
       name: notice.name || '',
+      type: toUiFormType(notice.type),
+      status: toUiFormStatus(notice.status),
       description: notice.description || '',
       attachments: parsedAttachments,
       start_date: notice.start_date || '',
@@ -281,6 +417,8 @@ export default function NoticeboardPage() {
     const payload = {
       trust_id: trustId,
       name: form.name,
+      type: toDbType(form.type),
+      status: toDbStatus(form.status),
       description: form.description,
       attachments: form.attachments.map(serializeAttachmentItem).filter(Boolean),
       start_date: form.start_date || null,
@@ -322,21 +460,39 @@ export default function NoticeboardPage() {
     setAttachmentWarning('');
 
     const existingImageCount = form.attachments.filter(isImageAttachment).length;
-    const incomingImageCount = files.filter(isImageFile).length;
-    if (incomingImageCount > 1 || existingImageCount + incomingImageCount > 1) {
-      setAttachmentWarning('Only one image is allowed. Second image cannot be added.');
-      if (warningTimerRef.current) {
-        clearTimeout(warningTimerRef.current);
+    const acceptedFiles = [];
+    const warningMessages = [];
+    let nextImageCount = existingImageCount;
+
+    files.forEach((file) => {
+      if (!isImageFile(file)) {
+        acceptedFiles.push(file);
+        return;
       }
-      warningTimerRef.current = setTimeout(() => {
-        setAttachmentWarning('');
-      }, 2500);
-      return;
+
+      if (file.size > MAX_NOTICE_IMAGE_SIZE_BYTES) {
+        warningMessages.push(`"${file.name}" skipped: image must be 20KB or less.`);
+        return;
+      }
+
+      if (nextImageCount >= MAX_NOTICE_IMAGE_ATTACHMENTS) {
+        warningMessages.push(`"${file.name}" skipped: max ${MAX_NOTICE_IMAGE_ATTACHMENTS} images allowed.`);
+        return;
+      }
+
+      acceptedFiles.push(file);
+      nextImageCount += 1;
+    });
+
+    if (warningMessages.length) {
+      setAttachmentWarning(warningMessages.join(' '));
     }
+
+    if (!acceptedFiles.length) return;
 
     setUploadingAttachment(true);
     try {
-      const uploaded = await Promise.all(files.map(readFileAsDataUrl));
+      const uploaded = await Promise.all(acceptedFiles.map(readFileAsDataUrl));
       setForm((prev) => ({ ...prev, attachments: [...prev.attachments, ...uploaded] }));
     } catch (error) {
       setFormError(error.message || 'Unable to upload attachment.');
@@ -376,7 +532,7 @@ export default function NoticeboardPage() {
   };
 
   const handleToggleStatus = async (notice) => {
-    const nextStatus = String(notice?.status || '').toLowerCase() === 'active' ? 'inactive' : 'active';
+    const nextStatus = isPausedStatus(notice?.status) ? 'active' : 'inactive';
     setUpdatingNoticeId(notice.id);
     const { data, error: updateError } = await updateNotice(
       notice.id,
@@ -409,7 +565,7 @@ export default function NoticeboardPage() {
     setAttachmentWarning('');
     setActiveNoticeMenuId(null);
     navigate(`/noticeboard/edit_details?id=${notice.id}`, {
-      state: { userName, trust, editNoticeId: notice.id },
+      state: { userName, trust, editNoticeId: notice.id, sidebarNavKey: currentSidebarNavKey },
     });
   };
 
@@ -436,7 +592,7 @@ export default function NoticeboardPage() {
               goToNoticeboardList();
               return;
             }
-            navigate('/dashboard', { state: { userName, trust } });
+            navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
           }}
         />
 
@@ -457,6 +613,32 @@ export default function NoticeboardPage() {
                         onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                         placeholder="Enter notice title"
                       />
+                    </label>
+                    <label>
+                      <span>Type</span>
+                      <select
+                        value={form.type}
+                        onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
+                      >
+                        {NOTICE_TYPE_OPTIONS.map((typeValue) => (
+                          <option key={typeValue} value={typeValue}>
+                            {typeValue === 'vip' ? 'VIP' : 'general'}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Status</span>
+                      <select
+                        value={form.status}
+                        onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
+                      >
+                        {NOTICE_STATUS_OPTIONS.map((statusValue) => (
+                          <option key={statusValue} value={statusValue}>
+                            {statusValue}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label>
                       <span>Start Date</span>
@@ -501,6 +683,10 @@ export default function NoticeboardPage() {
                   <div className="nb-form-grid nb-form-grid-2">
                     <div className="nb-span-full">
                       <span>Upload PDF, docs, photos, etc.</span>
+                      <p className="nb-attachment-limit-note">
+                        Important: You can upload up to {MAX_NOTICE_IMAGE_ATTACHMENTS} images. Each image must be{' '}
+                        {Math.floor(MAX_NOTICE_IMAGE_SIZE_BYTES / 1024)}KB or smaller.
+                      </p>
                       <label
                         className={`nb-attachment-dropzone ${attachmentDragOver ? 'drag' : ''}`}
                         onDragOver={(event) => {
@@ -565,7 +751,7 @@ export default function NoticeboardPage() {
               <button
                 className="nb-add-btn nb-list-add-btn"
                 type="button"
-                onClick={() => navigate('/noticeboard/create_notice', { state: { userName, trust } })}
+                onClick={() => navigate('/noticeboard/create_notice', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
               >
                 Add Notice
               </button>
@@ -584,19 +770,27 @@ export default function NoticeboardPage() {
                 <div className="nb-tabs">
                   <button
                     type="button"
-                    className={`nb-tab ${statusTab === 'active' ? 'active' : ''}`}
-                    onClick={() => setStatusTab('active')}
+                    className={`nb-tab ${statusTab === 'past' ? 'active' : ''}`}
+                    onClick={() => setStatusTab('past')}
                   >
-                    <span>Active</span>
-                    <b>{activeNotices.length}</b>
+                    <span>Past</span>
+                    <b>{pastNotices.length}</b>
                   </button>
                   <button
                     type="button"
-                    className={`nb-tab ${statusTab === 'passed' ? 'active' : ''}`}
-                    onClick={() => setStatusTab('passed')}
+                    className={`nb-tab ${statusTab === 'current' ? 'active' : ''}`}
+                    onClick={() => setStatusTab('current')}
                   >
-                    <span>Passed</span>
-                    <b>{passedNotices.length}</b>
+                    <span>Current</span>
+                    <b>{currentNotices.length}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className={`nb-tab ${statusTab === 'upcoming' ? 'active' : ''}`}
+                    onClick={() => setStatusTab('upcoming')}
+                  >
+                    <span>Upcoming</span>
+                    <b>{upcomingNotices.length}</b>
                   </button>
                 </div>
 
@@ -606,10 +800,38 @@ export default function NoticeboardPage() {
                   value={listSearch}
                   onChange={(event) => setListSearch(event.target.value)}
                 />
+                <div className="nb-type-tabs">
+                  <button
+                    type="button"
+                    className={`nb-type-tab ${typeFilter === 'general' ? 'active' : ''}`}
+                    onClick={() => setTypeFilter('general')}
+                  >
+                    <span>General</span>
+                    <b>{scopedTypeCounts.general}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className={`nb-type-tab ${typeFilter === 'vip' ? 'active' : ''}`}
+                    onClick={() => setTypeFilter('vip')}
+                  >
+                    <span>VIP</span>
+                    <b>{scopedTypeCounts.vip}</b>
+                  </button>
+                </div>
+                <div className="nb-status-summary">
+                  <div className="nb-status-summary-item active">
+                    <span>Active</span>
+                    <b>{filteredStatusCounts.active}</b>
+                  </div>
+                  <div className="nb-status-summary-item paused">
+                    <span>Paused</span>
+                    <b>{filteredStatusCounts.paused}</b>
+                  </div>
+                </div>
                 <button
                   className="nb-add-btn nb-list-add-btn"
                   type="button"
-                  onClick={() => navigate('/noticeboard/create_notice', { state: { userName, trust } })}
+                  onClick={() => navigate('/noticeboard/create_notice', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
                 >
                   Add Notice
                 </button>
@@ -684,8 +906,8 @@ export default function NoticeboardPage() {
                         <div>
                           <h3>{selectedNotice.name}</h3>
                           <div className="nb-profile-hero-actions">
-                            <span className={`nb-chip ${String(selectedNotice.status || '').toLowerCase() === 'inactive' ? 'inactive' : ''}`}>
-                              {selectedNotice.status}
+                            <span className={`nb-chip ${isPausedStatus(selectedNotice.status) ? 'inactive' : ''}`}>
+                              {formatStatusLabel(selectedNotice.status)}
                             </span>
                             <button
                               className="nb-secondary-btn"
@@ -726,9 +948,9 @@ export default function NoticeboardPage() {
                               onClick={() => handleToggleStatus(selectedNotice)}
                               disabled={updatingNoticeId === selectedNotice.id}
                             >
-                              {String(selectedNotice.status || '').toLowerCase() === 'active'
-                                ? 'Set Inactive'
-                                : 'Set Active'}
+                              {isPausedStatus(selectedNotice.status)
+                                ? 'Set Active'
+                                : 'Set Paused'}
                             </button>
                             <button
                               type="button"
@@ -749,7 +971,8 @@ export default function NoticeboardPage() {
                       </div>
                       <div className="nb-profile-detail-grid">
                         <div><span>Name</span><strong>{selectedNotice.name || '-'}</strong></div>
-                        <div><span>Status</span><strong>{selectedNotice.status || '-'}</strong></div>
+                        <div><span>Status</span><strong>{formatStatusLabel(selectedNotice.status)}</strong></div>
+                        <div><span>Type</span><strong>{formatTypeLabel(selectedNotice.type)}</strong></div>
                         <div><span>Created Date</span><strong>{formatDate(selectedNotice.created_at)}</strong></div>
                         <div><span>Date Range</span><strong>{formatDate(selectedNotice.start_date)} to {formatDate(selectedNotice.end_date)}</strong></div>
                         <div className="nb-detail-span-2"><span>Description</span><strong>{selectedNotice.description || 'No description added.'}</strong></div>
@@ -767,13 +990,17 @@ export default function NoticeboardPage() {
                             <div><span>Total Attachments</span><strong>{attachmentMeta.count}</strong></div>
                             <div className="nb-detail-span-2">
                               <span>Image Preview</span>
-                              {attachmentMeta.firstImageUrl ? (
-                                <div className="nb-attachment-preview">
-                                  <img
-                                    src={attachmentMeta.firstImageUrl}
-                                    alt={selectedNotice.name || 'Notice attachment preview'}
-                                    className="nb-attachment-preview-thumb"
-                                  />
+                              {attachmentMeta.imageUrls.length > 0 ? (
+                                <div className="nb-attachment-preview-list">
+                                  {attachmentMeta.imageUrls.map((imageUrl, index) => (
+                                    <div key={`${imageUrl}-${index}`} className="nb-attachment-preview">
+                                      <img
+                                        src={imageUrl}
+                                        alt={`${selectedNotice.name || 'Notice'} attachment ${index + 1}`}
+                                        className="nb-attachment-preview-thumb"
+                                      />
+                                    </div>
+                                  ))}
                                 </div>
                               ) : (
                                 <strong>-</strong>
@@ -810,8 +1037,8 @@ export default function NoticeboardPage() {
                   </div>
                 )}
                 <div className="nb-card-top">
-                  <span className={`nb-chip ${String(previewNotice.status || '').toLowerCase() === 'inactive' ? 'inactive' : ''}`}>
-                    {previewNotice.status}
+                  <span className={`nb-chip ${isPausedStatus(previewNotice.status) ? 'inactive' : ''}`}>
+                    {formatStatusLabel(previewNotice.status)}
                   </span>
                   <span className="nb-date">{formatDate(previewNotice.created_at)}</span>
                 </div>
