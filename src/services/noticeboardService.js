@@ -2,7 +2,31 @@ import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'noticeboard';
+const NOTICEBOARD_BUCKET = 'noticeboard';
 const MAX_NOTICE_FETCH = 20;
+
+function uniqueId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function extensionFromFile(file) {
+  const fromName = String(file?.name || '').split('.').pop()?.toLowerCase();
+  if (fromName && fromName.length <= 5) return fromName;
+  const mime = String(file?.type || '').toLowerCase();
+  if (mime.includes('png')) return 'png';
+  if (mime.includes('webp')) return 'webp';
+  if (mime.includes('gif')) return 'gif';
+  return 'jpg';
+}
+
+function buildNoticeboardAttachmentPath(trustId, file) {
+  const ext = extensionFromFile(file);
+  const safeTrustId = String(trustId || 'misc').replace(/[^a-zA-Z0-9_-]/g, '') || 'misc';
+  return `${safeTrustId}/${Date.now()}-${uniqueId()}.${ext}`;
+}
 
 function normalizeRow(row = {}) {
   return {
@@ -50,6 +74,38 @@ export async function fetchNoticeById(trustId, noticeId) {
 
     return { data: data ? normalizeRow(data) : null, error };
   }, 12000);
+}
+
+export async function uploadNoticeboardAttachment(file, { trustId = null } = {}) {
+  if (!file) return { data: null, error: { message: 'No attachment file provided.' } };
+  if (!file.type || !file.type.startsWith('image/')) {
+    return { data: null, error: { message: 'Please select a valid image file.' } };
+  }
+
+  const path = buildNoticeboardAttachmentPath(trustId, file);
+  const { error: uploadError } = await supabase
+    .storage
+    .from(NOTICEBOARD_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+
+  if (uploadError) return { data: null, error: uploadError };
+
+  const { data: publicData } = supabase
+    .storage
+    .from(NOTICEBOARD_BUCKET)
+    .getPublicUrl(path);
+
+  return {
+    data: {
+      path,
+      publicUrl: publicData?.publicUrl || null,
+    },
+    error: null,
+  };
 }
 
 export async function createNotice(payload = {}) {

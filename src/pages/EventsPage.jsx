@@ -2,8 +2,14 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
-import { createEvent, deleteEvent, fetchEventsByTrust, updateEvent } from '../services/eventsService';
-import { parseAttachmentItem, readFileAsDataUrl, serializeAttachmentItem } from '../utils/attachmentUtils';
+import {
+  createEvent,
+  deleteEvent,
+  fetchEventsByTrust,
+  updateEvent,
+  uploadEventAttachment,
+} from '../services/eventsService';
+import { parseAttachmentItem } from '../utils/attachmentUtils';
 import './EventsPage.css';
 
 const EVENT_TYPES = ['general', 'vip'];
@@ -62,6 +68,58 @@ function isImageAttachment(item = {}) {
 
 function isImageFile(file) {
   return String(file?.type || '').toLowerCase().startsWith('image/');
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Unable to process selected image.'));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+async function compressImageToLimit(file, maxBytes) {
+  if ((file?.size || 0) <= maxBytes) return { file };
+
+  const image = await loadImageFromFile(file);
+  const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
+  const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
+  for (let scaleStep = 0; scaleStep < 9; scaleStep += 1) {
+    const scale = Math.pow(0.82, scaleStep);
+    const targetWidth = Math.max(160, Math.round(baseWidth * scale));
+    const targetHeight = Math.max(160, Math.round(baseHeight * scale));
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    context.clearRect(0, 0, targetWidth, targetHeight);
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    for (let quality = 0.82; quality >= 0.2; quality -= 0.08) {
+      const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
+      if (blob && blob.size <= maxBytes) {
+        return { file: blob };
+      }
+    }
+  }
+
+  return null;
 }
 
 function buildAttachmentMeta(rawItems = []) {
@@ -427,7 +485,7 @@ export default function EventsPage() {
       trust_id: trustId,
       title: form.title,
       description: form.description,
-      attachments: form.attachments.map(serializeAttachmentItem).filter(Boolean),
+      attachments: form.attachments.map((item) => String(item?.value || '').trim()).filter(Boolean),
       location: form.location,
       startEventDate: form.startEventDate,
       startTime: form.startTime || null,
@@ -435,7 +493,6 @@ export default function EventsPage() {
       endEventDate: form.endEventDate || null,
       type: form.type,
       status: toDbStatus(form.status),
-      is_registration_required: form.is_registration_required,
     };
 
     if (editingEventId) {
@@ -479,12 +536,7 @@ export default function EventsPage() {
 
     files.forEach((file) => {
       if (!isImageFile(file)) {
-        acceptedFiles.push(file);
-        return;
-      }
-
-      if (file.size > MAX_EVENT_IMAGE_SIZE_BYTES) {
-        warningMessages.push(`"${file.name}" skipped: image must be 20KB or less.`);
+        warningMessages.push(`"${file.name}" skipped: only image files are allowed.`);
         return;
       }
 
@@ -505,8 +557,36 @@ export default function EventsPage() {
     setUploadingAttachment(true);
 
     try {
-      const uploaded = await Promise.all(acceptedFiles.map(readFileAsDataUrl));
-      setForm((prev) => ({ ...prev, attachments: [...prev.attachments, ...uploaded] }));
+      const uploadedItems = [];
+      for (const file of acceptedFiles) {
+        const processed = await compressImageToLimit(file, MAX_EVENT_IMAGE_SIZE_BYTES);
+        if (!processed?.file) {
+          warningMessages.push(
+            `"${file.name}" skipped: image could not be compressed to ${Math.floor(MAX_EVENT_IMAGE_SIZE_BYTES / 1024)}KB.`
+          );
+          continue;
+        }
+
+        const { data: uploadData, error: uploadError } = await uploadEventAttachment(processed.file, { trustId });
+        if (uploadError || !uploadData?.publicUrl) {
+          warningMessages.push(`"${file.name}" failed to upload.`);
+          continue;
+        }
+
+        uploadedItems.push({
+          name: file?.name || 'Attachment',
+          value: uploadData.publicUrl,
+          isDataUrl: false,
+        });
+      }
+
+      if (uploadedItems.length) {
+        setForm((prev) => ({ ...prev, attachments: [...prev.attachments, ...uploadedItems] }));
+      }
+
+      if (warningMessages.length) {
+        setAttachmentWarning(warningMessages.join(' '));
+      }
     } catch (uploadError) {
       setFormError(uploadError.message || 'Unable to upload attachment.');
     } finally {
@@ -711,7 +791,7 @@ export default function EventsPage() {
                   <h4 className="ev-section-title">Attachments</h4>
                   <div className="ev-form-grid ev-form-grid-2">
                     <div className="ev-span-full">
-                      <span>Upload PDF, docs, photos, etc.</span>
+                      <span>Upload image attachments</span>
                       <p className="ev-attachment-limit-note">
                         Important: You can upload up to {MAX_EVENT_IMAGE_ATTACHMENTS} images. Each image must be{' '}
                         {Math.floor(MAX_EVENT_IMAGE_SIZE_BYTES / 1024)}KB or smaller.

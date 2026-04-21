@@ -12,6 +12,7 @@ import {
   fetchRegisteredMembersDirectory,
   registerExistingMember,
   unregisterRegisteredMember,
+  uploadMemberProfilePhoto,
   updateFamilyMember,
   updateRegisteredMember,
   updateRegisteredMembership,
@@ -80,6 +81,7 @@ const PICKER_PAGE_SIZE = 6;
 const CREATE_NEW_ROLE_VALUE = '__create_new_role__';
 const FAMILY_GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const FAMILY_BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const PROFILE_PHOTO_MAX_BYTES = 25 * 1024;
 
 function getMembersCacheKey(trustId) {
   return `member_profile_members_${trustId}`;
@@ -218,6 +220,58 @@ function buildFamilyForm(source = {}) {
   };
 }
 
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Unable to process selected image.'));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+async function compressImageToLimit(file, maxBytes) {
+  if ((file?.size || 0) <= maxBytes) return { file };
+
+  const image = await loadImageFromFile(file);
+  const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
+  const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
+  for (let scaleStep = 0; scaleStep < 9; scaleStep += 1) {
+    const scale = Math.pow(0.82, scaleStep);
+    const targetWidth = Math.max(160, Math.round(baseWidth * scale));
+    const targetHeight = Math.max(160, Math.round(baseHeight * scale));
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    context.clearRect(0, 0, targetWidth, targetHeight);
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    for (let quality = 0.82; quality >= 0.2; quality -= 0.08) {
+      const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
+      if (blob && blob.size <= maxBytes) {
+        return { file: blob };
+      }
+    }
+  }
+
+  return null;
+}
+
 function compareMembers(left = {}, right = {}, sortBy = 'name_asc') {
   const leftName = String(left.name || '').toLowerCase();
   const rightName = String(right.name || '').toLowerCase();
@@ -328,6 +382,8 @@ export default function MemberProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [editForm, setEditForm] = useState(() => buildEditForm());
+  const [pendingProfilePhotoFile, setPendingProfilePhotoFile] = useState(null);
+  const [pendingProfilePhotoPreviewUrl, setPendingProfilePhotoPreviewUrl] = useState('');
   const [photoDragOver, setPhotoDragOver] = useState(false);
   const [familyMembers, setFamilyMembers] = useState([]);
   const [loadingFamily, setLoadingFamily] = useState(false);
@@ -358,6 +414,12 @@ export default function MemberProfilePage() {
   useEffect(() => {
     if (!trustId) navigate('/dashboard', { replace: true, state: { userName, trust } });
   }, [trustId, navigate, trust, userName]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingProfilePhotoPreviewUrl) URL.revokeObjectURL(pendingProfilePhotoPreviewUrl);
+    };
+  }, [pendingProfilePhotoPreviewUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -572,6 +634,11 @@ export default function MemberProfilePage() {
       if (!trustId || !effectiveSelectedMemberId) return;
       setError('');
       setSaveError('');
+      setPendingProfilePhotoPreviewUrl((previousUrl) => {
+        if (previousUrl) URL.revokeObjectURL(previousUrl);
+        return '';
+      });
+      setPendingProfilePhotoFile(null);
       setIsEditing(false);
 
       const { data, error: fetchError } = await fetchMemberProfileView({
@@ -673,6 +740,9 @@ export default function MemberProfilePage() {
 
   const handleStartEdit = () => {
     if (!canEditDetails || !profile) return;
+    if (pendingProfilePhotoPreviewUrl) URL.revokeObjectURL(pendingProfilePhotoPreviewUrl);
+    setPendingProfilePhotoPreviewUrl('');
+    setPendingProfilePhotoFile(null);
     setEditForm(buildEditForm(profile));
     setUseCustomEditRole(
       !!profile.role && !trustRoleOptions.includes(String(profile.role || '').trim())
@@ -682,6 +752,9 @@ export default function MemberProfilePage() {
   };
 
   const handleCancelEdit = () => {
+    if (pendingProfilePhotoPreviewUrl) URL.revokeObjectURL(pendingProfilePhotoPreviewUrl);
+    setPendingProfilePhotoPreviewUrl('');
+    setPendingProfilePhotoFile(null);
     setEditForm(buildEditForm(profile || {}));
     setUseCustomEditRole(false);
     setSaveError('');
@@ -700,9 +773,23 @@ export default function MemberProfilePage() {
     setSaving(true);
     setSaveError('');
 
+    let uploadedProfilePhotoUrl = null;
+    if (canEditProfile && pendingProfilePhotoFile && profile?.member_id) {
+      const { data: uploadData, error: uploadError } = await uploadMemberProfilePhoto(
+        profile.member_id,
+        pendingProfilePhotoFile
+      );
+      if (uploadError) {
+        setSaveError(uploadError.message || 'Unable to upload profile photo.');
+        setSaving(false);
+        return;
+      }
+      uploadedProfilePhotoUrl = uploadData?.publicUrl || null;
+    }
+
     const payload = canEditProfile
       ? {
-          profile_photo_url: editForm.profile_photo_url.trim() || null,
+          profile_photo_url: uploadedProfilePhotoUrl || editForm.profile_photo_url.trim() || null,
           name: editForm.name.trim(),
           company_name: editForm.company_name.trim() || null,
           membership_number: editForm.membership_number.trim() || null,
@@ -750,6 +837,9 @@ export default function MemberProfilePage() {
     }
 
     const updated = data || {};
+    if (pendingProfilePhotoPreviewUrl) URL.revokeObjectURL(pendingProfilePhotoPreviewUrl);
+    setPendingProfilePhotoPreviewUrl('');
+    setPendingProfilePhotoFile(null);
     setMembers((prev) =>
       prev.map((member) =>
         String(member.member_id) === String(updated.member_id)
@@ -774,18 +864,29 @@ export default function MemberProfilePage() {
     setSaving(false);
   };
 
-  const handleProfilePhotoFile = (file) => {
+  const handleProfilePhotoFile = async (file) => {
     if (!file) return;
     if (!file.type || !file.type.startsWith('image/')) {
       setSaveError('Please select a valid image file for profile photo.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setEditForm((prev) => ({ ...prev, profile_photo_url: String(reader.result || '') }));
+
+    try {
+      const processed = await compressImageToLimit(file, PROFILE_PHOTO_MAX_BYTES);
+      if (!processed?.file) {
+        setSaveError('Image is too large and could not be compressed to 25KB.');
+        return;
+      }
+
+      if (pendingProfilePhotoPreviewUrl) URL.revokeObjectURL(pendingProfilePhotoPreviewUrl);
+      const previewUrl = URL.createObjectURL(processed.file);
+      setPendingProfilePhotoFile(processed.file);
+      setPendingProfilePhotoPreviewUrl(previewUrl);
+      setEditForm((prev) => ({ ...prev, profile_photo_url: previewUrl }));
       setSaveError('');
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setSaveError('Unable to process selected image.');
+    }
   };
 
   const handleStartFamilyAdd = () => {
@@ -1207,6 +1308,9 @@ export default function MemberProfilePage() {
                         <div className="mp-photo-upload">
                           <div className="mp-upload-head">
                             <span className="mp-photo-label">Profile Photo</span>
+                            <span className="mp-upload-hint">
+                              Max file size: 25 KB
+                            </span>
                           </div>
                           <label
                             className={`mp-photo-drop ${photoDragOver ? 'drag' : ''}`}
@@ -1239,7 +1343,12 @@ export default function MemberProfilePage() {
                               <button
                                 type="button"
                                 className="mp-photo-clear"
-                                onClick={() => setEditForm((prev) => ({ ...prev, profile_photo_url: '' }))}
+                                onClick={() => {
+                                  if (pendingProfilePhotoPreviewUrl) URL.revokeObjectURL(pendingProfilePhotoPreviewUrl);
+                                  setPendingProfilePhotoPreviewUrl('');
+                                  setPendingProfilePhotoFile(null);
+                                  setEditForm((prev) => ({ ...prev, profile_photo_url: '' }));
+                                }}
                               >
                                 Remove
                               </button>

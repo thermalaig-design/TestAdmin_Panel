@@ -2,7 +2,31 @@ import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'events';
+const EVENTS_BUCKET = 'events';
 const MAX_EVENTS_FETCH = 20;
+
+function uniqueId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function extensionFromFile(file) {
+  const fromName = String(file?.name || '').split('.').pop()?.toLowerCase();
+  if (fromName && fromName.length <= 5) return fromName;
+  const mime = String(file?.type || '').toLowerCase();
+  if (mime.includes('png')) return 'png';
+  if (mime.includes('webp')) return 'webp';
+  if (mime.includes('gif')) return 'gif';
+  return 'jpg';
+}
+
+function buildEventAttachmentPath(trustId, file) {
+  const ext = extensionFromFile(file);
+  const safeTrustId = String(trustId || 'misc').replace(/[^a-zA-Z0-9_-]/g, '') || 'misc';
+  return `${safeTrustId}/${Date.now()}-${uniqueId()}.${ext}`;
+}
 
 function normalizeRow(row = {}) {
   return {
@@ -59,6 +83,38 @@ export async function fetchEventById(trustId, eventId) {
   }, 12000);
 }
 
+export async function uploadEventAttachment(file, { trustId = null } = {}) {
+  if (!file) return { data: null, error: { message: 'No attachment file provided.' } };
+  if (!file.type || !file.type.startsWith('image/')) {
+    return { data: null, error: { message: 'Please select a valid image file.' } };
+  }
+
+  const path = buildEventAttachmentPath(trustId, file);
+  const { error: uploadError } = await supabase
+    .storage
+    .from(EVENTS_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+
+  if (uploadError) return { data: null, error: uploadError };
+
+  const { data: publicData } = supabase
+    .storage
+    .from(EVENTS_BUCKET)
+    .getPublicUrl(path);
+
+  return {
+    data: {
+      path,
+      publicUrl: publicData?.publicUrl || null,
+    },
+    error: null,
+  };
+}
+
 export async function createEvent(payload = {}) {
   if (!payload.trust_id) return { data: null, error: { message: 'No trust id provided.' } };
 
@@ -74,7 +130,6 @@ export async function createEvent(payload = {}) {
     endEventDate: payload.endEventDate || null,
     type: payload.type || 'general',
     status: payload.status || 'active',
-    is_registration_required: !!payload.is_registration_required,
     created_by: payload.created_by || null,
   };
 
@@ -106,9 +161,6 @@ export async function updateEvent(eventId, updates = {}, trustId = null) {
     ...(updates.startTime !== undefined ? { startTime: updates.startTime || null } : {}),
     ...(updates.endTime !== undefined ? { endTime: updates.endTime || null } : {}),
     ...(updates.endEventDate !== undefined ? { endEventDate: updates.endEventDate || null } : {}),
-    ...(updates.is_registration_required !== undefined
-      ? { is_registration_required: !!updates.is_registration_required }
-      : {}),
     ...(updates.status !== undefined ? { status: updates.status } : {}),
     ...(updates.type !== undefined ? { type: updates.type } : {}),
     updated_at: new Date().toISOString(),

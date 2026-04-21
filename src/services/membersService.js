@@ -6,6 +6,7 @@ const MEMBER_TABLE_CANDIDATES = ['members', 'Members'];
 const MEMBER_PROFILE_TABLE_CANDIDATES = ['member_profiles'];
 const FAMILY_MEMBERS_TABLE_CANDIDATES = ['family_members'];
 const OTHER_MEMBERSHIPS_TABLE_CANDIDATES = ['other_memberships'];
+const PROFILE_PHOTO_BUCKET = 'profile_photo';
 const MEMBER_FETCH_CHUNK_SIZE = 100;
 const TABLE_PAGE_SIZE = 1000;
 
@@ -322,6 +323,55 @@ export async function fetchFamilyMembersByMemberId(memberId) {
 
     return { data: (data || []).map(normalizeFamilyMemberRow), error: null };
   }, 12000);
+}
+
+function extensionFromImageFile(file) {
+  const fromName = String(file?.name || '').split('.').pop()?.toLowerCase();
+  if (fromName && fromName.length <= 5) return fromName;
+  const mime = String(file?.type || '').toLowerCase();
+  if (mime.includes('png')) return 'png';
+  if (mime.includes('webp')) return 'webp';
+  if (mime.includes('gif')) return 'gif';
+  return 'jpg';
+}
+
+function buildProfilePhotoPath(memberId, file) {
+  const ext = extensionFromImageFile(file);
+  const safeMemberId = String(memberId || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '') || 'unknown';
+  return `profile_photo/${safeMemberId}/${Date.now()}.${ext}`;
+}
+
+export async function uploadMemberProfilePhoto(memberId, file) {
+  if (!memberId) return { data: null, error: { message: 'Member id is required for profile photo upload.' } };
+  if (!file) return { data: null, error: { message: 'No profile photo file provided.' } };
+  if (!file.type || !file.type.startsWith('image/')) {
+    return { data: null, error: { message: 'Please select a valid image file for profile photo.' } };
+  }
+
+  const path = buildProfilePhotoPath(memberId, file);
+  const { error: uploadError } = await supabase
+    .storage
+    .from(PROFILE_PHOTO_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+
+  if (uploadError) return { data: null, error: uploadError };
+
+  const { data: publicData } = supabase
+    .storage
+    .from(PROFILE_PHOTO_BUCKET)
+    .getPublicUrl(path);
+
+  return {
+    data: {
+      path,
+      publicUrl: publicData?.publicUrl || null,
+    },
+    error: null,
+  };
 }
 
 export async function fetchOtherMembershipsByMemberId(memberId) {

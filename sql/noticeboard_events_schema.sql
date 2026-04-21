@@ -110,28 +110,24 @@ create table if not exists public.events (
   type public.event_type not null default 'general'::event_type,
   title text not null,
   description text null,
-  banner_image text null,
   attachments text[] null default '{}'::text[],
   location text null,
-  event_date date not null,
-  start_time time without time zone null,
-  end_time time without time zone null,
-  is_registration_required boolean null default false,
+  "startEventDate" date not null,
+  "startTime" time without time zone null,
+  "endTime" time without time zone null,
   status public.event_status not null default 'active'::event_status,
   created_by uuid null,
   created_at timestamp with time zone null default now(),
   updated_at timestamp with time zone null default now(),
+  "endEventDate" date null,
   constraint events_pkey primary key (id),
   constraint events_created_by_fkey foreign key (created_by) references auth.users (id),
   constraint events_trust_id_fkey foreign key (trust_id) references public."Trust" (id) on delete cascade
 ) tablespace pg_default;
 
-alter table if exists public.events
-drop column if exists max_participants;
-
 create index if not exists idx_events_trust on public.events using btree (trust_id) tablespace pg_default;
 create index if not exists idx_events_status on public.events using btree (status) tablespace pg_default;
-create index if not exists idx_events_date on public.events using btree (event_date) tablespace pg_default;
+create index if not exists idx_events_date on public.events using btree ("startEventDate") tablespace pg_default;
 
 do $$
 begin
