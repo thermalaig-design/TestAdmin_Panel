@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
@@ -30,7 +30,6 @@ export default function GalleryPage() {
   const [selectedPhotoTotal, setSelectedPhotoTotal] = useState(0);
   const [selectedPhotoFetching, setSelectedPhotoFetching] = useState(false);
   const [selectedPhotoInitialLoading, setSelectedPhotoInitialLoading] = useState(false);
-  const [selectedPhotoLoadSignal, setSelectedPhotoLoadSignal] = useState(0);
   const [selectedFolderId, setSelectedFolderId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -43,9 +42,8 @@ export default function GalleryPage() {
   const [folderPage, setFolderPage] = useState(1);
   const deferredFolderSearch = useDeferredValue(folderSearch);
   const currentMemberId = location.state?.selectedMemberId || null;
-  const selectedPhotoSentinelRef = useRef(null);
   const FOLDER_PAGE_SIZE = 6;
-  const PHOTO_BATCH_SIZE = 5;
+  const PHOTO_BATCH_SIZE = 20;
   const MAX_UPLOAD_COUNT = 10;
   const MAX_IMAGE_SIZE_BYTES = 25 * 1024;
 
@@ -208,24 +206,28 @@ export default function GalleryPage() {
     let isCancelled = false;
     setSelectedPhotoFetching(false);
     setSelectedPhotoInitialLoading(true);
-    setSelectedPhotoLoadSignal(0);
 
     const loadSelectedFolderPhotos = async () => {
-      const { data, count, error: photoErr } = await fetchGalleryPhotosByFolder(selectedFolderId, {
-        offset: 0,
-        limit: PHOTO_BATCH_SIZE,
-      });
-      if (isCancelled) return;
-      if (photoErr) {
-        setError(photoErr.message || 'Unable to load photos.');
-        setSelectedFolderPhotos([]);
-        setSelectedPhotoTotal(0);
-        setSelectedPhotoInitialLoading(false);
-        return;
+      try {
+        const { data, count, error: photoErr } = await fetchGalleryPhotosByFolder(selectedFolderId, {
+          offset: 0,
+          limit: PHOTO_BATCH_SIZE,
+        });
+        if (isCancelled) return;
+        if (photoErr) {
+          setError(photoErr.message || 'Unable to load photos.');
+          setSelectedFolderPhotos([]);
+          setSelectedPhotoTotal(0);
+          return;
+        }
+        const initialRows = data || [];
+        setSelectedFolderPhotos(initialRows);
+        setSelectedPhotoTotal(count || initialRows.length);
+      } finally {
+        if (!isCancelled) {
+          setSelectedPhotoInitialLoading(false);
+        }
       }
-      setSelectedFolderPhotos(data || []);
-      setSelectedPhotoTotal(count || 0);
-      setSelectedPhotoInitialLoading(false);
     };
 
     loadSelectedFolderPhotos();
@@ -234,75 +236,42 @@ export default function GalleryPage() {
     };
   }, [showFolderDetail, selectedFolderId]);
 
-  useEffect(() => {
-    if (!showFolderDetail || !selectedFolderId || selectedPhotoInitialLoading) return;
-    const node = selectedPhotoSentinelRef.current;
-    if (!node) return;
-    if (selectedPhotoFetching) return;
+  const loadMoreSelectedFolderPhotos = async () => {
+    if (!showFolderDetail || !selectedFolderId) return;
+    if (selectedPhotoInitialLoading || selectedPhotoFetching) return;
     if (selectedFolderPhotos.length >= selectedPhotoTotal) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setSelectedPhotoLoadSignal((prev) => prev + 1);
-        }
-      },
-      { root: null, rootMargin: '220px 0px', threshold: 0.01 }
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [
-    showFolderDetail,
-    selectedFolderId,
-    selectedPhotoInitialLoading,
-    selectedPhotoFetching,
-    selectedFolderPhotos.length,
-    selectedPhotoTotal,
-  ]);
-
-  useEffect(() => {
-    if (!selectedPhotoLoadSignal) return;
-    if (!showFolderDetail || !selectedFolderId) return;
-    if (selectedFolderPhotos.length >= selectedPhotoTotal || selectedPhotoFetching) return;
-
-    let isCancelled = false;
-    const loadMorePhotos = async () => {
-      setSelectedPhotoFetching(true);
-      try {
-        const offset = selectedFolderPhotos.length;
-        const { data, error: photoErr } = await fetchGalleryPhotosByFolder(selectedFolderId, {
-          offset,
-          limit: PHOTO_BATCH_SIZE,
-        });
-        if (isCancelled) return;
-        if (photoErr) {
-          setError(photoErr.message || 'Unable to load more photos.');
-          return;
-        }
-
-        if (data?.length) {
-          setSelectedFolderPhotos((prev) => {
-            const seen = new Set(prev.map((item) => item.id));
-            const next = data.filter((item) => !seen.has(item.id));
-            return [...prev, ...next];
-          });
-          return;
-        }
-
-        // Safety: when backend returns no next rows, stop infinite loading loop.
-        setSelectedPhotoTotal(selectedFolderPhotos.length);
-      } finally {
-        if (!isCancelled) {
-          setSelectedPhotoFetching(false);
-        }
+    setSelectedPhotoFetching(true);
+    try {
+      const { data, error: photoErr } = await fetchGalleryPhotosByFolder(selectedFolderId, {
+        offset: selectedFolderPhotos.length,
+        limit: PHOTO_BATCH_SIZE,
+      });
+      if (photoErr) {
+        setError(photoErr.message || 'Unable to load more photos.');
+        return;
       }
-    };
-    loadMorePhotos();
-    return () => {
-      isCancelled = true;
-    };
-  }, [selectedPhotoLoadSignal, showFolderDetail, selectedFolderId, selectedPhotoTotal, selectedFolderPhotos.length, selectedPhotoFetching]);
+
+      const nextRows = data || [];
+      if (!nextRows.length) return;
+
+      setSelectedFolderPhotos((prev) => {
+        const seen = new Set(prev.map((item) => item.id));
+        const uniqueNext = nextRows.filter((item) => !seen.has(item.id));
+        return [...prev, ...uniqueNext];
+      });
+    } finally {
+      setSelectedPhotoFetching(false);
+    }
+  };
+
+  const handlePhotosScroll = (event) => {
+    const node = event.currentTarget;
+    const remaining = node.scrollHeight - node.scrollTop - node.clientHeight;
+    if (remaining <= 220) {
+      loadMoreSelectedFolderPhotos();
+    }
+  };
 
   const loadImageFromFile = (file) =>
     new Promise((resolve, reject) => {
@@ -867,57 +836,56 @@ export default function GalleryPage() {
                     </div>
                   </div>
 
-                  {(loading || selectedPhotoInitialLoading) && <div className="gallery-loading">Loading photos...</div>}
+                  <div className="gallery-photos-scroll" onScroll={handlePhotosScroll}>
+                    {(loading || selectedPhotoInitialLoading) && <div className="gallery-loading">Loading photos...</div>}
 
-                  {!loading && !selectedPhotoInitialLoading && selectedPhotoTotal === 0 && (
-                    <div className="gallery-empty">
-                      No photos yet. Drop your first image to get started.
-                    </div>
-                  )}
-
-                  {!loading && !selectedPhotoInitialLoading && selectedPhotoTotal > 0 && (
-                    <>
-                    <div className="gallery-grid">
-                      {selectedFolderPhotos.map((photo, index) => (
-                        <div key={photo.id} className="gallery-photo">
-                          <img src={photo.url} alt="Gallery" loading="lazy" decoding="async" />
-                          <div className="gallery-photo-overlay">
-                            <div className="gallery-photo-index">
-                              {String(index + 1).padStart(2, '0')}
-                            </div>
-                            {photo.folderId && (
-                              <div className="gallery-photo-tag">{folderNameById.get(photo.folderId)}</div>
-                            )}
-                          </div>
-                          {isEditingFolder && (
-                            <button
-                              type="button"
-                              className="gallery-photo-remove"
-                              onClick={() => handleDeletePhoto(photo.id)}
-                            >
-                              Delete photo
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {selectedFolderPhotos.length < selectedPhotoTotal && (
-                      <div ref={selectedPhotoSentinelRef} className="gallery-photo-load-sentinel">
-                        {selectedPhotoFetching ? (
-                          <span className="gallery-photo-load-indicator">
-                            <span className="gallery-photo-spinner" aria-hidden="true" />
-                            Loading next 5 images...
-                          </span>
-                        ) : (
-                          'Scroll down to load more images'
-                        )}
+                    {!loading && !selectedPhotoInitialLoading && selectedPhotoTotal === 0 && (
+                      <div className="gallery-empty">
+                        No photos yet. Drop your first image to get started.
                       </div>
                     )}
-                    {selectedFolderPhotos.length >= selectedPhotoTotal && selectedPhotoTotal > 0 && (
-                      <div className="gallery-photo-load-sentinel done">All images loaded</div>
+
+                    {!loading && !selectedPhotoInitialLoading && selectedPhotoTotal > 0 && (
+                      <>
+                        <div className="gallery-grid">
+                          {selectedFolderPhotos.map((photo, index) => (
+                            <div key={photo.id} className="gallery-photo">
+                              <img src={photo.url} alt="Gallery" loading="lazy" decoding="async" />
+                              <div className="gallery-photo-overlay">
+                                <div className="gallery-photo-index">
+                                  {String(index + 1).padStart(2, '0')}
+                                </div>
+                                {photo.folderId && (
+                                  <div className="gallery-photo-tag">{folderNameById.get(photo.folderId)}</div>
+                                )}
+                              </div>
+                              {isEditingFolder && (
+                                <button
+                                  type="button"
+                                  className="gallery-photo-remove"
+                                  onClick={() => handleDeletePhoto(photo.id)}
+                                >
+                                  Delete photo
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {selectedFolderPhotos.length < selectedPhotoTotal && (
+                          <div className="gallery-photo-load-sentinel">
+                            {selectedPhotoFetching ? (
+                              <span className="gallery-photo-load-indicator">
+                                <span className="gallery-photo-spinner" aria-hidden="true" />
+                                Loading...
+                              </span>
+                            ) : (
+                              'Scroll to load more images'
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
-                    </>
-                  )}
+                  </div>
                 </div>
               </section>
             )}

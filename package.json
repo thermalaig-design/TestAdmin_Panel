@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "migrate:gallery": "node scripts/migrate-gallery-base64-to-storage.mjs"
+    "migrate:gallery": "node scripts/migrate-gallery-base64-to-storage.mjs",
+    "migrate:sponsors": "node scripts/migrate-sponsors-base64-to-storage.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",

@@ -188,6 +188,19 @@ const MODULE_CARDS = [
     ),
   },
   {
+    id: 'card-facilities',
+    label: 'Facilities',
+    description: 'Manage facilities updates and details',
+    route: '/facilities',
+    gradient: 'linear-gradient(135deg, #14B8A6 0%, #0EA5E9 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="4" y="4" width="16" height="16" rx="2.5" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.16)" />
+        <path d="M8 16v-3h8v3M10 10h4M12 7v6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     id: 'card-theme',
     label: 'Theme',
     description: 'Preview and manage visual themes',
@@ -249,7 +262,7 @@ const MODULE_CARDS = [
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
-const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-noticeboard', 'card-events']);
+const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-noticeboard', 'card-events', 'card-facilities']);
 
 const NAV_SECTION_TITLES = {
   dashboard: 'Dashboard',
@@ -340,6 +353,12 @@ function FeatureIcon({ flag }) {
     '/noticeboard': (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    '/facilities': (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <rect x="4" y="4" width="16" height="16" rx="2.5" stroke="white" strokeWidth="1.8" />
+        <path d="M8 16v-3h8v3M10 10h4M12 7v6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
     '/reports': (

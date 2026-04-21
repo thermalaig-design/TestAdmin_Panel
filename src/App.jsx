@@ -18,6 +18,7 @@ const NoticeboardPage = lazy(() => import('./pages/NoticeboardPage'));
 const NoticeDetailPage = lazy(() => import('./pages/NoticeDetailPage'));
 const EventsPage = lazy(() => import('./pages/EventsPage'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
+const FacilitiesPage = lazy(() => import('./pages/FacilitiesPage'));
 const ThemePage = lazy(() => import('./pages/ThemePage'));
 const FeatureControlPage = lazy(() => import('./pages/FeatureControlPage'));
 const SubFeatureControlPage = lazy(() => import('./pages/SubFeatureControlPage'));
@@ -54,6 +55,9 @@ function App() {
           <Route path="/events/create_event" element={<EventsPage />} />
           <Route path="/events/edit_details" element={<EventsPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
+          <Route path="/facilities" element={<FacilitiesPage />} />
+          <Route path="/facilities/create_facility" element={<FacilitiesPage />} />
+          <Route path="/facilities/edit_details" element={<FacilitiesPage />} />
           <Route path="/theme"        element={<ThemePage />} />
           <Route path="/feature-control" element={<FeatureControlPage />} />
           <Route path="/sub-feature-control" element={<SubFeatureControlPage />} />

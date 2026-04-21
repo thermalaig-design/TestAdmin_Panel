@@ -4,6 +4,7 @@ import {
   fetchSponsors,
   createSponsor,
   updateSponsor,
+  uploadSponsorPhotoDataUrl,
   fetchSponsorFlashByTrust,
   createSponsorFlash,
   updateSponsorFlash,
@@ -65,6 +66,7 @@ const WHATSAPP_COUNTRIES = [
 ];
 
 const DEFAULT_WHATSAPP_COUNTRY = 'IN';
+const MAX_SPONSOR_IMAGE_SIZE_BYTES = 25 * 1024;
 
 function getWhatsappCountry(value) {
   return (
@@ -91,6 +93,67 @@ function splitWhatsappForForm(rawValue) {
     country: matchedCountry.value,
     local: digits.slice(matchedCountry.dialDigits.length),
   };
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Unable to process selected image.'));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+async function compressImageToLimit(file, maxBytes) {
+  if ((file?.size || 0) <= maxBytes) return { file };
+
+  const image = await loadImageFromFile(file);
+  const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
+  const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
+  for (let scaleStep = 0; scaleStep < 9; scaleStep += 1) {
+    const scale = Math.pow(0.82, scaleStep);
+    const targetWidth = Math.max(160, Math.round(baseWidth * scale));
+    const targetHeight = Math.max(160, Math.round(baseHeight * scale));
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    context.clearRect(0, 0, targetWidth, targetHeight);
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    for (let quality = 0.82; quality >= 0.2; quality -= 0.08) {
+      const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
+      if (blob && blob.size <= maxBytes) {
+        return { file: blob };
+      }
+    }
+  }
+
+  return null;
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Unable to read selected image.'));
+    reader.readAsDataURL(blob);
+  });
 }
 
 function formatWhatsappForDisplay(rawValue) {
@@ -447,17 +510,24 @@ export default function SponsorsPage() {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  const handleFile = (file) => {
+  const handleFile = async (file) => {
     if (!file) return;
     if (!file.type || !file.type.startsWith('image/')) {
       setSaveError('Please select a valid image file.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setForm(prev => ({ ...prev, photo_url: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const processed = await compressImageToLimit(file, MAX_SPONSOR_IMAGE_SIZE_BYTES);
+      if (!processed?.file) {
+        setSaveError(`Image is too large and could not be compressed to ${Math.floor(MAX_SPONSOR_IMAGE_SIZE_BYTES / 1024)}KB.`);
+        return;
+      }
+      const dataUrl = await blobToDataUrl(processed.file);
+      setForm(prev => ({ ...prev, photo_url: dataUrl }));
+      setSaveError('');
+    } catch {
+      setSaveError('Unable to process selected image.');
+    }
   };
 
   const startAdd = () => {
@@ -609,12 +679,23 @@ export default function SponsorsPage() {
     const whatsappInternationalDigits = whatsappDigits
       ? `${countryDigits}${whatsappDigits}`.slice(0, 15)
       : '';
+
+    let resolvedPhotoUrl = String(form.photo_url || '').trim();
+    if (resolvedPhotoUrl.startsWith('data:image/')) {
+      const { data: uploadData, error: uploadError } = await uploadSponsorPhotoDataUrl(resolvedPhotoUrl, { trustId });
+      if (uploadError || !uploadData?.publicUrl) {
+        setSaveError(uploadError?.message || 'Unable to upload sponsor photo.');
+        return;
+      }
+      resolvedPhotoUrl = uploadData.publicUrl;
+    }
+
     const payload = {
       name: form.name.trim(),
       position: form.position.trim() || null,
       position2: form.position2.trim() || null,
       about: form.about.trim() || null,
-      photo_url: form.photo_url || null,
+      photo_url: resolvedPhotoUrl || null,
       company_name: form.company_name.trim(),
       coPartner: form.coPartner.trim() || null,
       trust_id: trustId,
@@ -933,6 +1014,7 @@ export default function SponsorsPage() {
 
                 <div className="sp-field sp-span-2">
                   <span>Photo URL (drag & drop)</span>
+                  <p className="sp-upload-note">Max file size: 25 KB</p>
                   <label
                     className={`sp-drop ${dragOver ? 'drag' : ''}`}
                     onDragOver={e => { e.preventDefault(); setDragOver(true); }}

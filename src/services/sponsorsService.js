@@ -1,6 +1,76 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
+const SPONSORS_BUCKET = 'sponsors';
+
+function uniqueId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function dataUrlToBuffer(dataUrl = '') {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/i.exec(String(dataUrl || ''));
+  if (!match) return null;
+  const b64 = match[2];
+  const raw = atob(b64);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) {
+    bytes[i] = raw.charCodeAt(i);
+  }
+  return {
+    mime: match[1].toLowerCase(),
+    buffer: bytes,
+  };
+}
+
+function extensionFromMime(mime = '') {
+  const value = String(mime || '').toLowerCase();
+  if (value.includes('png')) return 'png';
+  if (value.includes('webp')) return 'webp';
+  if (value.includes('gif')) return 'gif';
+  return 'jpg';
+}
+
+function buildSponsorPhotoPath(trustId, mime = 'image/jpeg') {
+  const ext = extensionFromMime(mime);
+  const safeTrustId = String(trustId || 'misc').replace(/[^a-zA-Z0-9_-]/g, '') || 'misc';
+  return `${safeTrustId}/${Date.now()}-${uniqueId()}.${ext}`;
+}
+
+export async function uploadSponsorPhotoDataUrl(dataUrl, { trustId = null } = {}) {
+  const parsed = dataUrlToBuffer(dataUrl);
+  if (!parsed?.buffer?.length) {
+    return { data: null, error: { message: 'Invalid sponsor image data.' } };
+  }
+
+  const path = buildSponsorPhotoPath(trustId, parsed.mime);
+  const { error: uploadError } = await supabase
+    .storage
+    .from(SPONSORS_BUCKET)
+    .upload(path, parsed.buffer, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: parsed.mime,
+    });
+
+  if (uploadError) return { data: null, error: uploadError };
+
+  const { data: publicData } = supabase
+    .storage
+    .from(SPONSORS_BUCKET)
+    .getPublicUrl(path);
+
+  return {
+    data: {
+      path,
+      publicUrl: publicData?.publicUrl || null,
+    },
+    error: null,
+  };
+}
+
 export async function fetchSponsors() {
   return cachedQuery('sponsors:list', async () => {
     const { data, error } = await supabase

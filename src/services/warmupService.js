@@ -2,6 +2,7 @@ import { fetchSponsors, fetchSponsorFlashByTrust } from './sponsorsService';
 import { fetchGalleryFolders } from './galleryService';
 import { fetchEventsByTrust } from './eventsService';
 import { fetchNoticeboardByTrust } from './noticeboardService';
+import { fetchFacilitiesByTrust } from './facilitiesService';
 import { fetchMarqueeUpdatesByTrust } from './marqueeService';
 import { fetchTrustees } from './trusteesService';
 import { fetchRegisteredMembersByTrust, fetchAllMembersDirectory } from './membersService';
@@ -19,6 +20,7 @@ export async function warmupTrustData(trustId) {
     fetchGalleryFolders(trustId),
     fetchEventsByTrust(trustId),
     fetchNoticeboardByTrust(trustId),
+    fetchFacilitiesByTrust(trustId),
     fetchMarqueeUpdatesByTrust(trustId),
     fetchTrustees(trustId),
     fetchRegisteredMembersByTrust(trustId),

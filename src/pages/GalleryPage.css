@@ -690,6 +690,12 @@
   gap: 16px;
 }
 
+.gallery-photos-scroll {
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .gallery-photo {
   position: relative;
   border-radius: 22px;

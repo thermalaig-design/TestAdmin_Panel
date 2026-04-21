@@ -767,6 +767,13 @@
   color: #374151;
 }
 
+.sp-upload-note {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6B7280;
+}
+
 .sp-field input,
 .sp-field select,
 .sp-field textarea {

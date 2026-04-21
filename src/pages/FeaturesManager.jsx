@@ -90,6 +90,12 @@ function FeatureIcon({ flag }) {
         <line x1="14" y1="17" x2="14" y2="20" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
       </svg>
     ),
+    '/facilities': (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <rect x="4" y="4" width="16" height="16" rx="2.5" stroke="white" strokeWidth="1.8" />
+        <path d="M8 16v-3h8v3M10 10h4M12 7v6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
     '/reports': (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <line x1="18" y1="20" x2="18" y2="10" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
@@ -221,6 +227,7 @@ const ROUTE_GRADIENTS = {
   '/messages':     'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
   '/slots':        'linear-gradient(135deg, #0891B2 0%, #06B6D4 100%)',
   '/trustees':     'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)',
+  '/facilities':   'linear-gradient(135deg, #14B8A6 0%, #0EA5E9 100%)',
   '/reports':      'linear-gradient(135deg, #0EA5E9 0%, #38BDF8 100%)',
 };
 const DEFAULT_GRADIENT = 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)';
