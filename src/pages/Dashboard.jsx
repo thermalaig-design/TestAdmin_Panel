@@ -288,7 +288,7 @@ const MODULE_CARDS = [
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
-const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-noticeboard', 'card-events', 'card-facilities', 'card-contact-us']);
+const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-noticeboard', 'card-events', 'card-facilities', 'card-contact-us', 'card-members']);
 
 const NAV_SECTION_TITLES = {
   dashboard: 'Dashboard',
@@ -558,8 +558,12 @@ export default function Dashboard() {
   const userInitials = initials(userName);
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const pageTitle = NAV_SECTION_TITLES[currentSidebarNavKey] || 'Dashboard';
+  const hideModuleCards = currentSidebarNavKey === 'dashboard';
 
   const scopedModules = useMemo(() => {
+    if (currentSidebarNavKey === 'dashboard') {
+      return [];
+    }
     if (currentSidebarNavKey === 'app-design') {
       return MODULE_CARDS.filter((card) => APP_DESIGN_CARD_IDS.has(card.id));
     }
@@ -724,6 +728,8 @@ export default function Dashboard() {
           </div>
 
           {/* ──── Module Cards Heading ──── */}
+          {!hideModuleCards && (
+          <>
           <div className="features-section-header">
             <h1 className="features-title">Modules</h1>
             <p className="features-subtitle">Select a module to manage</p>
@@ -777,6 +783,8 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="features-empty">No module found for "{searchTerm}".</div>
+          )}
+          </>
           )}
         </div>
       </main>

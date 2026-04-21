@@ -65,6 +65,26 @@ export async function fetchMasterFeatures() {
   }, 30000);
 }
 
+export async function fetchSubFeatureCountsByFeatureIds(featureIds = []) {
+  if (!featureIds.length) return { data: {}, error: null };
+
+  const { data, error } = await supabase
+    .from('sub_features')
+    .select('feature_id')
+    .in('feature_id', featureIds);
+
+  if (error) return { data: {}, error };
+
+  const counts = (data || []).reduce((acc, row) => {
+    const key = String(row.feature_id || '');
+    if (!key) return acc;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  return { data: counts, error: null };
+}
+
 export async function fetchFeatureFlagsByTrustAndTier(trustId, tier) {
   return cachedQuery(`feature-control:flags:${trustId}:${tier}`, async () => {
     const { data, error } = await supabase

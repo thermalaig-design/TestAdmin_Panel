@@ -7,6 +7,7 @@ import FeatureEditModal from '../components/feature-control/FeatureEditModal';
 import { fetchLinkedTrusts } from '../services/authService';
 import {
   fetchMasterFeatures,
+  fetchSubFeatureCountsByFeatureIds,
   fetchFeatureFlagsByTrustAndTier,
   mergeFeaturesWithFlags,
   mergeSingleFeatureWithFlag,
@@ -24,12 +25,16 @@ export default function FeatureControlPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null, superuserId = null } = location.state || {};
+  const openedFromFeatures20 = !!location.state?.fromFeatures20;
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
 
   const [trustOptions, setTrustOptions] = useState(trust ? [trust] : []);
   const [selectedTrustId, setSelectedTrustId] = useState(trust?.id || '');
-  const [selectedTier, setSelectedTier] = useState('general');
+  const [selectedTier, setSelectedTier] = useState(
+    location.state?.tier === 'vip' ? 'vip' : 'general',
+  );
   const [masterFeatures, setMasterFeatures] = useState([]);
+  const [subFeatureCountByFeatureId, setSubFeatureCountByFeatureId] = useState({});
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -81,8 +86,15 @@ export default function FeatureControlPage() {
       setError(masterError.message || 'Unable to load features master list.');
       return [];
     }
-    setMasterFeatures(data || []);
-    return data || [];
+    const masterList = data || [];
+    setMasterFeatures(masterList);
+
+    const { data: counts, error: countError } = await fetchSubFeatureCountsByFeatureIds(
+      masterList.map((item) => item.id).filter(Boolean),
+    );
+    if (!countError) setSubFeatureCountByFeatureId(counts || {});
+
+    return masterList;
   }, []);
 
   const loadMergedRows = useCallback(async (featuresInput) => {
@@ -112,7 +124,14 @@ export default function FeatureControlPage() {
   }, [navigate, trust, userName]);
 
   useEffect(() => {
-    loadTrusts();
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
+  useEffect(() => {
+    const run = async () => {
+      await loadTrusts();
+    };
+    run();
   }, [loadTrusts]);
 
   useEffect(() => {
@@ -138,10 +157,19 @@ export default function FeatureControlPage() {
     return () => clearTimeout(timer);
   }, [flash]);
 
+  const rowsWithCounts = useMemo(
+    () =>
+      rows.map((row) => ({
+        ...row,
+        sub_feature_count: Number(subFeatureCountByFeatureId[String(row.feature_id)] || 0),
+      })),
+    [rows, subFeatureCountByFeatureId],
+  );
+
   const filteredRows = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    const searched = rows.filter((row) => {
+    const searched = rowsWithCounts.filter((row) => {
       if (!normalizedSearch) return true;
       const fields = [
         row.master_name,
@@ -170,7 +198,7 @@ export default function FeatureControlPage() {
         sensitivity: 'base',
       });
     });
-  }, [rows, searchTerm, statusFilter, quickOrderSort]);
+  }, [rowsWithCounts, searchTerm, statusFilter, quickOrderSort]);
 
   const applyUpdatedFlag = (featureId, updatedFlag) => {
     setRows((prev) =>
@@ -204,6 +232,19 @@ export default function FeatureControlPage() {
   const handleOpenEdit = (row) => {
     setSaveError('');
     setActiveEditRow(row);
+  };
+
+  const handleOpenSubScreens = (row) => {
+    navigate('/sub-feature-control', {
+      state: {
+        userName,
+        trust: selectedTrust || trust,
+        sidebarNavKey: currentSidebarNavKey,
+        fromFeatures20: openedFromFeatures20,
+        featureId: row.feature_id,
+        tier: selectedTier === 'vip' ? 'vip' : 'gen',
+      },
+    });
   };
 
   const handleSaveEdit = async (payload) => {
@@ -245,11 +286,22 @@ export default function FeatureControlPage() {
       <main className="fc-main">
         <PageHeader
           title="Feature Control"
-          subtitle="Enable, disable and customize dashboard features"
-          onBack={() => navigate('/dashboard', { state: { userName, trust: selectedTrust || trust, sidebarNavKey: currentSidebarNavKey } })}
+          subtitle="Master features are read-only; this page edits feature_flags only"
+          onBack={() => navigate('/dashboard', {
+            state: {
+              userName,
+              trust: selectedTrust || trust,
+              sidebarNavKey: currentSidebarNavKey,
+              tier: selectedTier,
+            },
+          })}
         />
 
         <section className="fc-panel">
+          <div className="fc-readonly-note">
+            Source table: <strong>features</strong> (view only). Editable table: <strong>feature_flags</strong>.
+          </div>
+
           <div className="fc-controls">
             <label>
               <span>Trust</span>
@@ -311,6 +363,7 @@ export default function FeatureControlPage() {
             togglingMap={togglingMap}
             onToggle={handleToggle}
             onEdit={handleOpenEdit}
+            onOpenSubScreens={handleOpenSubScreens}
           />
         </section>
       </main>

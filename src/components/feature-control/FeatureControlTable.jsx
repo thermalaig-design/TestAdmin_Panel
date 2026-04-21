@@ -41,7 +41,7 @@ function FeatureIconCell({ iconUrl, featureName }) {
         event.currentTarget.style.display = 'none';
         const parent = event.currentTarget.parentElement;
         if (parent) {
-          parent.innerHTML = `<span class=\"fc-icon-fallback\">${String(featureName || '?').slice(0, 1).toUpperCase()}</span>`;
+          parent.innerHTML = `<span class="fc-icon-fallback">${String(featureName || '?').slice(0, 1).toUpperCase()}</span>`;
         }
       }}
     />
@@ -54,6 +54,7 @@ export default function FeatureControlTable({
   togglingMap,
   onToggle,
   onEdit,
+  onOpenSubScreens,
 }) {
   if (loading) {
     return (
@@ -83,6 +84,7 @@ export default function FeatureControlTable({
             <th>Feature Name</th>
             <th>Display Name</th>
             <th>Tagline</th>
+            <th>Route</th>
             <th>Tier</th>
             <th>Quick Order</th>
             <th>Status</th>
@@ -105,13 +107,14 @@ export default function FeatureControlTable({
                   <div className="fc-feature-name">{row.master_name}</div>
                   {row.master_subname ? <div className="fc-feature-sub">{row.master_subname}</div> : null}
                 </td>
-                <td>{row.display_name || '-'}</td>
-                <td>{row.tagline || '-'}</td>
-                <td>
+                <td className="fc-display-col">{row.display_name || '-'}</td>
+                <td className="fc-tagline-col">{row.tagline || '-'}</td>
+                <td className="fc-route-col">{row.route || '-'}</td>
+                <td className="fc-tier-col">
                   <span className="fc-pill">{row.tier}</span>
                 </td>
-                <td>{row.quick_order ?? '-'}</td>
-                <td>
+                <td className="fc-order-col">{row.quick_order ?? '-'}</td>
+                <td className="fc-status-col">
                   <button
                     type="button"
                     className={`fc-toggle ${row.is_enabled ? 'on' : 'off'}`}
@@ -123,13 +126,20 @@ export default function FeatureControlTable({
                     <span className="fc-toggle-track">
                       <span className="fc-toggle-thumb" />
                     </span>
-                    <span>{isBusy ? 'Saving...' : row.is_enabled ? 'Enabled' : 'Disabled'}</span>
+                    <span className="fc-toggle-label">{isBusy ? 'Saving...' : row.is_enabled ? 'Enabled' : 'Disabled'}</span>
                   </button>
                 </td>
-                <td>
-                  <button className="fc-btn fc-btn-edit" type="button" onClick={() => onEdit(row)}>
-                    Edit
-                  </button>
+                <td className="fc-actions-col">
+                  <div className="fc-actions-cell">
+                    <button className="fc-btn fc-btn-edit fc-btn-action" type="button" onClick={() => onEdit(row)}>
+                      Edit
+                    </button>
+                    {row.sub_feature_count > 0 && row.is_enabled ? (
+                      <button className="fc-btn fc-btn-subscreens fc-btn-action" type="button" onClick={() => onOpenSubScreens(row)}>
+                        Sub Screens
+                      </button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             );

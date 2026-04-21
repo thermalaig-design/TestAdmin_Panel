@@ -18,11 +18,13 @@
 }
 
 .f20-intro {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 18px;
-  padding: 16px 18px;
-  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.1);
+  background:
+    radial-gradient(600px 220px at 85% -20%, rgba(56, 189, 248, 0.28), transparent 55%),
+    linear-gradient(135deg, #ffffff 0%, #f1f7ff 100%);
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 20px;
+  padding: 18px 20px;
+  box-shadow: 0 14px 30px rgba(30, 64, 175, 0.12);
 }
 
 .f20-intro h2 {
@@ -36,6 +38,50 @@
   font-size: 14px;
   color: #475569;
   line-height: 1.45;
+}
+
+.f20-meta {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.f20-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: rgba(219, 234, 254, 0.8);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+.f20-admin-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.f20-admin-btn {
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.f20-admin-btn:hover {
+  transform: translateY(-2px);
+  filter: saturate(1.08);
+}
+
+.f20-admin-feature {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
 }
 
 .f20-grid {

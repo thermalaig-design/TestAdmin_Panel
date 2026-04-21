@@ -7,6 +7,7 @@ function toDefaults(row) {
     display_name: row.display_name || row.master_name || '',
     tagline: row.tagline || row.master_subname || '',
     icon_url: row.icon_url || '',
+    route: row.route || '',
     quick_order: row.quick_order ?? '',
   };
 }
@@ -31,6 +32,13 @@ function validate(values) {
   const isEmojiOrGlyph = !isUrl && !isPath && !isData && iconUrl.length <= 12;
   if (iconUrl && !(isUrl || isPath || isData || isEmojiOrGlyph)) {
     errors.icon_url = 'Icon should be URL/path/data image or emoji.';
+  }
+
+  const route = String(values.route || '').trim();
+  const isHttpRoute = /^https?:\/\//i.test(route);
+  const isAppRoute = /^\/[A-Za-z0-9\-_/]*$/.test(route);
+  if (route && !(isHttpRoute || isAppRoute)) {
+    errors.route = 'Route should start with "/" or be an absolute URL.';
   }
 
   return errors;
@@ -115,6 +123,7 @@ export default function FeatureEditModal({
       display_name: String(form.display_name || '').trim(),
       tagline: String(form.tagline || '').trim(),
       icon_url: String(form.icon_url || '').trim(),
+      route: String(form.route || '').trim(),
     });
   };
 
@@ -190,6 +199,16 @@ export default function FeatureEditModal({
                 onChange={(event) => handleChange('quick_order', event.target.value)}
               />
               {fieldErrors.quick_order ? <small>{fieldErrors.quick_order}</small> : null}
+            </label>
+
+            <label>
+              <span>Route</span>
+              <input
+                placeholder="/feature-control"
+                value={form.route}
+                onChange={(event) => handleChange('route', event.target.value)}
+              />
+              {fieldErrors.route ? <small>{fieldErrors.route}</small> : null}
             </label>
           </div>
         </div>

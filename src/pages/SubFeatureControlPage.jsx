@@ -25,13 +25,17 @@ export default function SubFeatureControlPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null, superuserId = null } = location.state || {};
+  const openedFromFeatures20 = !!location.state?.fromFeatures20;
+  const openedFromFeatureControl = !!location.state?.featureId;
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
 
   const [trustOptions, setTrustOptions] = useState(trust ? [trust] : []);
   const [selectedTrustId, setSelectedTrustId] = useState(trust?.id || '');
-  const [selectedTier, setSelectedTier] = useState('gen');
+  const [selectedTier, setSelectedTier] = useState(
+    location.state?.tier === 'vip' ? 'vip' : 'gen',
+  );
   const [masterFeatures, setMasterFeatures] = useState([]);
-  const [selectedFeatureId, setSelectedFeatureId] = useState('');
+  const [selectedFeatureId, setSelectedFeatureId] = useState(location.state?.featureId || '');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -263,11 +267,41 @@ export default function SubFeatureControlPage() {
       <main className="fc-main">
         <PageHeader
           title="Sub Feature Control"
-          subtitle="Manage sub feature display, order and visibility"
-          onBack={() => navigate('/dashboard', { state: { userName, trust: selectedTrust || trust, sidebarNavKey: currentSidebarNavKey } })}
+          subtitle="Master sub features are read-only; this page edits sub_feature_flags only"
+          onBack={() => {
+            if (openedFromFeatureControl) {
+              navigate('/feature-control', {
+                state: {
+                  userName,
+                  trust: selectedTrust || trust,
+                  sidebarNavKey: currentSidebarNavKey,
+                  fromFeatures20: openedFromFeatures20,
+                  tier: selectedTier === 'vip' ? 'vip' : 'general',
+                },
+              });
+              return;
+            }
+
+            navigate(
+              openedFromFeatures20 ? '/feature-control' : '/dashboard',
+              {
+                state: {
+                  userName,
+                  trust: selectedTrust || trust,
+                  sidebarNavKey: currentSidebarNavKey,
+                  fromFeatures20: openedFromFeatures20,
+                  tier: selectedTier === 'vip' ? 'vip' : 'general',
+                },
+              },
+            );
+          }}
         />
 
         <section className="fc-panel">
+          <div className="fc-readonly-note">
+            Source tables: <strong>features</strong> + <strong>sub_features</strong> (view only). Editable table: <strong>sub_feature_flags</strong>.
+          </div>
+
           <div className="fc-controls">
             <label>
               <span>Trust</span>

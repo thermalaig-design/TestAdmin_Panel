@@ -80,6 +80,7 @@ export default function SubFeatureControlTable({
             <th>Sub Feature</th>
             <th>Display Name</th>
             <th>Tagline</th>
+            <th>Route</th>
             <th>Tier</th>
             <th>Quick Order</th>
             <th>Status</th>
@@ -105,6 +106,7 @@ export default function SubFeatureControlTable({
                 </td>
                 <td>{row.display_name || '-'}</td>
                 <td>{row.tagline || '-'}</td>
+                <td>{row.route || '-'}</td>
                 <td>
                   <span className="fc-pill">{row.tier}</span>
                 </td>
