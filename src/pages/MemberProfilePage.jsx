@@ -155,12 +155,34 @@ function toText(value) {
   return String(value);
 }
 
+function regionNameFromCode(code = '') {
+  const normalized = String(code || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) return normalized;
+  if (typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function') {
+    try {
+      const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
+      return displayNames.of(normalized) || normalized;
+    } catch {
+      return normalized;
+    }
+  }
+  return normalized;
+}
+
 function normalizeNationality(value) {
   const text = toText(value).trim();
   if (!text) return '';
-  const lowered = text.toLowerCase();
+  // Remove leading flag if already present.
+  const withoutFlag = text.replace(/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u, '').trim();
+  if (!withoutFlag) return '';
+  // Convert values like "IN India" to "India".
+  const codeWithNameMatch = withoutFlag.match(/^([A-Za-z]{2})\s+(.+)$/);
+  if (codeWithNameMatch) return codeWithNameMatch[2].trim();
+  // Convert two-letter country code like "IN" to country name.
+  if (/^[A-Za-z]{2}$/.test(withoutFlag)) return regionNameFromCode(withoutFlag);
+  const lowered = withoutFlag.toLowerCase();
   if (lowered === 'indian') return 'India';
-  return text;
+  return withoutFlag;
 }
 
 function countryCodeToFlag(code = '') {
@@ -174,15 +196,24 @@ function buildNationalityOptions() {
   if (!canUseIntl) {
     return FALLBACK_REGION_CODES.map((code) => ({
       code,
-      value: code,
-      label: `${countryCodeToFlag(code)} ${code}`.trim(),
+      value: regionNameFromCode(code),
+      label: `${countryCodeToFlag(code)} ${regionNameFromCode(code)}`.trim(),
     }));
   }
 
   const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
-  const regionCodes = typeof Intl.supportedValuesOf === 'function'
-    ? Intl.supportedValuesOf('region')
-    : FALLBACK_REGION_CODES;
+  let regionCodes = FALLBACK_REGION_CODES;
+  if (typeof Intl.supportedValuesOf === 'function') {
+    try {
+      // Some runtimes throw RangeError for unsupported keys such as "region".
+      const supported = Intl.supportedValuesOf('region');
+      if (Array.isArray(supported) && supported.length > 0) {
+        regionCodes = supported;
+      }
+    } catch {
+      regionCodes = FALLBACK_REGION_CODES;
+    }
+  }
 
   const mapped = regionCodes
     .map((code) => String(code || '').toUpperCase())
@@ -1555,6 +1586,8 @@ export default function MemberProfilePage() {
                                       <input
                                         type="date"
                                         value={getProfileFieldValue(field.key)}
+                                        onFocus={(event) => event.target.showPicker?.()}
+                                        onClick={(event) => event.target.showPicker?.()}
                                         onChange={(event) => {
                                           if (!isFieldEditable(field.key)) return;
                                           setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
@@ -2008,6 +2041,8 @@ export default function MemberProfilePage() {
                   <input
                     type="date"
                     value={registerForm.joined_date}
+                    onFocus={(event) => event.target.showPicker?.()}
+                    onClick={(event) => event.target.showPicker?.()}
                     onChange={(event) => setRegisterForm((prev) => ({ ...prev, joined_date: event.target.value }))}
                   />
                 </label>

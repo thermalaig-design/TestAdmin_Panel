@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
-import { fetchTrustDetails, updateTrustInfo } from '../services/trustService';
+import { fetchTrustDetails } from '../services/trustService';
 import { assignTemplateToTrust, createTemplate, fetchTemplates, updateTemplate } from '../services/themeService';
 import './ThemePage.css';
 
@@ -11,33 +11,126 @@ const EMPTY_FORM = {
   description: '',
   template_key: 'mahila',
   theme_config: {},
-  home_layout: '["gallery","quickActions","sponsors"]',
+  home_layout: '["trustList","sponsors","marquee","gallery","quickActions"]',
   custom_css: '',
   is_active: true,
 };
+const DEFAULT_NEW_HOME_LAYOUT = ['trustList', 'sponsors', 'marquee', 'gallery', 'quickActions'];
 
 const pretty = (value, fallback) => JSON.stringify(value ?? fallback, null, 2);
 const DEFAULT_ANIMATIONS = { cards: 'fadeUp', navbar: 'fadeSlideDown', gallery: 'zoomIn' };
-const THEME_COLOR_SECTIONS = [
+const GRADIENT_OPTIONS = ['none', 'linear', 'radial', 'conic'];
+const DEFAULT_THEME_SECTION_CONFIG = {
+  footer: { bg_color_1: '#ffffff', bg_color_2: null, text_color: '#111827', gradient_type: 'none' },
+  navbar: { blur: 8, opacity: 0.96, bg_color_1: '#ffffff', bg_color_2: null, text_color: '#1f2937', gradient_type: 'none' },
+  marquee: { bg_color_1: '#4a42e8', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
+  page_bg: { bg_color_1: '#f6f8fc', bg_color_2: '#eef2ff', gradient_type: 'linear', gradient_angle: 180, gradient_transition: 'ease' },
+  sidebar: { blur: 12, opacity: 0.98, bg_color_1: '#4a42e8', bg_color_2: null, text_color: '#ffffff', button_color: '#4a42e8', gradient_type: 'none', button_text_color: '#ffffff' },
+  typography: {
+    font_family: 'Inter',
+    heading_color: '#111827',
+    body_text_color: '#4b5563',
+    subheading_color: '#4a42e8',
+    component_overrides: {
+      footer_text: '#111827',
+      navbar_text: '#1f2937',
+      marquee_text: '#ffffff',
+      sidebar_text: '#ffffff',
+    },
+  },
+  app_buttons: { bg_color_1: '#4a42e8', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
+  advertisement: { bg_color: '#eef2ff', bg_opacity: 1, text_color: '#4a42e8' },
+  quick_actions: { bg_color_1: '#ffffff', bg_color_2: null, text_color: '#111827', gradient_type: 'none', icon_bg_color: '#e0e7ff' },
+};
+const THEME_SECTION_FIELDS = {
+  footer: [
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#fff' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#fff', allowNull: true },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#000' },
+    { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
+  ],
+  navbar: [
+    { key: 'blur', label: 'Blur Strength', type: 'number', min: 0, step: 1 },
+    { key: 'opacity', label: 'Transparency', type: 'number', min: 0, max: 1, step: 0.01 },
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#000000' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#000000', allowNull: true },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
+  ],
+  marquee: [
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#C0241A' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#C0241A', allowNull: true },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
+  ],
+  page_bg: [
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#fff5f5' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#f0f1fb' },
+    { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
+    { key: 'gradient_angle', label: 'Gradient Angle', type: 'number', min: 0, max: 360, step: 1 },
+    { key: 'gradient_transition', label: 'Transition Feel', type: 'text' },
+  ],
+  sidebar: [
+    { key: 'blur', label: 'Blur Strength', type: 'number', min: 0, step: 1 },
+    { key: 'opacity', label: 'Transparency', type: 'number', min: 0, max: 1, step: 0.01 },
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#2B2F7E' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#2B2F7E', allowNull: true },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'button_color', label: 'Button Color', type: 'color', fallback: '#C0241A' },
+    { key: 'button_text_color', label: 'Button Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
+  ],
+  typography: [
+    { key: 'font_family', label: 'Font Family', type: 'text' },
+    { key: 'heading_color', label: 'Heading Text Color', type: 'color', fallback: '#1a1a2e' },
+    { key: 'body_text_color', label: 'Body Text Color', type: 'color', fallback: '#374151' },
+    { key: 'subheading_color', label: 'Subheading Color', type: 'color', fallback: '#2B2F7E' },
+    { key: 'component_overrides.footer_text', label: 'Footer Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'component_overrides.navbar_text', label: 'Navbar Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'component_overrides.marquee_text', label: 'Marquee Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'component_overrides.sidebar_text', label: 'Sidebar Text Color', type: 'color', fallback: '#ffffff' },
+  ],
+  app_buttons: [
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#C0241A' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#C0241A', allowNull: true },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'icon_color', label: 'Icon Color', type: 'color', fallback: '#ffffff' },
+    { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
+  ],
+  advertisement: [
+    { key: 'bg_color', label: 'Background Color', type: 'color', fallback: '#FDECEA' },
+    { key: 'bg_opacity', label: 'Background Transparency', type: 'number', min: 0, max: 1, step: 0.01 },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#C0241A' },
+  ],
+  quick_actions: [
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#2B2F7E' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#2B2F7E', allowNull: true },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'icon_bg_color', label: 'Icon Background Color', type: 'color', fallback: '#ffffff' },
+    { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
+  ],
+};
+const THEME_SECTION_ORDER = [
   { key: 'footer', label: 'Footer' },
   { key: 'navbar', label: 'Navbar' },
   { key: 'marquee', label: 'Marquee' },
   { key: 'page_bg', label: 'Page Background' },
   { key: 'sidebar', label: 'Sidebar' },
+  { key: 'typography', label: 'Typography' },
   { key: 'app_buttons', label: 'App Buttons' },
   { key: 'advertisement', label: 'Advertisement' },
   { key: 'quick_actions', label: 'Quick Actions' },
 ];
-const GRADIENT_OPTIONS = ['none', 'linear', 'radial', 'conic'];
-const DEFAULT_THEME_SECTION_CONFIG = {
-  footer: { bg_color_1: '#ffffff', bg_color_2: null, text_color: '#000000', gradient_type: 'none' },
-  navbar: { bg_color_1: '#000000', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
-  marquee: { bg_color_1: '#C0241A', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
-  page_bg: { bg_color_1: '#fff5f5', bg_color_2: '#f0f1fb', text_color: '#1a1a2e', gradient_type: 'linear' },
-  sidebar: { bg_color_1: '#2B2F7E', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
-  app_buttons: { bg_color_1: '#C0241A', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
-  advertisement: { bg_color_1: '#FDECEA', bg_color_2: null, text_color: '#C0241A', gradient_type: 'none' },
-  quick_actions: { bg_color_1: '#2B2F7E', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
+const THEME_SECTION_HELP = {
+  footer: 'Colors for the bottom area of the app.',
+  navbar: 'Controls the top bar look and readability.',
+  marquee: 'Style for the running announcement strip.',
+  page_bg: 'Overall page background appearance.',
+  sidebar: 'Color theme for the left menu panel.',
+  typography: 'Control for heading and text colors.',
+  app_buttons: 'Common style for buttons and icons.',
+  advertisement: 'Background and text for ad/notice boxes.',
+  quick_actions: 'Appearance of quick action cards.',
 };
 const ANIMATION_OPTIONS = {
   cards: ['fadeUp', 'fadeIn', 'slideUp', 'zoomIn', 'none'],
@@ -54,10 +147,6 @@ const HOME_LAYOUT_OPTIONS = [
 ];
 const normalizePickerColor = (value, fallback) => (HEX_COLOR_RE.test(String(value || '').trim()) ? String(value).trim() : fallback);
 const safeText = (value, fallback = '') => (typeof value === 'string' ? value : fallback);
-const normalizePreviewPaint = (value, fallback) => {
-  const trimmed = safeText(value, '').trim();
-  return trimmed || fallback;
-};
 const createLayoutOrderMap = (layout = []) => {
   const parsedLayout = Array.isArray(layout) ? layout : [];
   const nextMap = {};
@@ -74,31 +163,61 @@ const previewBg = (theme) => {
   return `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`;
 };
 
-const normalizeSectionColorValue = (value, fallback = null) => {
-  if (value === null || value === undefined) return fallback;
-  const text = String(value).trim();
-  if (!text) return fallback;
-  return text;
+const getNestedValue = (obj, keyPath) =>
+  String(keyPath)
+    .split('.')
+    .reduce((acc, part) => (acc && typeof acc === 'object' ? acc[part] : undefined), obj);
+
+const setNestedValue = (obj, keyPath, value) => {
+  const parts = String(keyPath).split('.');
+  const nextObj = { ...(obj && typeof obj === 'object' ? obj : {}) };
+  let cursor = nextObj;
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const part = parts[index];
+    cursor[part] = cursor[part] && typeof cursor[part] === 'object' ? { ...cursor[part] } : {};
+    cursor = cursor[part];
+  }
+  cursor[parts[parts.length - 1]] = value;
+  return nextObj;
 };
 
 const buildThemeConfigForm = (source = {}) => {
   const sourceConfig = source && typeof source === 'object' ? source : {};
-  const nextConfig = { ...sourceConfig };
+  const nextConfig = {};
 
-  THEME_COLOR_SECTIONS.forEach(({ key }) => {
+  THEME_SECTION_ORDER.forEach(({ key }) => {
     const defaults = DEFAULT_THEME_SECTION_CONFIG[key] || {};
     const sourceSection = sourceConfig[key] && typeof sourceConfig[key] === 'object' ? sourceConfig[key] : {};
-    nextConfig[key] = {
-      ...defaults,
-      ...sourceSection,
-      bg_color_1: normalizeSectionColorValue(sourceSection.bg_color_1 ?? defaults.bg_color_1, defaults.bg_color_1 || '#ffffff'),
-      bg_color_2: normalizeSectionColorValue(sourceSection.bg_color_2 ?? defaults.bg_color_2, defaults.bg_color_2 ?? ''),
-      text_color: normalizeSectionColorValue(sourceSection.text_color ?? defaults.text_color, defaults.text_color || '#111827'),
-      gradient_type: normalizeSectionColorValue(sourceSection.gradient_type ?? defaults.gradient_type, defaults.gradient_type || 'none'),
-    };
+    nextConfig[key] = { ...defaults, ...sourceSection };
+    if (defaults.component_overrides && typeof defaults.component_overrides === 'object') {
+      nextConfig[key].component_overrides = {
+        ...defaults.component_overrides,
+        ...(sourceSection.component_overrides && typeof sourceSection.component_overrides === 'object' ? sourceSection.component_overrides : {}),
+      };
+    }
   });
 
   return nextConfig;
+};
+
+const buildLegacyColorFields = (themeConfig) => {
+  const config = buildThemeConfigForm(themeConfig);
+  const pageBg = config.page_bg || {};
+  const gradientType = safeText(pageBg.gradient_type, 'linear') || 'linear';
+  const angle = Number(pageBg.gradient_angle);
+  const gradientAngle = Number.isFinite(angle) ? angle : 160;
+  const bgOne = safeText(pageBg.bg_color_1, '#f6f8fc') || '#f6f8fc';
+  const bgTwo = safeText(pageBg.bg_color_2, '#eef2ff') || '#eef2ff';
+  const fallbackPageBg = gradientType === 'none' ? bgOne : `${gradientType}-gradient(${gradientAngle}deg, ${bgOne} 0%, ${bgTwo} 100%)`;
+
+  return {
+    primary_color: safeText(config?.app_buttons?.bg_color_1, '#4a42e8') || '#4a42e8',
+    secondary_color: safeText(config?.sidebar?.bg_color_1, '#111827') || '#111827',
+    accent_color: safeText(config?.advertisement?.text_color, '#4a42e8') || '#4a42e8',
+    accent_bg: safeText(config?.advertisement?.bg_color, '#eef2ff') || '#eef2ff',
+    navbar_bg: safeText(config?.navbar?.bg_color_1, '#ffffff') || '#ffffff',
+    page_bg: fallbackPageBg,
+  };
 };
 
 export default function ThemePage() {
@@ -121,8 +240,9 @@ export default function ThemePage() {
   const [saveError, setSaveError] = useState('');
   const [assigningId, setAssigningId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [themeConfigForm, setThemeConfigForm] = useState(buildThemeConfigForm(DEFAULT_THEME_SECTION_CONFIG));
   const [animationConfig, setAnimationConfig] = useState(DEFAULT_ANIMATIONS);
-  const [homeLayoutOrder, setHomeLayoutOrder] = useState(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
+  const [homeLayoutOrder, setHomeLayoutOrder] = useState(createLayoutOrderMap(DEFAULT_NEW_HOME_LAYOUT));
 
   useEffect(() => {
     if (!trustId) navigate('/dashboard', { replace: true, state: { userName, trust } });
@@ -171,27 +291,23 @@ export default function ThemePage() {
   useEffect(() => {
     if (!selectedTemplate) {
       setForm(EMPTY_FORM);
+      setThemeConfigForm(buildThemeConfigForm(DEFAULT_THEME_SECTION_CONFIG));
       setAnimationConfig(DEFAULT_ANIMATIONS);
-      setHomeLayoutOrder(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
+      setHomeLayoutOrder(createLayoutOrderMap(DEFAULT_NEW_HOME_LAYOUT));
       return;
     }
     const nextHomeLayout = Array.isArray(selectedTemplate.home_layout)
       ? selectedTemplate.home_layout
-      : ['gallery', 'quickActions', 'sponsors'];
+      : DEFAULT_NEW_HOME_LAYOUT;
     setForm({
       name: selectedTemplate.name || '',
       description: selectedTemplate.description || '',
       template_key: selectedTemplate.template_key || 'mahila',
-      primary_color: safeText(selectedTemplate.primary_color, '#C0241A') || '#C0241A',
-      secondary_color: safeText(selectedTemplate.secondary_color, '#2B2F7E') || '#2B2F7E',
-      accent_color: safeText(selectedTemplate.accent_color, '#FDECEA') || '#FDECEA',
-      accent_bg: safeText(selectedTemplate.accent_bg, '#EAEBF8') || '#EAEBF8',
-      navbar_bg: safeText(selectedTemplate.navbar_bg, 'rgba(234,235,248,0.88)') || 'rgba(234,235,248,0.88)',
-      page_bg: safeText(selectedTemplate.page_bg, 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)') || 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)',
-      home_layout: pretty(nextHomeLayout, ['gallery', 'quickActions', 'sponsors']),
+      home_layout: pretty(nextHomeLayout, DEFAULT_NEW_HOME_LAYOUT),
       custom_css: selectedTemplate.custom_css || '',
       is_active: selectedTemplate.is_active !== false,
     });
+    setThemeConfigForm(buildThemeConfigForm(selectedTemplate.theme_config));
     setAnimationConfig({
       cards: safeText(selectedTemplate?.animations?.cards, DEFAULT_ANIMATIONS.cards) || DEFAULT_ANIMATIONS.cards,
       navbar: safeText(selectedTemplate?.animations?.navbar, DEFAULT_ANIMATIONS.navbar) || DEFAULT_ANIMATIONS.navbar,
@@ -203,8 +319,9 @@ export default function ThemePage() {
   const openCreate = () => {
     setSelectedId(null);
     setForm(EMPTY_FORM);
+    setThemeConfigForm(buildThemeConfigForm(DEFAULT_THEME_SECTION_CONFIG));
     setAnimationConfig(DEFAULT_ANIMATIONS);
-    setHomeLayoutOrder(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
+    setHomeLayoutOrder(createLayoutOrderMap(DEFAULT_NEW_HOME_LAYOUT));
     setSaveError('');
     setShowForm(true);
     setShowPicker(false);
@@ -264,17 +381,15 @@ export default function ThemePage() {
       navbar: animationConfig.navbar || DEFAULT_ANIMATIONS.navbar,
       gallery: animationConfig.gallery || DEFAULT_ANIMATIONS.gallery,
     };
+    const normalizedThemeConfig = buildThemeConfigForm(themeConfigForm);
+    const legacyThemeColors = buildLegacyColorFields(normalizedThemeConfig);
 
     const payload = {
       name: form.name.trim(),
       description: form.description.trim() || null,
       template_key: form.template_key.trim() || 'mahila',
-      primary_color: form.primary_color.trim() || '#C0241A',
-      secondary_color: form.secondary_color.trim() || '#2B2F7E',
-      accent_color: form.accent_color.trim() || '#FDECEA',
-      accent_bg: form.accent_bg.trim() || '#EAEBF8',
-      navbar_bg: form.navbar_bg.trim() || 'rgba(234,235,248,0.88)',
-      page_bg: form.page_bg.trim() || 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)',
+      ...legacyThemeColors,
+      theme_config: normalizedThemeConfig,
       home_layout: homeLayout,
       animations,
       custom_css: form.custom_css || '',
@@ -308,51 +423,217 @@ export default function ThemePage() {
     setSaving(false);
   };
 
-  const renderColorField = (key, label, fallback) => (
-    <label className="theme-field theme-color-field" key={key}>
-      <span>{label}</span>
-      <div className="theme-color-input-shell">
-        <input
-          className="theme-color-text"
-          value={form[key]}
-          onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
-        />
-        <input
-          className="theme-color-native"
-          id={`theme-color-picker-${key}`}
-          type="color"
-          aria-label={`${label} picker`}
-          value={normalizePickerColor(form[key], fallback)}
-          onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
-        />
-      </div>
-    </label>
-  );
+  const updateThemeConfigField = (sectionKey, fieldKey, value) => {
+    setThemeConfigForm((prev) => {
+      const nextSection = setNestedValue(prev[sectionKey] || {}, fieldKey, value);
+      return { ...prev, [sectionKey]: nextSection };
+    });
+  };
 
-  const renderPaintField = (key, label, pickerFallback) => (
-    <label className="theme-field theme-color-field" key={key}>
-      <span>{label}</span>
-      <div className="theme-color-input-shell">
-        <input
-          className="theme-color-text"
-          value={form[key]}
-          onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
-        />
-        <input
-          className="theme-color-native"
-          id={`theme-color-picker-${key}`}
-          type="color"
-          aria-label={`${label} picker`}
-          value={normalizePickerColor(form[key], pickerFallback)}
-          onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
-        />
-      </div>
-    </label>
-  );
+  const renderThemeField = (sectionKey, field) => {
+    const sectionValue = themeConfigForm[sectionKey] || {};
+    const currentValue = getNestedValue(sectionValue, field.key);
+    const fieldId = `theme-config-${sectionKey}-${field.key.replaceAll('.', '-')}`;
 
-  const openColorPicker = (key) => {
-    const picker = document.getElementById(`theme-color-picker-${key}`);
-    if (picker) picker.click();
+    if (field.type === 'color') {
+      const fallback = field.fallback || '#000000';
+      const displayValue = currentValue ?? '';
+      return (
+        <label className="theme-field theme-color-field" key={fieldId}>
+          <span>{field.label}</span>
+          <div className="theme-color-input-shell">
+            <input
+              className="theme-color-text"
+              value={displayValue}
+              placeholder={field.allowNull ? 'null' : fallback}
+              onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value || (field.allowNull ? null : fallback))}
+            />
+            <input
+              className="theme-color-native"
+              id={fieldId}
+              type="color"
+              aria-label={`${field.label} picker`}
+              value={normalizePickerColor(displayValue, fallback)}
+              onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value)}
+            />
+          </div>
+        </label>
+      );
+    }
+
+    if (field.type === 'select') {
+      return (
+        <label className="theme-field" key={fieldId}>
+          <span>{field.label}</span>
+          <select
+            value={currentValue ?? ''}
+            onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value)}
+          >
+            {(field.options || []).map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+
+    if (field.type === 'number') {
+      return (
+        <label className="theme-field" key={fieldId}>
+          <span>{field.label}</span>
+          <input
+            type="number"
+            min={field.min}
+            max={field.max}
+            step={field.step || 1}
+            value={currentValue ?? ''}
+            onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value === '' ? null : Number(e.target.value))}
+          />
+        </label>
+      );
+    }
+
+    return (
+      <label className="theme-field" key={fieldId}>
+        <span>{field.label}</span>
+        <input
+          value={currentValue ?? ''}
+          onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value)}
+        />
+      </label>
+    );
+  };
+
+  const renderSectionPreview = (sectionKey) => {
+    const section = themeConfigForm?.[sectionKey] || {};
+    const backgroundA = safeText(section.bg_color_1, '') || safeText(section.bg_color, '') || '#ffffff';
+    const backgroundB = safeText(section.bg_color_2, '') || backgroundA;
+    const textColor = safeText(section.text_color, '') || '#111827';
+    const gradientType = safeText(section.gradient_type, 'none') || 'none';
+    const gradientAngle = Number(section.gradient_angle);
+    const angle = Number.isFinite(gradientAngle) ? gradientAngle : 135;
+    const previewBackground = gradientType !== 'none'
+      ? `${gradientType}-gradient(${angle}deg, ${backgroundA} 0%, ${backgroundB} 100%)`
+      : backgroundA;
+    const iconBg = safeText(section.icon_bg_color, '#e5e7eb') || '#e5e7eb';
+
+    if (sectionKey === 'typography') {
+      const headingColor = safeText(section.heading_color, '#1a1a2e') || '#1a1a2e';
+      const bodyColor = safeText(section.body_text_color, '#374151') || '#374151';
+      const subColor = safeText(section.subheading_color, '#2B2F7E') || '#2B2F7E';
+      const fontFamily = safeText(section.font_family, 'Inter') || 'Inter';
+      return (
+        <div className="theme-config-preview typography">
+          <div style={{ fontFamily, color: headingColor, fontWeight: 800 }}>Heading Preview</div>
+          <div style={{ fontFamily, color: subColor, fontSize: '12px', fontWeight: 700 }}>Subheading Preview</div>
+          <div style={{ fontFamily, color: bodyColor, fontSize: '12px' }}>This is normal body text preview.</div>
+        </div>
+      );
+    }
+
+    if (sectionKey === 'navbar') {
+      return (
+        <div className="theme-config-preview theme-config-preview-app">
+          <div className="theme-config-preview-navbar" style={{ background: previewBackground, color: textColor }}>
+            <span>☰</span>
+            <strong>Home</strong>
+            <span>🔔</span>
+          </div>
+          <div className="theme-config-preview-body">Navbar top area preview</div>
+        </div>
+      );
+    }
+
+    if (sectionKey === 'footer') {
+      return (
+        <div className="theme-config-preview theme-config-preview-app">
+          <div className="theme-config-preview-body">Page Content</div>
+          <div className="theme-config-preview-footer" style={{ background: previewBackground, color: textColor }}>
+            <span>Home</span>
+            <span>Profile</span>
+            <span>More</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (sectionKey === 'sidebar') {
+      const buttonColor = safeText(section.button_color, '#C0241A') || '#C0241A';
+      const buttonText = safeText(section.button_text_color, '#ffffff') || '#ffffff';
+      return (
+        <div className="theme-config-preview theme-config-preview-sidebar" style={{ background: previewBackground, color: textColor }}>
+          <div className="theme-config-preview-side-item">Dashboard</div>
+          <div className="theme-config-preview-side-item">Members</div>
+          <button type="button" className="theme-config-preview-btn" style={{ background: buttonColor, color: buttonText }}>
+            Action Button
+          </button>
+        </div>
+      );
+    }
+
+    if (sectionKey === 'marquee') {
+      return (
+        <div className="theme-config-preview theme-config-preview-app">
+          <div className="theme-config-preview-marquee" style={{ background: previewBackground, color: textColor }}>
+            Emergency services available | New updates
+          </div>
+        </div>
+      );
+    }
+
+    if (sectionKey === 'page_bg') {
+      return (
+        <div className="theme-config-preview theme-config-preview-pagebg" style={{ background: previewBackground }}>
+          <div className="theme-config-preview-phone-card" />
+          <div className="theme-config-preview-phone-card short" />
+        </div>
+      );
+    }
+
+    if (sectionKey === 'app_buttons') {
+      return (
+        <div className="theme-config-preview">
+          <button type="button" className="theme-config-preview-btn" style={{ background: previewBackground, color: textColor }}>
+            Primary Button
+          </button>
+          <button type="button" className="theme-config-preview-btn" style={{ background: previewBackground, color: textColor }}>
+            Secondary Button
+          </button>
+        </div>
+      );
+    }
+
+    if (sectionKey === 'quick_actions') {
+      return (
+        <div className="theme-config-preview theme-config-preview-quick-actions">
+          <div className="theme-config-preview-action-card" style={{ background: previewBackground, color: textColor }}>
+            <span className="theme-config-preview-action-icon" style={{ background: iconBg }} />
+            <strong>Directory</strong>
+          </div>
+          <div className="theme-config-preview-action-card" style={{ background: previewBackground, color: textColor }}>
+            <span className="theme-config-preview-action-icon" style={{ background: iconBg }} />
+            <strong>Reports</strong>
+          </div>
+        </div>
+      );
+    }
+
+    if (sectionKey === 'advertisement') {
+      return (
+        <div className="theme-config-preview" style={{ background: previewBackground, color: textColor }}>
+          <div style={{ fontWeight: 800 }}>Special Offer / Notice</div>
+          <div style={{ fontSize: '12px', opacity: 0.9 }}>Short message preview</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="theme-config-preview" style={{ background: previewBackground, color: textColor }}>
+        <div className="theme-config-preview-line" />
+        <div className="theme-config-preview-line short" />
+        <div style={{ fontSize: '12px', fontWeight: 700 }}>Sample Text</div>
+      </div>
+    );
   };
 
   const renderHomeLayoutField = () => (
@@ -520,80 +801,25 @@ export default function ThemePage() {
                   <label className="theme-field"><span>Name *</span><input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} /></label>
                   <label className="theme-field"><span>Template Key</span><input value={form.template_key} onChange={(e) => setForm((p) => ({ ...p, template_key: e.target.value }))} /></label>
                   <label className="theme-field theme-span-2"><span>Description</span><textarea rows="3" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></label>
-                  {renderColorField('primary_color', 'Primary Color Shade', '#C0241A')}
-                  {renderColorField('secondary_color', 'Secondary Color Shade', '#2B2F7E')}
-                  {renderColorField('accent_color', 'Accent Color Shade', '#FDECEA')}
-                  {renderColorField('accent_bg', 'Accent Background Shade', '#EAEBF8')}
-                  <div className="theme-span-2 theme-palette-preview-card">
-                    <div className="theme-palette-preview-top">
-                      <div>
-                        <span className="theme-palette-preview-label">Live Palette</span>
-                        <strong>Modern color preview</strong>
-                      </div>
-                      <div className="theme-palette-preview-chips">
-                        {[
-                          { key: 'primary_color', label: 'Primary', fallback: '#C0241A' },
-                          { key: 'secondary_color', label: 'Secondary', fallback: '#2B2F7E' },
-                          { key: 'accent_color', label: 'Accent', fallback: '#FDECEA' },
-                          { key: 'accent_bg', label: 'Accent Bg', fallback: '#EAEBF8' },
-                        ].map((item) => (
-                          <button
-                            key={item.key}
-                            className="theme-palette-preview-chip"
-                            type="button"
-                            onClick={() => openColorPicker(item.key)}
-                          >
-                            <span
-                              className="theme-palette-preview-chip-sample"
-                              style={{ background: normalizePickerColor(form[item.key], item.fallback) }}
-                              aria-hidden="true"
-                            />
-                            <span className="theme-palette-preview-chip-copy">
-                              <strong>{item.label}</strong>
-                              <small>{form[item.key] || item.fallback}</small>
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div
-                      className="theme-palette-preview-hero"
-                      style={{ background: `linear-gradient(135deg, ${form.primary_color || '#C0241A'} 0%, ${form.secondary_color || '#2B2F7E'} 100%)` }}
-                    >
-                      <div className="theme-palette-preview-badge" style={{ background: form.accent_bg || '#EAEBF8', color: form.secondary_color || '#2B2F7E' }}>
-                        Accent surface
-                      </div>
-                      <div className="theme-palette-preview-line" />
-                      <div className="theme-palette-preview-line short" />
-                      <button
-                        className="theme-palette-preview-button"
-                        type="button"
-                        style={{ background: form.accent_color || '#FDECEA', color: form.primary_color || '#C0241A' }}
-                      >
-                        Preview CTA
-                      </button>
-                    </div>
+                  <div className="theme-field theme-span-2">
+                    <span>Colors</span>
                   </div>
-                  {renderPaintField('navbar_bg', 'Navbar Background Shade', '#EAEBF8')}
-                  <div className="theme-span-2 theme-navbar-preview-card">
-                    <span className="theme-navbar-preview-label">Navbar Preview</span>
-                    <div className="theme-navbar-preview-shell" style={{ background: normalizePreviewPaint(form.navbar_bg, 'rgba(234,235,248,0.88)') }}>
-                      <div className="theme-navbar-preview-brand" style={{ color: form.secondary_color || '#2B2F7E' }}>Trust Admin</div>
-                      <div className="theme-navbar-preview-links">
-                        <span style={{ color: form.primary_color || '#C0241A' }}>Home</span>
-                        <span style={{ color: form.secondary_color || '#2B2F7E' }}>Events</span>
-                        <span style={{ color: form.secondary_color || '#2B2F7E' }}>Gallery</span>
+                  <div className="theme-span-2 theme-config-groups">
+                    {THEME_SECTION_ORDER.map((section) => (
+                      <div className="theme-config-group" key={section.key}>
+                        <div className="theme-config-group-head-row">
+                          <div>
+                            <div className="theme-config-group-head">{section.label}</div>
+                            <div className="theme-config-group-help">{THEME_SECTION_HELP[section.key] || ''}</div>
+                          </div>
+                          {renderSectionPreview(section.key)}
+                        </div>
+                        <div className="theme-config-group-grid">
+                          {(THEME_SECTION_FIELDS[section.key] || []).map((field) => renderThemeField(section.key, field))}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        className="theme-navbar-preview-cta"
-                        style={{ background: form.accent_color || '#FDECEA', color: form.primary_color || '#C0241A' }}
-                      >
-                        Action
-                      </button>
-                    </div>
+                    ))}
                   </div>
-                  {renderPaintField('page_bg', 'Page Background Shade', '#FFF5F5')}
                   {renderHomeLayoutField()}
                   {renderAnimationsField()}
                   <label className="theme-field theme-span-2"><span>Custom CSS</span><textarea rows="5" value={form.custom_css} onChange={(e) => setForm((p) => ({ ...p, custom_css: e.target.value }))} /></label>

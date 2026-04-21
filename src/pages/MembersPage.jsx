@@ -757,7 +757,13 @@ export default function MembersPage() {
                     </label>
                     <label className="sp-field">
                       <span>Joined Date</span>
-                      <input type="date" value={form.joined_date} onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))} />
+                      <input
+                        type="date"
+                        value={form.joined_date}
+                        onFocus={(e) => e.target.showPicker?.()}
+                        onClick={(e) => e.target.showPicker?.()}
+                        onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
+                      />
                     </label>
                     <label className="sp-field">
                       <span>Status</span>
@@ -955,6 +961,8 @@ export default function MembersPage() {
                   <input
                     type="date"
                     value={registerForm.joined_date}
+                    onFocus={(e) => e.target.showPicker?.()}
+                    onClick={(e) => e.target.showPicker?.()}
                     onChange={(e) => setRegisterForm((prev) => ({ ...prev, joined_date: e.target.value }))}
                   />
                 </label>

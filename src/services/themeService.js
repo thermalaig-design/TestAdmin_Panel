@@ -1,19 +1,19 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
-const DEFAULT_HOME_LAYOUT = ['gallery', 'quickActions', 'sponsors'];
+const DEFAULT_HOME_LAYOUT = ['trustList', 'sponsors', 'marquee', 'gallery', 'quickActions'];
 const DEFAULT_ANIMATIONS = {
   cards: 'fadeUp',
   navbar: 'fadeSlideDown',
   gallery: 'zoomIn',
 };
 const DEFAULT_THEME_CONFIG = {
-  primary_color: '#C0241A',
-  secondary_color: '#2B2F7E',
-  accent_color: '#FDECEA',
-  accent_bg: '#EAEBF8',
-  navbar_bg: 'rgba(234,235,248,0.88)',
-  page_bg: 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)',
+  primary_color: '#4a42e8',
+  secondary_color: '#111827',
+  accent_color: '#4a42e8',
+  accent_bg: '#eef2ff',
+  navbar_bg: '#ffffff',
+  page_bg: 'linear-gradient(180deg,#f6f8fc 0%,#eef2ff 100%)',
 };
 
 function normalizeTemplateRow(row = {}) {
