@@ -19,6 +19,7 @@ const NoticeDetailPage = lazy(() => import('./pages/NoticeDetailPage'));
 const EventsPage = lazy(() => import('./pages/EventsPage'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const FacilitiesPage = lazy(() => import('./pages/FacilitiesPage'));
+const ContactUsPage = lazy(() => import('./pages/ContactUsPage'));
 const ThemePage = lazy(() => import('./pages/ThemePage'));
 const FeatureControlPage = lazy(() => import('./pages/FeatureControlPage'));
 const SubFeatureControlPage = lazy(() => import('./pages/SubFeatureControlPage'));
@@ -58,6 +59,9 @@ function App() {
           <Route path="/facilities" element={<FacilitiesPage />} />
           <Route path="/facilities/create_facility" element={<FacilitiesPage />} />
           <Route path="/facilities/edit_details" element={<FacilitiesPage />} />
+          <Route path="/contact-us" element={<ContactUsPage />} />
+          <Route path="/contact-us/create_contact" element={<ContactUsPage />} />
+          <Route path="/contact-us/edit_details" element={<ContactUsPage />} />
           <Route path="/theme"        element={<ThemePage />} />
           <Route path="/feature-control" element={<FeatureControlPage />} />
           <Route path="/sub-feature-control" element={<SubFeatureControlPage />} />

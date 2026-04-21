@@ -96,6 +96,11 @@ function FeatureIcon({ flag }) {
         <path d="M8 16v-3h8v3M10 10h4M12 7v6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
+    '/contact-us': (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 3.18 2 2 0 0 1 4.11 1h2a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.62a2 2 0 0 1-.45 2.11L7.1 8.9a16 16 0 0 0 8 8l1.45-1.19a2 2 0 0 1 2.11-.45c.84.3 1.72.51 2.62.63A2 2 0 0 1 22 16.92Z" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
     '/reports': (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <line x1="18" y1="20" x2="18" y2="10" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
@@ -228,6 +233,7 @@ const ROUTE_GRADIENTS = {
   '/slots':        'linear-gradient(135deg, #0891B2 0%, #06B6D4 100%)',
   '/trustees':     'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)',
   '/facilities':   'linear-gradient(135deg, #14B8A6 0%, #0EA5E9 100%)',
+  '/contact-us':   'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
   '/reports':      'linear-gradient(135deg, #0EA5E9 0%, #38BDF8 100%)',
 };
 const DEFAULT_GRADIENT = 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)';
