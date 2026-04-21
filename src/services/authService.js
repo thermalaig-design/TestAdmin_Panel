@@ -67,7 +67,7 @@ export async function fetchLinkedTrusts(superuserId) {
   return cachedQuery(`auth:trusts:${superuserId}`, async () => {
     const { data, error } = await supabase
       .from('Trust')
-      .select('id, name, icon_url, remark, legal_name')
+      .select('id, name, icon_url, remark, legal_name, gst_number, pan_number, website, email_id, remark1, remark2, remark3')
       .eq('superuser_id', superuserId)
       .order('name', { ascending: true });
 
@@ -83,7 +83,7 @@ export async function fetchTrustDetails(trustId) {
   return cachedQuery(`auth:trust:${trustId}`, async () => {
     const { data, error } = await supabase
       .from('Trust')
-      .select('id, name, icon_url, remark, legal_name, terms_content, privacy_content, created_at')
+      .select('id, name, icon_url, remark, legal_name, terms_content, privacy_content, created_at, gst_number, pan_number, website, email_id, remark1, remark2, remark3')
       .eq('id', trustId)
       .maybeSingle();
 
@@ -100,7 +100,7 @@ export async function updateTrustDetails(trustId, updates = {}) {
     .from('Trust')
     .update(updates)
     .eq('id', trustId)
-    .select('id, name, icon_url, remark, legal_name, terms_content, privacy_content, created_at')
+    .select('id, name, icon_url, remark, legal_name, terms_content, privacy_content, created_at, gst_number, pan_number, website, email_id, remark1, remark2, remark3')
     .maybeSingle();
 
   if (!error) {

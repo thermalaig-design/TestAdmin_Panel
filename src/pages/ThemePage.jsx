@@ -10,21 +10,40 @@ const EMPTY_FORM = {
   name: '',
   description: '',
   template_key: 'mahila',
-  primary_color: '#C0241A',
-  secondary_color: '#2B2F7E',
-  accent_color: '#FDECEA',
-  accent_bg: '#EAEBF8',
-  navbar_bg: 'rgba(234,235,248,0.88)',
-  page_bg: 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)',
+  theme_config: {},
   home_layout: '["gallery","quickActions","sponsors"]',
-  animations: '{"cards":"fadeUp","navbar":"fadeSlideDown","gallery":"zoomIn"}',
   custom_css: '',
   is_active: true,
 };
 
 const pretty = (value, fallback) => JSON.stringify(value ?? fallback, null, 2);
-const parseJson = (value, fallback) => (!String(value || '').trim() ? fallback : JSON.parse(value));
-const previewBg = (theme) => `linear-gradient(135deg, ${theme.primary_color || '#C0241A'} 0%, ${theme.secondary_color || '#2B2F7E'} 100%)`;
+const DEFAULT_ANIMATIONS = { cards: 'fadeUp', navbar: 'fadeSlideDown', gallery: 'zoomIn' };
+const THEME_COLOR_SECTIONS = [
+  { key: 'footer', label: 'Footer' },
+  { key: 'navbar', label: 'Navbar' },
+  { key: 'marquee', label: 'Marquee' },
+  { key: 'page_bg', label: 'Page Background' },
+  { key: 'sidebar', label: 'Sidebar' },
+  { key: 'app_buttons', label: 'App Buttons' },
+  { key: 'advertisement', label: 'Advertisement' },
+  { key: 'quick_actions', label: 'Quick Actions' },
+];
+const GRADIENT_OPTIONS = ['none', 'linear', 'radial', 'conic'];
+const DEFAULT_THEME_SECTION_CONFIG = {
+  footer: { bg_color_1: '#ffffff', bg_color_2: null, text_color: '#000000', gradient_type: 'none' },
+  navbar: { bg_color_1: '#000000', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
+  marquee: { bg_color_1: '#C0241A', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
+  page_bg: { bg_color_1: '#fff5f5', bg_color_2: '#f0f1fb', text_color: '#1a1a2e', gradient_type: 'linear' },
+  sidebar: { bg_color_1: '#2B2F7E', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
+  app_buttons: { bg_color_1: '#C0241A', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
+  advertisement: { bg_color_1: '#FDECEA', bg_color_2: null, text_color: '#C0241A', gradient_type: 'none' },
+  quick_actions: { bg_color_1: '#2B2F7E', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
+};
+const ANIMATION_OPTIONS = {
+  cards: ['fadeUp', 'fadeIn', 'slideUp', 'zoomIn', 'none'],
+  navbar: ['fadeSlideDown', 'fadeIn', 'slideDown', 'none'],
+  gallery: ['zoomIn', 'fadeIn', 'slideUp', 'none'],
+};
 const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const HOME_LAYOUT_OPTIONS = [
   { key: 'gallery', label: 'Gallery' },
@@ -34,8 +53,9 @@ const HOME_LAYOUT_OPTIONS = [
   { key: 'trustList', label: 'Trust List' },
 ];
 const normalizePickerColor = (value, fallback) => (HEX_COLOR_RE.test(String(value || '').trim()) ? String(value).trim() : fallback);
+const safeText = (value, fallback = '') => (typeof value === 'string' ? value : fallback);
 const normalizePreviewPaint = (value, fallback) => {
-  const trimmed = String(value || '').trim();
+  const trimmed = safeText(value, '').trim();
   return trimmed || fallback;
 };
 const createLayoutOrderMap = (layout = []) => {
@@ -46,6 +66,39 @@ const createLayoutOrderMap = (layout = []) => {
     nextMap[item.key] = index >= 0 ? index + 1 : '';
   });
   return nextMap;
+};
+const previewBg = (theme) => {
+  const config = theme?.theme_config && typeof theme.theme_config === 'object' ? theme.theme_config : {};
+  const colorA = safeText(config?.app_buttons?.bg_color_1, '') || safeText(theme?.primary_color, '') || '#C0241A';
+  const colorB = safeText(config?.quick_actions?.bg_color_1, '') || safeText(theme?.secondary_color, '') || '#2B2F7E';
+  return `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`;
+};
+
+const normalizeSectionColorValue = (value, fallback = null) => {
+  if (value === null || value === undefined) return fallback;
+  const text = String(value).trim();
+  if (!text) return fallback;
+  return text;
+};
+
+const buildThemeConfigForm = (source = {}) => {
+  const sourceConfig = source && typeof source === 'object' ? source : {};
+  const nextConfig = { ...sourceConfig };
+
+  THEME_COLOR_SECTIONS.forEach(({ key }) => {
+    const defaults = DEFAULT_THEME_SECTION_CONFIG[key] || {};
+    const sourceSection = sourceConfig[key] && typeof sourceConfig[key] === 'object' ? sourceConfig[key] : {};
+    nextConfig[key] = {
+      ...defaults,
+      ...sourceSection,
+      bg_color_1: normalizeSectionColorValue(sourceSection.bg_color_1 ?? defaults.bg_color_1, defaults.bg_color_1 || '#ffffff'),
+      bg_color_2: normalizeSectionColorValue(sourceSection.bg_color_2 ?? defaults.bg_color_2, defaults.bg_color_2 ?? ''),
+      text_color: normalizeSectionColorValue(sourceSection.text_color ?? defaults.text_color, defaults.text_color || '#111827'),
+      gradient_type: normalizeSectionColorValue(sourceSection.gradient_type ?? defaults.gradient_type, defaults.gradient_type || 'none'),
+    };
+  });
+
+  return nextConfig;
 };
 
 export default function ThemePage() {
@@ -68,6 +121,7 @@ export default function ThemePage() {
   const [saveError, setSaveError] = useState('');
   const [assigningId, setAssigningId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [animationConfig, setAnimationConfig] = useState(DEFAULT_ANIMATIONS);
   const [homeLayoutOrder, setHomeLayoutOrder] = useState(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
 
   useEffect(() => {
@@ -102,15 +156,22 @@ export default function ThemePage() {
     );
   }, [templates, searchTerm]);
 
-  const myTemplates = useMemo(() => filtered.filter((item) => item.trust_id === trustId), [filtered, trustId]);
-  const otherTemplates = useMemo(() => filtered.filter((item) => item.trust_id !== trustId), [filtered, trustId]);
+  const myTemplates = useMemo(
+    () => filtered.filter((item) => String(item.trust_id || '') === String(trustId || '')),
+    [filtered, trustId]
+  );
+  const otherTemplates = useMemo(
+    () => filtered.filter((item) => String(item.trust_id || '') !== String(trustId || '')),
+    [filtered, trustId]
+  );
   const activeTemplateId = currentTrust?.template_id || null;
   const selectedTemplate = useMemo(() => templates.find((item) => item.id === selectedId) || null, [templates, selectedId]);
   const detailTemplate = useMemo(() => templates.find((item) => item.id === detailId) || null, [templates, detailId]);
-  const canEdit = (item) => item?.trust_id === trustId;
+  const canEdit = (item) => String(item?.trust_id || '') === String(trustId || '');
   useEffect(() => {
     if (!selectedTemplate) {
       setForm(EMPTY_FORM);
+      setAnimationConfig(DEFAULT_ANIMATIONS);
       setHomeLayoutOrder(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
       return;
     }
@@ -121,16 +182,20 @@ export default function ThemePage() {
       name: selectedTemplate.name || '',
       description: selectedTemplate.description || '',
       template_key: selectedTemplate.template_key || 'mahila',
-      primary_color: selectedTemplate.primary_color || '#C0241A',
-      secondary_color: selectedTemplate.secondary_color || '#2B2F7E',
-      accent_color: selectedTemplate.accent_color || '#FDECEA',
-      accent_bg: selectedTemplate.accent_bg || '#EAEBF8',
-      navbar_bg: selectedTemplate.navbar_bg || 'rgba(234,235,248,0.88)',
-      page_bg: selectedTemplate.page_bg || 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)',
+      primary_color: safeText(selectedTemplate.primary_color, '#C0241A') || '#C0241A',
+      secondary_color: safeText(selectedTemplate.secondary_color, '#2B2F7E') || '#2B2F7E',
+      accent_color: safeText(selectedTemplate.accent_color, '#FDECEA') || '#FDECEA',
+      accent_bg: safeText(selectedTemplate.accent_bg, '#EAEBF8') || '#EAEBF8',
+      navbar_bg: safeText(selectedTemplate.navbar_bg, 'rgba(234,235,248,0.88)') || 'rgba(234,235,248,0.88)',
+      page_bg: safeText(selectedTemplate.page_bg, 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)') || 'linear-gradient(160deg,#fff5f5 0%,#ffffff 50%,#f0f1fb 100%)',
       home_layout: pretty(nextHomeLayout, ['gallery', 'quickActions', 'sponsors']),
-      animations: pretty(selectedTemplate.animations, { cards: 'fadeUp', navbar: 'fadeSlideDown', gallery: 'zoomIn' }),
       custom_css: selectedTemplate.custom_css || '',
       is_active: selectedTemplate.is_active !== false,
+    });
+    setAnimationConfig({
+      cards: safeText(selectedTemplate?.animations?.cards, DEFAULT_ANIMATIONS.cards) || DEFAULT_ANIMATIONS.cards,
+      navbar: safeText(selectedTemplate?.animations?.navbar, DEFAULT_ANIMATIONS.navbar) || DEFAULT_ANIMATIONS.navbar,
+      gallery: safeText(selectedTemplate?.animations?.gallery, DEFAULT_ANIMATIONS.gallery) || DEFAULT_ANIMATIONS.gallery,
     });
     setHomeLayoutOrder(createLayoutOrderMap(nextHomeLayout));
   }, [selectedTemplate]);
@@ -138,6 +203,7 @@ export default function ThemePage() {
   const openCreate = () => {
     setSelectedId(null);
     setForm(EMPTY_FORM);
+    setAnimationConfig(DEFAULT_ANIMATIONS);
     setHomeLayoutOrder(createLayoutOrderMap(['gallery', 'quickActions', 'sponsors']));
     setSaveError('');
     setShowForm(true);
@@ -161,14 +227,11 @@ export default function ThemePage() {
     if (!template?.id || !trustId) return;
     setSaveError('');
     setAssigningId(template.id);
-    const overrides = currentTrust?.theme_overrides && typeof currentTrust.theme_overrides === 'object'
-      ? currentTrust.theme_overrides
-      : {};
-    const { data, error: assignErr } = await assignTemplateToTrust(trustId, template.id, overrides);
+    const { data, error: assignErr } = await assignTemplateToTrust(trustId, template.id);
     if (assignErr) {
       setSaveError(assignErr.message || 'Unable to apply template.');
     } else {
-      setCurrentTrust((prev) => ({ ...(prev || {}), ...(data || {}), template_id: template.id, theme_overrides: overrides }));
+      setCurrentTrust((prev) => ({ ...(prev || {}), ...(data || {}), template_id: template.id }));
       setShowPicker(false);
       setShowDetail(false);
     }
@@ -184,7 +247,6 @@ export default function ThemePage() {
       return;
     }
     let homeLayout;
-    let animations;
     homeLayout = HOME_LAYOUT_OPTIONS
       .map((item) => ({
         key: item.key,
@@ -197,8 +259,11 @@ export default function ThemePage() {
       setSaveError('Home layout mein kam se kam ek section order dena zaroori hai.');
       return;
     }
-    try { animations = parseJson(form.animations, { cards: 'fadeUp', navbar: 'fadeSlideDown', gallery: 'zoomIn' }); }
-    catch { setSaveError('Animations must be valid JSON.'); return; }
+    const animations = {
+      cards: animationConfig.cards || DEFAULT_ANIMATIONS.cards,
+      navbar: animationConfig.navbar || DEFAULT_ANIMATIONS.navbar,
+      gallery: animationConfig.gallery || DEFAULT_ANIMATIONS.gallery,
+    };
 
     const payload = {
       name: form.name.trim(),
@@ -314,10 +379,41 @@ export default function ThemePage() {
             </label>
           ))}
         </div>
-        <label className="theme-field">
-          <span>Generated Home Layout JSON</span>
-          <textarea rows="4" value={form.home_layout} readOnly />
-        </label>
+      </div>
+    </div>
+  );
+
+  const renderAnimationsField = () => (
+    <div className="theme-field theme-span-2" key="animations_ui">
+      <span>Animation Settings</span>
+      <div className="theme-layout-order-card">
+        <div className="theme-layout-order-list">
+          {[
+            { key: 'cards', label: 'Cards Animation' },
+            { key: 'navbar', label: 'Navbar Animation' },
+            { key: 'gallery', label: 'Gallery Animation' },
+          ].map((item) => (
+            <label className="theme-layout-order-row" key={item.key}>
+              <div className="theme-layout-order-copy">
+                <strong>{item.label}</strong>
+                <small>{item.key}</small>
+              </div>
+              <select
+                value={animationConfig[item.key] || DEFAULT_ANIMATIONS[item.key]}
+                onChange={(e) =>
+                  setAnimationConfig((prev) => ({
+                    ...prev,
+                    [item.key]: e.target.value,
+                  }))
+                }
+              >
+                {(ANIMATION_OPTIONS[item.key] || []).map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -499,7 +595,7 @@ export default function ThemePage() {
                   </div>
                   {renderPaintField('page_bg', 'Page Background Shade', '#FFF5F5')}
                   {renderHomeLayoutField()}
-                  <label className="theme-field theme-span-2"><span>Animations JSON</span><textarea rows="4" value={form.animations} onChange={(e) => setForm((p) => ({ ...p, animations: e.target.value }))} /></label>
+                  {renderAnimationsField()}
                   <label className="theme-field theme-span-2"><span>Custom CSS</span><textarea rows="5" value={form.custom_css} onChange={(e) => setForm((p) => ({ ...p, custom_css: e.target.value }))} /></label>
                   <label className="theme-check"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} /><span>Template is active</span></label>
                 </div>

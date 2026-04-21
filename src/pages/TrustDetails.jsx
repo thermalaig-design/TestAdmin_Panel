@@ -20,8 +20,6 @@ function TrustDetails() {
   const location = useLocation();
 
   const trustId = location.state?.trustId;
-  const trustName = location.state?.trustName;
-
   // State
   const [trust, setTrust] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -105,6 +103,57 @@ function TrustDetails() {
     setEditValues({});
   };
 
+  const renderEditableField = ({
+    field,
+    label,
+    multiline = false,
+    rows = 3,
+    type = 'text',
+    emptyText = 'Not set',
+  }) => (
+    <div className="info-item">
+      <label className="info-label">{label}</label>
+      {editingField === field ? (
+        <div className="edit-input-group">
+          {multiline ? (
+            <textarea
+              value={editValues[field] || ''}
+              onChange={(e) => setEditValues({ ...editValues, [field]: e.target.value })}
+              className="edit-input"
+              rows={rows}
+            />
+          ) : (
+            <input
+              type={type}
+              value={editValues[field] || ''}
+              onChange={(e) => setEditValues({ ...editValues, [field]: e.target.value })}
+              className="edit-input"
+            />
+          )}
+          <div className="edit-actions">
+            <button
+              onClick={() => handleSaveInfo(field)}
+              disabled={saving}
+              className="btn btn-primary"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+            <button onClick={handleCancel} className="btn btn-secondary">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="info-content">
+          <p className="info-value">{trust?.[field] || emptyText}</p>
+          <button onClick={() => handleEditClick(field)} className="btn-edit">
+            Edit
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="trust-details-container">
@@ -154,106 +203,28 @@ function TrustDetails() {
         {/* Trust Info Section */}
         <div className="info-section">
           <div className="info-row">
-            <div className="info-item">
-              <label className="info-label">APP NAME</label>
-              {editingField === 'name' ? (
-                <div className="edit-input-group">
-                  <input
-                    type="text"
-                    value={editValues.name || ''}
-                    onChange={(e) => setEditValues({ ...editValues, name: e.target.value })}
-                    className="edit-input"
-                  />
-                  <div className="edit-actions">
-                    <button
-                      onClick={() => handleSaveInfo('name')}
-                      disabled={saving}
-                      className="btn btn-primary"
-                    >
-                      {saving ? 'Saving...' : 'Save'}
-                    </button>
-                    <button onClick={handleCancel} className="btn btn-secondary">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="info-content">
-                  <p className="info-value">{trust.name}</p>
-                  <button onClick={() => handleEditClick('name')} className="btn-edit">
-                    Edit
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="info-item">
-              <label className="info-label">LEGAL NAME</label>
-              {editingField === 'legal_name' ? (
-                <div className="edit-input-group">
-                  <input
-                    type="text"
-                    value={editValues.legal_name || ''}
-                    onChange={(e) => setEditValues({ ...editValues, legal_name: e.target.value })}
-                    className="edit-input"
-                  />
-                  <div className="edit-actions">
-                    <button
-                      onClick={() => handleSaveInfo('legal_name')}
-                      disabled={saving}
-                      className="btn btn-primary"
-                    >
-                      {saving ? 'Saving...' : 'Save'}
-                    </button>
-                    <button onClick={handleCancel} className="btn btn-secondary">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="info-content">
-                  <p className="info-value">{trust.legal_name || 'Not set'}</p>
-                  <button onClick={() => handleEditClick('legal_name')} className="btn-edit">
-                    Edit
-                  </button>
-                </div>
-              )}
-            </div>
+            {renderEditableField({ field: 'name', label: 'APP NAME', emptyText: '-' })}
+            {renderEditableField({ field: 'legal_name', label: 'LEGAL NAME' })}
           </div>
 
           <div className="info-row">
-            <div className="info-item">
-              <label className="info-label">SUBHEADING / REMARK</label>
-              {editingField === 'remark' ? (
-                <div className="edit-input-group">
-                  <textarea
-                    value={editValues.remark || ''}
-                    onChange={(e) => setEditValues({ ...editValues, remark: e.target.value })}
-                    className="edit-input"
-                    rows="3"
-                  />
-                  <div className="edit-actions">
-                    <button
-                      onClick={() => handleSaveInfo('remark')}
-                      disabled={saving}
-                      className="btn btn-primary"
-                    >
-                      {saving ? 'Saving...' : 'Save'}
-                    </button>
-                    <button onClick={handleCancel} className="btn btn-secondary">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="info-content">
-                  <p className="info-value">{trust.remark || 'Not set'}</p>
-                  <button onClick={() => handleEditClick('remark')} className="btn-edit">
-                    Edit
-                  </button>
-                </div>
-              )}
-            </div>
+            {renderEditableField({ field: 'remark', label: 'SUBHEADING / REMARK', multiline: true })}
+            {renderEditableField({ field: 'website', label: 'WEBSITE', type: 'url' })}
+          </div>
+
+          <div className="info-row">
+            {renderEditableField({ field: 'email_id', label: 'EMAIL ID', type: 'email' })}
+            {renderEditableField({ field: 'gst_number', label: 'GST NUMBER' })}
+          </div>
+
+          <div className="info-row">
+            {renderEditableField({ field: 'pan_number', label: 'PAN NUMBER' })}
+            {renderEditableField({ field: 'remark1', label: 'REMARK 1', multiline: true })}
+          </div>
+
+          <div className="info-row">
+            {renderEditableField({ field: 'remark2', label: 'REMARK 2', multiline: true })}
+            {renderEditableField({ field: 'remark3', label: 'REMARK 3', multiline: true })}
           </div>
         </div>
 

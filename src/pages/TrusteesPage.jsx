@@ -173,8 +173,32 @@ export default function TrusteesPage() {
   const [trust,         setTrust]         = useState(null);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState(null);
-  const [editMode,      setEditMode]      = useState({ name: false, legal: false, remark: false, logo: false });
-  const [draft,         setDraft]         = useState({ name: '', legal_name: '', remark: '', icon_url: '' });
+  const [editMode,      setEditMode]      = useState({
+    name: false,
+    legal: false,
+    remark: false,
+    logo: false,
+    gst: false,
+    pan: false,
+    website: false,
+    email: false,
+    remark1: false,
+    remark2: false,
+    remark3: false,
+  });
+  const [draft,         setDraft]         = useState({
+    name: '',
+    legal_name: '',
+    remark: '',
+    icon_url: '',
+    gst_number: '',
+    pan_number: '',
+    website: '',
+    email_id: '',
+    remark1: '',
+    remark2: '',
+    remark3: '',
+  });
   const [savingField,   setSavingField]   = useState('');
   const [saveError,     setSaveError]     = useState('');
   const [dragOver,      setDragOver]      = useState(false);
@@ -214,26 +238,76 @@ export default function TrusteesPage() {
   const showLogoRemarkCard = isLogoCardView && matchesQuery('subheading', 'remark', trust?.remark);
   const showLogoIconCard = isLogoCardView && matchesQuery('logo', 'icon', 'image', trust?.icon_url);
   const showLegalCard = !isLogoCardView && matchesQuery('legal name', 'company', trust?.legal_name);
+  const showGstCard = !isLogoCardView && matchesQuery('gst', 'gst number', trust?.gst_number);
+  const showPanCard = !isLogoCardView && matchesQuery('pan', 'pan number', trust?.pan_number);
+  const showWebsiteCard = !isLogoCardView && matchesQuery('website', 'web', trust?.website);
+  const showEmailCard = !isLogoCardView && matchesQuery('email', 'email id', trust?.email_id);
+  const showRemark1Card = !isLogoCardView && matchesQuery('remark 1', 'business remark', trust?.remark1);
+  const showRemark2Card = !isLogoCardView && matchesQuery('remark 2', 'business remark', trust?.remark2);
+  const showRemark3Card = !isLogoCardView && matchesQuery('remark 3', 'business remark', trust?.remark3);
   const showTermsSection = !isLogoCardView && matchesQuery('terms', 'conditions', stripHtmlTags(trust?.terms_content));
   const showPrivacySection = !isLogoCardView && matchesQuery('privacy', 'policy', stripHtmlTags(trust?.privacy_content));
   const hasSearchResults = isLogoCardView
     ? (showLogoNameCard || showLogoRemarkCard || showLogoIconCard)
-    : (showLegalCard || showTermsSection || showPrivacySection);
+    : (
+      showLegalCard ||
+      showGstCard ||
+      showPanCard ||
+      showWebsiteCard ||
+      showEmailCard ||
+      showRemark1Card ||
+      showRemark2Card ||
+      showRemark3Card ||
+      showTermsSection ||
+      showPrivacySection
+    );
 
   const startEdit = (field) => {
     setSaveError('');
     if (field === 'logo') setLogoFile(null);
-    setEditMode({ name: false, legal: false, remark: false, logo: false, [field]: true });
+    setEditMode({
+      name: false,
+      legal: false,
+      remark: false,
+      logo: false,
+      gst: false,
+      pan: false,
+      website: false,
+      email: false,
+      remark1: false,
+      remark2: false,
+      remark3: false,
+      [field]: true,
+    });
     setDraft({
       name: trust?.name || '',
       legal_name: trust?.legal_name || '',
       remark: trust?.remark || '',
       icon_url: trust?.icon_url || '',
+      gst_number: trust?.gst_number || '',
+      pan_number: trust?.pan_number || '',
+      website: trust?.website || '',
+      email_id: trust?.email_id || '',
+      remark1: trust?.remark1 || '',
+      remark2: trust?.remark2 || '',
+      remark3: trust?.remark3 || '',
     });
   };
 
   const cancelEdit = () => {
-    setEditMode({ name: false, legal: false, remark: false, logo: false });
+    setEditMode({
+      name: false,
+      legal: false,
+      remark: false,
+      logo: false,
+      gst: false,
+      pan: false,
+      website: false,
+      email: false,
+      remark1: false,
+      remark2: false,
+      remark3: false,
+    });
     setSaveError('');
     setDragOver(false);
     setLogoFile(null);
@@ -262,6 +336,13 @@ export default function TrusteesPage() {
     if (field === 'name') updates.name = draft.name.trim();
     if (field === 'legal') updates.legal_name = draft.legal_name.trim();
     if (field === 'remark') updates.remark = draft.remark.trim();
+    if (field === 'gst') updates.gst_number = draft.gst_number.trim();
+    if (field === 'pan') updates.pan_number = draft.pan_number.trim();
+    if (field === 'website') updates.website = draft.website.trim();
+    if (field === 'email') updates.email_id = draft.email_id.trim();
+    if (field === 'remark1') updates.remark1 = draft.remark1.trim();
+    if (field === 'remark2') updates.remark2 = draft.remark2.trim();
+    if (field === 'remark3') updates.remark3 = draft.remark3.trim();
     if (field === 'logo') {
       if (logoFile) {
         const { data: uploadData, error: uploadError } = await uploadTrustIcon(logoFile, { ownerId: trustId });
@@ -652,6 +733,261 @@ export default function TrusteesPage() {
                               disabled={savingField === 'legal'}
                             >
                               {savingField === 'legal' ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    )}
+
+                    {showGstCard && (
+                    <div className="tp-info-card">
+                      <div className="tp-info-icon" style={{ background: '#EEF2FF', color: '#4F46E5' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <rect x="3.5" y="4" width="17" height="16" rx="2.2" stroke="currentColor" strokeWidth="1.8"/>
+                          <path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <div className="tp-info-body">
+                        <span className="tp-info-label">GST Number</span>
+                        {!editMode.gst ? (
+                          <span className="tp-info-value">{trust.gst_number || '—'}</span>
+                        ) : (
+                          <input
+                            className="tp-edit-input"
+                            value={draft.gst_number}
+                            onChange={e => setDraft(p => ({ ...p, gst_number: e.target.value }))}
+                            placeholder="Enter GST number"
+                          />
+                        )}
+                      </div>
+                      <div className="tp-info-actions">
+                        {!editMode.gst ? (
+                          <button className="tp-edit-btn" onClick={() => startEdit('gst')}>Edit</button>
+                        ) : (
+                          <div className="tp-edit-actions">
+                            <button className="tp-edit-btn ghost" onClick={cancelEdit}>Cancel</button>
+                            <button className="tp-edit-btn primary" onClick={() => saveField('gst')} disabled={savingField === 'gst'}>
+                              {savingField === 'gst' ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    )}
+
+                    {showPanCard && (
+                    <div className="tp-info-card">
+                      <div className="tp-info-icon" style={{ background: '#ECFDF5', color: '#059669' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <rect x="3.5" y="4" width="17" height="16" rx="2.2" stroke="currentColor" strokeWidth="1.8"/>
+                          <path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <div className="tp-info-body">
+                        <span className="tp-info-label">PAN Number</span>
+                        {!editMode.pan ? (
+                          <span className="tp-info-value">{trust.pan_number || '—'}</span>
+                        ) : (
+                          <input
+                            className="tp-edit-input"
+                            value={draft.pan_number}
+                            onChange={e => setDraft(p => ({ ...p, pan_number: e.target.value }))}
+                            placeholder="Enter PAN number"
+                          />
+                        )}
+                      </div>
+                      <div className="tp-info-actions">
+                        {!editMode.pan ? (
+                          <button className="tp-edit-btn" onClick={() => startEdit('pan')}>Edit</button>
+                        ) : (
+                          <div className="tp-edit-actions">
+                            <button className="tp-edit-btn ghost" onClick={cancelEdit}>Cancel</button>
+                            <button className="tp-edit-btn primary" onClick={() => saveField('pan')} disabled={savingField === 'pan'}>
+                              {savingField === 'pan' ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    )}
+
+                    {showWebsiteCard && (
+                    <div className="tp-info-card">
+                      <div className="tp-info-icon" style={{ background: '#FFF7ED', color: '#EA580C' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
+                          <path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <div className="tp-info-body">
+                        <span className="tp-info-label">Website</span>
+                        {!editMode.website ? (
+                          <span className="tp-info-value">{trust.website || '—'}</span>
+                        ) : (
+                          <input
+                            className="tp-edit-input"
+                            value={draft.website}
+                            onChange={e => setDraft(p => ({ ...p, website: e.target.value }))}
+                            placeholder="Enter website URL"
+                          />
+                        )}
+                      </div>
+                      <div className="tp-info-actions">
+                        {!editMode.website ? (
+                          <button className="tp-edit-btn" onClick={() => startEdit('website')}>Edit</button>
+                        ) : (
+                          <div className="tp-edit-actions">
+                            <button className="tp-edit-btn ghost" onClick={cancelEdit}>Cancel</button>
+                            <button className="tp-edit-btn primary" onClick={() => saveField('website')} disabled={savingField === 'website'}>
+                              {savingField === 'website' ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    )}
+
+                    {showEmailCard && (
+                    <div className="tp-info-card">
+                      <div className="tp-info-icon" style={{ background: '#FDF4FF', color: '#9333EA' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                          <path d="M3 7l9 6 9-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <div className="tp-info-body">
+                        <span className="tp-info-label">Email ID</span>
+                        {!editMode.email ? (
+                          <span className="tp-info-value">{trust.email_id || '—'}</span>
+                        ) : (
+                          <input
+                            className="tp-edit-input"
+                            value={draft.email_id}
+                            onChange={e => setDraft(p => ({ ...p, email_id: e.target.value }))}
+                            placeholder="Enter email ID"
+                          />
+                        )}
+                      </div>
+                      <div className="tp-info-actions">
+                        {!editMode.email ? (
+                          <button className="tp-edit-btn" onClick={() => startEdit('email')}>Edit</button>
+                        ) : (
+                          <div className="tp-edit-actions">
+                            <button className="tp-edit-btn ghost" onClick={cancelEdit}>Cancel</button>
+                            <button className="tp-edit-btn primary" onClick={() => saveField('email')} disabled={savingField === 'email'}>
+                              {savingField === 'email' ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    )}
+
+                    {showRemark1Card && (
+                    <div className="tp-info-card">
+                      <div className="tp-info-icon" style={{ background: '#EEF2FF', color: '#4F46E5' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M4 5h16v14H4z" stroke="currentColor" strokeWidth="1.8"/>
+                          <path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <div className="tp-info-body">
+                        <span className="tp-info-label">Remark 1</span>
+                        {!editMode.remark1 ? (
+                          <span className="tp-info-value">{trust.remark1 || '—'}</span>
+                        ) : (
+                          <textarea
+                            className="tp-edit-textarea"
+                            rows={2}
+                            value={draft.remark1}
+                            onChange={e => setDraft(p => ({ ...p, remark1: e.target.value }))}
+                            placeholder="Enter remark 1"
+                          />
+                        )}
+                      </div>
+                      <div className="tp-info-actions">
+                        {!editMode.remark1 ? (
+                          <button className="tp-edit-btn" onClick={() => startEdit('remark1')}>Edit</button>
+                        ) : (
+                          <div className="tp-edit-actions">
+                            <button className="tp-edit-btn ghost" onClick={cancelEdit}>Cancel</button>
+                            <button className="tp-edit-btn primary" onClick={() => saveField('remark1')} disabled={savingField === 'remark1'}>
+                              {savingField === 'remark1' ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    )}
+
+                    {showRemark2Card && (
+                    <div className="tp-info-card">
+                      <div className="tp-info-icon" style={{ background: '#ECFDF5', color: '#059669' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M4 5h16v14H4z" stroke="currentColor" strokeWidth="1.8"/>
+                          <path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <div className="tp-info-body">
+                        <span className="tp-info-label">Remark 2</span>
+                        {!editMode.remark2 ? (
+                          <span className="tp-info-value">{trust.remark2 || '—'}</span>
+                        ) : (
+                          <textarea
+                            className="tp-edit-textarea"
+                            rows={2}
+                            value={draft.remark2}
+                            onChange={e => setDraft(p => ({ ...p, remark2: e.target.value }))}
+                            placeholder="Enter remark 2"
+                          />
+                        )}
+                      </div>
+                      <div className="tp-info-actions">
+                        {!editMode.remark2 ? (
+                          <button className="tp-edit-btn" onClick={() => startEdit('remark2')}>Edit</button>
+                        ) : (
+                          <div className="tp-edit-actions">
+                            <button className="tp-edit-btn ghost" onClick={cancelEdit}>Cancel</button>
+                            <button className="tp-edit-btn primary" onClick={() => saveField('remark2')} disabled={savingField === 'remark2'}>
+                              {savingField === 'remark2' ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    )}
+
+                    {showRemark3Card && (
+                    <div className="tp-info-card">
+                      <div className="tp-info-icon" style={{ background: '#FFF7ED', color: '#EA580C' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M4 5h16v14H4z" stroke="currentColor" strokeWidth="1.8"/>
+                          <path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <div className="tp-info-body">
+                        <span className="tp-info-label">Remark 3</span>
+                        {!editMode.remark3 ? (
+                          <span className="tp-info-value">{trust.remark3 || '—'}</span>
+                        ) : (
+                          <textarea
+                            className="tp-edit-textarea"
+                            rows={2}
+                            value={draft.remark3}
+                            onChange={e => setDraft(p => ({ ...p, remark3: e.target.value }))}
+                            placeholder="Enter remark 3"
+                          />
+                        )}
+                      </div>
+                      <div className="tp-info-actions">
+                        {!editMode.remark3 ? (
+                          <button className="tp-edit-btn" onClick={() => startEdit('remark3')}>Edit</button>
+                        ) : (
+                          <div className="tp-edit-actions">
+                            <button className="tp-edit-btn ghost" onClick={cancelEdit}>Cancel</button>
+                            <button className="tp-edit-btn primary" onClick={() => saveField('remark3')} disabled={savingField === 'remark3'}>
+                              {savingField === 'remark3' ? 'Saving...' : 'Save'}
                             </button>
                           </div>
                         )}

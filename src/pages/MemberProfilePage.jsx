@@ -81,7 +81,14 @@ const PICKER_PAGE_SIZE = 6;
 const CREATE_NEW_ROLE_VALUE = '__create_new_role__';
 const FAMILY_GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const FAMILY_BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const PROFILE_GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+const PROFILE_BLOOD_GROUP_OPTIONS = FAMILY_BLOOD_GROUP_OPTIONS;
+const PROFILE_MARITAL_STATUS_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed'];
 const PROFILE_PHOTO_MAX_BYTES = 25 * 1024;
+const FALLBACK_REGION_CODES = [
+  'IN', 'US', 'GB', 'CA', 'AU', 'AE', 'DE', 'FR', 'IT', 'ES', 'JP', 'SG', 'MY', 'TH', 'NZ', 'ZA',
+  'BR', 'MX', 'CN', 'KR', 'ID', 'PH', 'VN', 'BD', 'NP', 'LK', 'PK', 'QA', 'SA', 'OM', 'KW'
+];
 
 function getMembersCacheKey(trustId) {
   return `member_profile_members_${trustId}`;
@@ -148,6 +155,58 @@ function toText(value) {
   return String(value);
 }
 
+function normalizeNationality(value) {
+  const text = toText(value).trim();
+  if (!text) return '';
+  const lowered = text.toLowerCase();
+  if (lowered === 'indian') return 'India';
+  return text;
+}
+
+function countryCodeToFlag(code = '') {
+  const normalized = String(code || '').toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) return '';
+  return String.fromCodePoint(...[...normalized].map((char) => 127397 + char.charCodeAt(0)));
+}
+
+function buildNationalityOptions() {
+  const canUseIntl = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function';
+  if (!canUseIntl) {
+    return FALLBACK_REGION_CODES.map((code) => ({
+      code,
+      value: code,
+      label: `${countryCodeToFlag(code)} ${code}`.trim(),
+    }));
+  }
+
+  const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
+  const regionCodes = typeof Intl.supportedValuesOf === 'function'
+    ? Intl.supportedValuesOf('region')
+    : FALLBACK_REGION_CODES;
+
+  const mapped = regionCodes
+    .map((code) => String(code || '').toUpperCase())
+    .filter((code) => /^[A-Z]{2}$/.test(code))
+    .map((code) => {
+      const name = displayNames.of(code) || code;
+      return {
+        code,
+        value: name,
+        label: `${countryCodeToFlag(code)} ${name}`.trim(),
+      };
+    })
+    .filter((item) => item.value)
+    .sort((left, right) => left.value.localeCompare(right.value, undefined, { sensitivity: 'base' }));
+
+  const indiaIndex = mapped.findIndex((item) => item.value === 'India');
+  if (indiaIndex > 0) {
+    const [india] = mapped.splice(indiaIndex, 1);
+    mapped.unshift(india);
+  }
+
+  return mapped;
+}
+
 function initials(name = '') {
   return (
     name
@@ -177,7 +236,7 @@ function buildEditForm(source = {}) {
     date_of_birth: toText(source.date_of_birth),
     blood_group: toText(source.blood_group),
     marital_status: toText(source.marital_status),
-    nationality: toText(source.nationality),
+    nationality: normalizeNationality(source.nationality),
     aadhaar_id: toText(source.aadhaar_id),
     emergency_contact_name: toText(source.emergency_contact_name),
     emergency_contact_number: toText(source.emergency_contact_number),
@@ -410,6 +469,7 @@ export default function MemberProfilePage() {
   const [familyError, setFamilyError] = useState('');
   const [otherMembershipError, setOtherMembershipError] = useState('');
   const [error, setError] = useState('');
+  const nationalityOptions = useMemo(() => buildNationalityOptions(), []);
 
   useEffect(() => {
     if (!trustId) navigate('/dashboard', { replace: true, state: { userName, trust } });
@@ -735,7 +795,24 @@ export default function MemberProfilePage() {
   const getProfileFieldValue = (key) => {
     if (isEditing) return toText(editForm[key] ?? '');
     if (key === 'home_address') return toText(profile?.address_home);
+    if (key === 'nationality') return normalizeNationality(profile?.[key]);
     return toText(profile?.[key]);
+  };
+
+  const getBasicDetailFieldOptions = (key) => {
+    if (key === 'gender') {
+      return PROFILE_GENDER_OPTIONS.map((option) => ({ value: option, label: option }));
+    }
+    if (key === 'blood_group') {
+      return PROFILE_BLOOD_GROUP_OPTIONS.map((option) => ({ value: option, label: option }));
+    }
+    if (key === 'marital_status') {
+      return PROFILE_MARITAL_STATUS_OPTIONS.map((option) => ({ value: option, label: option }));
+    }
+    if (key === 'nationality') {
+      return nationalityOptions.map((option) => ({ value: option.value, label: option.label }));
+    }
+    return [];
   };
 
   const handleStartEdit = () => {
@@ -1474,14 +1551,50 @@ export default function MemberProfilePage() {
                                 {section.fields.map((field) => (
                                   <label key={field.key}>
                                     <span>{field.label}</span>
-                                    <input
-                                      value={getProfileFieldValue(field.key)}
-                                      onChange={(event) => {
-                                        if (!isFieldEditable(field.key)) return;
-                                        setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
-                                      }}
-                                      readOnly={!isFieldEditable(field.key)}
-                                    />
+                                    {section.title === 'Basic Details' && field.key === 'date_of_birth' ? (
+                                      <input
+                                        type="date"
+                                        value={getProfileFieldValue(field.key)}
+                                        onChange={(event) => {
+                                          if (!isFieldEditable(field.key)) return;
+                                          setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
+                                        }}
+                                        disabled={!isFieldEditable(field.key)}
+                                      />
+                                    ) : section.title === 'Basic Details' && ['gender', 'blood_group', 'marital_status', 'nationality'].includes(field.key) ? (
+                                      <select
+                                        value={getProfileFieldValue(field.key)}
+                                        onChange={(event) => {
+                                          if (!isFieldEditable(field.key)) return;
+                                          setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
+                                        }}
+                                        disabled={!isFieldEditable(field.key)}
+                                      >
+                                        <option value="">Select</option>
+                                        {(() => {
+                                          const currentValue = getProfileFieldValue(field.key);
+                                          const options = getBasicDetailFieldOptions(field.key);
+                                          const hasCurrent = options.some((option) => option.value === currentValue);
+                                          const safeOptions = hasCurrent || !currentValue
+                                            ? options
+                                            : [{ value: currentValue, label: currentValue }, ...options];
+                                          return safeOptions.map((option) => (
+                                            <option key={`${field.key}-${option.value}`} value={option.value}>
+                                              {option.label}
+                                            </option>
+                                          ));
+                                        })()}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        value={getProfileFieldValue(field.key)}
+                                        onChange={(event) => {
+                                          if (!isFieldEditable(field.key)) return;
+                                          setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
+                                        }}
+                                        readOnly={!isFieldEditable(field.key)}
+                                      />
+                                    )}
                                   </label>
                                 ))}
                               </div>

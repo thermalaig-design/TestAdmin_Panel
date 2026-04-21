@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
-const TRUST_COLUMNS = 'id, name, icon_url, remark, created_at, terms_content, privacy_content, template_id, legal_name, superuser_id';
+const TRUST_COLUMNS = 'id, name, icon_url, remark, created_at, terms_content, privacy_content, template_id, legal_name, superuser_id, gst_number, pan_number, website, email_id, remark1, remark2, remark3';
 const TRUST_ICON_BUCKET = 'trust-icons';
 
 function extensionFromFile(file) {
