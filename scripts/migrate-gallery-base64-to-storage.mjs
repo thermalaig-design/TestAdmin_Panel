@@ -146,7 +146,7 @@ function mimeToExt(mime = '') {
 }
 
 function formatKb(bytes) {
-  return `${(Number(bytes || 0) / 1024).toFixed(2)} KB`;
+  return Number((Number(bytes || 0) / 1024).toFixed(2));
 }
 
 function buildStoragePath(folderId, id, ext) {

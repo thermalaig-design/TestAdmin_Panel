@@ -23,6 +23,7 @@ const ContactUsPage = lazy(() => import('./pages/ContactUsPage'));
 const ThemePage = lazy(() => import('./pages/ThemePage'));
 const FeatureControlPage = lazy(() => import('./pages/FeatureControlPage'));
 const SubFeatureControlPage = lazy(() => import('./pages/SubFeatureControlPage'));
+const Features20Page = lazy(() => import('./pages/Features20Page'));
 
 function App() {
   return (
@@ -65,6 +66,7 @@ function App() {
           <Route path="/theme"        element={<ThemePage />} />
           <Route path="/feature-control" element={<FeatureControlPage />} />
           <Route path="/sub-feature-control" element={<SubFeatureControlPage />} />
+          <Route path="/features-2-o" element={<Features20Page />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

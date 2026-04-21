@@ -293,11 +293,11 @@ export default function GalleryPage() {
       canvas.toBlob((blob) => resolve(blob), type, quality);
     });
 
-  const formatSizeToKb = (bytes) => `${((Number(bytes) || 0) / 1024).toFixed(2)} KB`;
+  const formatSizeToKb = (bytes) => Number(((Number(bytes) || 0) / 1024).toFixed(2));
 
   const compressImageToLimit = async (file, maxBytes) => {
     if ((file?.size || 0) <= maxBytes) {
-      return { file, sizeText: formatSizeToKb(file.size) };
+      return { file, sizeValue: formatSizeToKb(file.size) };
     }
 
     const image = await loadImageFromFile(file);
@@ -319,7 +319,7 @@ export default function GalleryPage() {
       for (let quality = 0.82; quality >= 0.2; quality -= 0.08) {
         const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
         if (blob && blob.size <= maxBytes) {
-          return { file: blob, sizeText: formatSizeToKb(blob.size) };
+          return { file: blob, sizeValue: formatSizeToKb(blob.size) };
         }
       }
     }
@@ -352,6 +352,7 @@ export default function GalleryPage() {
     const uploaded = [];
     let failed = 0;
     let sizeSkipped = 0;
+    let firstUploadError = '';
 
     for (const file of imageFiles) {
       try {
@@ -363,11 +364,14 @@ export default function GalleryPage() {
         const { data, error: createErr } = await createGalleryPhoto({
           file: processed.file,
           uploadedBy: currentMemberId,
-          size: processed.sizeText,
+          size: processed.sizeValue,
           folderId: selectedFolderId,
         });
         if (createErr) {
           failed += 1;
+          if (!firstUploadError) {
+            firstUploadError = createErr.message || createErr.error_description || 'Upload failed.';
+          }
         } else if (data) {
           uploaded.push(data);
         }
@@ -390,6 +394,7 @@ export default function GalleryPage() {
       if (failed > 0) notes.push(`${failed} failed`);
       if (sizeSkipped > 0) notes.push(`${sizeSkipped} could not be compressed to 25KB`);
       if (files.length !== imageFiles.length) notes.push(`${files.length - imageFiles.length} non-image skipped`);
+      if (firstUploadError) notes.push(firstUploadError);
       setError(`Uploaded ${uploaded.length}/${imageFiles.length} image(s). ${notes.join('. ')}.`);
     } else {
       setError('');

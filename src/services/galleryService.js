@@ -30,7 +30,7 @@ function buildGalleryStoragePath(folderId, file) {
 
 function formatSizeToKb(bytes) {
   if (!Number.isFinite(Number(bytes))) return null;
-  return `${(Number(bytes) / 1024).toFixed(2)} KB`;
+  return Number((Number(bytes) / 1024).toFixed(2));
 }
 
 function dataUrlToBuffer(dataUrl = '') {
@@ -217,9 +217,12 @@ export async function createGalleryPhoto(payload) {
     storage_path: storagePath || publicUrl,
     public_url: publicUrl,
     folder_id: payload.folderId || null,
-    uploaded_by: payload.uploadedBy || null,
     size: size || null,
   };
+  // Avoid forcing NULL into uploaded_by; let DB defaults/constraints handle missing uploader.
+  if (payload.uploadedBy) {
+    row.uploaded_by = payload.uploadedBy;
+  }
 
   const { data, error } = await supabase
     .from(PHOTOS_TABLE)

@@ -256,6 +256,20 @@ const MODULE_CARDS = [
     ),
   },
   {
+    id: 'card-features-2-o',
+    label: 'Features2.O',
+    description: 'Merged access for feature and sub feature controls',
+    route: '/features-2-o',
+    gradient: 'linear-gradient(135deg, #0F766E 0%, #2563EB 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="4" width="18" height="16" rx="3" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.18)"/>
+        <path d="M8 9h8M8 12h8M8 15h4" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+        <circle cx="16.5" cy="15.5" r="2.8" stroke="white" strokeWidth="1.8"/>
+      </svg>
+    ),
+  },
+  {
     id: 'card-profile',
     label: 'Profile',
     description: 'View member profile details by member id',
@@ -271,7 +285,7 @@ const MODULE_CARDS = [
   },
 ];
 
-const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control']);
+const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
 const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-noticeboard', 'card-events', 'card-facilities', 'card-contact-us']);
