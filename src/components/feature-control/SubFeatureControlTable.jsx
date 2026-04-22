@@ -114,16 +114,16 @@ export default function SubFeatureControlTable({
                 <td>
                   <button
                     type="button"
-                    className={`fc-toggle ${row.is_enabled ? 'on' : 'off'}`}
+                    className={`fc-toggle ${row.is_enabled ? 'on' : 'off'} ${isBusy ? 'busy' : ''}`}
                     onClick={() => onToggle(row, !row.is_enabled)}
                     disabled={isBusy}
                     aria-pressed={row.is_enabled}
-                    title={row.is_enabled ? 'Disable sub feature' : 'Enable sub feature'}
+                    aria-label={isBusy ? 'Saving status' : row.is_enabled ? 'Disable sub feature' : 'Enable sub feature'}
+                    title={isBusy ? 'Saving...' : row.is_enabled ? 'Disable sub feature' : 'Enable sub feature'}
                   >
                     <span className="fc-toggle-track">
                       <span className="fc-toggle-thumb" />
                     </span>
-                    <span>{isBusy ? 'Saving...' : row.is_enabled ? 'Enabled' : 'Disabled'}</span>
                   </button>
                 </td>
                 <td>

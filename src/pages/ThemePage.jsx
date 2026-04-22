@@ -185,6 +185,39 @@ const previewBg = (theme) => {
   const colorB = safeText(config?.quick_actions?.bg_color_1, '') || safeText(theme?.secondary_color, '') || '#2B2F7E';
   return `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`;
 };
+const sectionPreviewBackground = (section = {}, fallback = '#ffffff') => {
+  const colorA = safeText(section?.bg_color_1, '') || safeText(section?.bg_color, '') || fallback;
+  const colorB = safeText(section?.bg_color_2, '') || deriveSecondBackgroundColor(colorA, colorA);
+  const gradientType = safeText(section?.gradient_type, 'none') || 'none';
+  const gradientAngle = Number(section?.gradient_angle);
+  const angle = Number.isFinite(gradientAngle) ? gradientAngle : 135;
+  return gradientType !== 'none'
+    ? `${gradientType}-gradient(${angle}deg, ${colorA} 0%, ${colorB} 100%)`
+    : colorA;
+};
+const buildTemplateMobilePreview = (theme) => {
+  const config = buildThemeConfigForm(theme?.theme_config || {});
+  const navbar = config?.navbar || {};
+  const pageBg = config?.page_bg || {};
+  const marquee = config?.marquee || {};
+  const quickActions = config?.quick_actions || {};
+  const appButtons = config?.app_buttons || {};
+  const footer = config?.footer || {};
+
+  return {
+    navbarBg: sectionPreviewBackground(navbar, '#1f296f'),
+    navbarText: safeText(navbar.text_color, '#f7f7f7') || '#f7f7f7',
+    pageBg: sectionPreviewBackground(pageBg, '#f6f8fc'),
+    marqueeBg: sectionPreviewBackground(marquee, '#1a1891'),
+    marqueeText: safeText(marquee.text_color, '#ffffff') || '#ffffff',
+    quickBg: sectionPreviewBackground(quickActions, '#ffffff'),
+    quickText: safeText(quickActions.text_color, '#111827') || '#111827',
+    buttonBg: sectionPreviewBackground(appButtons, '#4a42e8'),
+    buttonText: safeText(appButtons.text_color, '#ffffff') || '#ffffff',
+    footerBg: sectionPreviewBackground(footer, '#1f296f'),
+    footerText: safeText(footer.text_color, '#ffffff') || '#ffffff',
+  };
+};
 
 const getNestedValue = (obj, keyPath) =>
   String(keyPath)
@@ -256,6 +289,7 @@ export default function ThemePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [detailId, setDetailId] = useState(null);
@@ -341,6 +375,7 @@ export default function ThemePage() {
 
   const openCreate = () => {
     setSelectedId(null);
+    setIsViewMode(false);
     setForm(EMPTY_FORM);
     setThemeConfigForm(buildThemeConfigForm(DEFAULT_THEME_SECTION_CONFIG));
     setAnimationConfig(DEFAULT_ANIMATIONS);
@@ -352,6 +387,16 @@ export default function ThemePage() {
 
   const openEdit = (id) => {
     setSelectedId(id);
+    setIsViewMode(false);
+    setSaveError('');
+    setShowForm(true);
+    setShowPicker(false);
+    setShowDetail(false);
+  };
+
+  const openView = (id) => {
+    setSelectedId(id);
+    setIsViewMode(true);
     setSaveError('');
     setShowForm(true);
     setShowPicker(false);
@@ -361,6 +406,13 @@ export default function ThemePage() {
   const openDetail = (id) => {
     setDetailId(id);
     setShowDetail(true);
+  };
+
+  const closeThemeForm = () => {
+    setShowForm(false);
+    setSelectedId(null);
+    setSaveError('');
+    setIsViewMode(false);
   };
 
   const handleAssign = async (template) => {
@@ -381,6 +433,7 @@ export default function ThemePage() {
 
 
   const handleSave = async () => {
+    if (isViewMode) return;
     setSaveError('');
     if (!form.name.trim()) {
       setSaveError('Theme name is required.');
@@ -482,6 +535,7 @@ export default function ThemePage() {
               className="theme-color-text"
               value={displayValue}
               placeholder={field.key === 'bg_color_2' ? 'auto from main color' : (field.allowNull ? 'null' : fallback)}
+              disabled={isViewMode}
               onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value || (field.allowNull ? null : fallback))}
             />
             <input
@@ -490,12 +544,14 @@ export default function ThemePage() {
               type="color"
               aria-label={`${field.label} picker`}
               value={nativeValue}
+              disabled={isViewMode}
               onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value)}
             />
             {field.key === 'bg_color_2' && (
               <button
                 type="button"
                 className="theme-color-auto-btn"
+                disabled={isViewMode}
                 onClick={() => updateThemeConfigField(sectionKey, field.key, null)}
                 title="Auto derive from main background color"
               >
@@ -513,6 +569,7 @@ export default function ThemePage() {
           <span>{field.label}</span>
           <select
             value={currentValue ?? ''}
+            disabled={isViewMode}
             onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value)}
           >
             {(field.options || []).map((option) => (
@@ -533,6 +590,7 @@ export default function ThemePage() {
             max={field.max}
             step={field.step || 1}
             value={currentValue ?? ''}
+            disabled={isViewMode}
             onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value === '' ? null : Number(e.target.value))}
           />
         </label>
@@ -544,6 +602,7 @@ export default function ThemePage() {
         <span>{field.label}</span>
         <input
           value={currentValue ?? ''}
+          disabled={isViewMode}
           onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value)}
         />
       </label>
@@ -684,6 +743,7 @@ export default function ThemePage() {
                 min="0"
                 placeholder="-"
                 value={homeLayoutOrder[item.key]}
+                disabled={isViewMode}
                 onChange={(e) => {
                   const rawValue = e.target.value;
                   setHomeLayoutOrder((prev) => ({ ...prev, [item.key]: rawValue === '' ? '' : Math.max(0, Number(rawValue) || 0) }));
@@ -713,6 +773,7 @@ export default function ThemePage() {
               </div>
               <select
                 value={animationConfig[item.key] || DEFAULT_ANIMATIONS[item.key]}
+                disabled={isViewMode}
                 onChange={(e) =>
                   setAnimationConfig((prev) => ({
                     ...prev,
@@ -770,23 +831,19 @@ export default function ThemePage() {
         <div className={`theme-content ${showForm ? 'form-only' : ''}`}>
           {!showForm && (
             <>
-          <section className="theme-hero">
-            <div className="theme-hero-copy">
-              <span className="theme-kicker">Theme manager</span>
-              <h2>Create templates and assign a live theme to this trust.</h2>
-              <p>
-                This module follows the sponsor flow: list, pick, inspect, create, edit, and apply.
-                Use it to manage `app_templates` and connect one to {currentTrust?.name || trust?.name || 'your trust'}.
-              </p>
+          <section className="theme-list-shell">
+            <div className="theme-list-head">
+              <div>
+                <h3>Theme Templates</h3>
+                <p>Pick, edit and apply templates for {currentTrust?.name || trust?.name || 'this trust'}.</p>
+              </div>
+              <div className="theme-list-meta">
+                <span>Templates: {templates.length}</span>
+                <button className="theme-add-btn" onClick={openCreate} type="button">Create Theme</button>
+              </div>
             </div>
-            <div className="theme-hero-stats">
-              <div className="theme-stat-card"><span>Templates</span><strong>{templates.length}</strong></div>
-              <div className="theme-stat-card"><span>Active template</span><strong>{activeTemplateId ? 'Assigned' : 'None'}</strong></div>
 
-            </div>
-          </section>
-
-          <section className="theme-list">
+          <div className="theme-list">
             {loading && <div className="theme-loading">Loading themes...</div>}
             {!loading && templates.filter((item) => item.is_active !== false).length === 0 && (
               <div className="theme-empty">
@@ -796,43 +853,77 @@ export default function ThemePage() {
                 <button className="theme-add-btn" onClick={openCreate}>Create Theme</button>
               </div>
             )}
-            {!loading && templates.filter((item) => item.is_active !== false).map((theme) => (
-              <div key={theme.id} className={`theme-card ${activeTemplateId === theme.id ? 'active' : ''} ${canEdit(theme) ? 'my' : 'other'}`} onClick={() => openDetail(theme.id)}>
-                <div className="theme-card-preview" style={{ background: previewBg(theme) }}>
-                  <div className="theme-preview-glass">
-                    <div className="theme-preview-dot-row"><span /><span /><span /></div>
-                    <div className="theme-preview-strip" />
-                    <div className="theme-preview-strip short" />
+            {!loading && templates.filter((item) => item.is_active !== false).map((theme) => {
+              const previewData = buildTemplateMobilePreview(theme);
+              return (
+                <div key={theme.id} className={`theme-card ${activeTemplateId === theme.id ? 'active' : ''} ${canEdit(theme) ? 'my' : 'other'}`} onClick={() => openDetail(theme.id)}>
+                  <div className="theme-card-preview" style={{ background: previewBg(theme) }}>
+                    <div className="theme-preview-phone" style={{ background: previewData.pageBg }}>
+                      <div className="theme-preview-phone-navbar" style={{ background: previewData.navbarBg, color: previewData.navbarText }}>
+                        <span>Ek Udaan</span>
+                        <span>Menu</span>
+                      </div>
+                      <div className="theme-preview-phone-body">
+                        <div className="theme-preview-phone-quick" style={{ background: previewData.quickBg, color: previewData.quickText }}>
+                          Sample quick action
+                        </div>
+                        <button className="theme-preview-phone-btn" type="button" style={{ background: previewData.buttonBg, color: previewData.buttonText }}>
+                          Donate Now
+                        </button>
+                        <div className="theme-preview-phone-marquee" style={{ background: previewData.marqueeBg, color: previewData.marqueeText }}>
+                          Emergency update running...
+                        </div>
+                      </div>
+                      <div className="theme-preview-phone-footer" style={{ background: previewData.footerBg, color: previewData.footerText }}>
+                        Home  |  Profile
+                      </div>
+                    </div>
+                  </div>
+                  <div className="theme-card-body">
+                    <div className="theme-card-title-row">
+                      <div className="theme-card-title">{theme.name}</div>
+                      <span className={`theme-card-badge ${canEdit(theme) ? 'my' : 'other'}`}>{canEdit(theme) ? 'My' : 'Other'}</span>
+                    </div>
+                    <div className="theme-card-sub">{theme.template_key || 'template'}</div>
+                    {theme.description && <div className="theme-card-tag">{theme.description}</div>}
+                  </div>
+                  <div className="theme-card-actions">
+                    <button className={`theme-status-btn ${activeTemplateId === theme.id ? 'active' : 'inactive'}`} type="button" onClick={(e) => { e.stopPropagation(); handleAssign(theme); }}>
+                      {assigningId === theme.id ? 'Applying...' : activeTemplateId === theme.id ? 'Applied' : 'Apply'}
+                    </button>
+                    {canEdit(theme) && <button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); openEdit(theme.id); }}>Edit</button>}
+                    {!canEdit(theme) && <button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); openView(theme.id); }}>View</button>}
                   </div>
                 </div>
-                <div className="theme-card-body">
-                  <div className="theme-card-title-row">
-                    <div className="theme-card-title">{theme.name}</div>
-                    <span className={`theme-card-badge ${canEdit(theme) ? 'my' : 'other'}`}>{canEdit(theme) ? 'My' : 'Other'}</span>
-                  </div>
-                  <div className="theme-card-sub">{theme.template_key || 'template'}</div>
-                  {theme.description && <div className="theme-card-tag">{theme.description}</div>}
-                </div>
-                <div className="theme-card-actions">
-                  <button className={`theme-status-btn ${activeTemplateId === theme.id ? 'active' : 'inactive'}`} type="button" onClick={(e) => { e.stopPropagation(); handleAssign(theme); }}>
-                    {assigningId === theme.id ? 'Applying...' : activeTemplateId === theme.id ? 'Applied' : 'Apply'}
-                  </button>
-                  {canEdit(theme) && <button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); openEdit(theme.id); }}>Edit</button>}
-                </div>
-              </div>
-            ))}
+              );
+            })}
+          </div>
           </section>
             </>
           )}
 
           {showForm && (
-            <section className="theme-form">
-              <div className="theme-form-card">
-                <div className="theme-form-title">{selectedId ? 'Edit Theme' : 'Create Theme'}</div>
+            <>
+              {isViewMode && (
+                <button
+                  className="theme-view-floating-close"
+                  type="button"
+                  onClick={closeThemeForm}
+                  aria-label="Close view"
+                  title="Close view"
+                >
+                  X
+                </button>
+              )}
+              <section className="theme-form">
+                <div className="theme-form-card">
+                  <div className="theme-form-head">
+                    <div className="theme-form-title">{isViewMode ? 'View Theme' : selectedId ? 'Edit Theme' : 'Create Theme'}</div>
+                  </div>
                 <div className="theme-grid">
-                  <label className="theme-field"><span>Name *</span><input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} /></label>
-                  <label className="theme-field"><span>Template Key</span><input value={form.template_key} onChange={(e) => setForm((p) => ({ ...p, template_key: e.target.value }))} /></label>
-                  <label className="theme-field theme-span-2"><span>Description</span><textarea rows="3" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></label>
+                  <label className="theme-field"><span>Name *</span><input value={form.name} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} /></label>
+                  <label className="theme-field"><span>Template Key</span><input value={form.template_key} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, template_key: e.target.value }))} /></label>
+                  <label className="theme-field theme-span-2"><span>Description</span><textarea rows="3" value={form.description} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></label>
                   <div className="theme-field theme-span-2">
                     <span>Colors</span>
                   </div>
@@ -854,15 +945,16 @@ export default function ThemePage() {
                   </div>
                   {renderHomeLayoutField()}
                   {renderAnimationsField()}
-                  <label className="theme-field theme-span-2"><span>Custom CSS</span><textarea rows="5" value={form.custom_css} onChange={(e) => setForm((p) => ({ ...p, custom_css: e.target.value }))} /></label>
-                  <label className="theme-check"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} /><span>Template is active</span></label>
+                  <label className="theme-field theme-span-2"><span>Custom CSS</span><textarea rows="5" value={form.custom_css} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, custom_css: e.target.value }))} /></label>
+                  <label className="theme-check"><input type="checkbox" checked={form.is_active} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} /><span>Template is active</span></label>
                 </div>
                 <div className="theme-form-actions">
-                  <button className="theme-secondary-btn" type="button" onClick={() => { setShowForm(false); setSelectedId(null); setSaveError(''); }}>Close</button>
-                  <button className="theme-primary-btn" type="button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Theme'}</button>
+                  <button className="theme-secondary-btn" type="button" onClick={closeThemeForm}>Close</button>
+                  {!isViewMode && <button className="theme-primary-btn" type="button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Theme'}</button>}
                 </div>
               </div>
-            </section>
+              </section>
+            </>
           )}
 
           {showPicker && (
@@ -886,7 +978,7 @@ export default function ThemePage() {
                   {otherTemplates.length > 0 && <div className="theme-modal-section other"><div className="theme-modal-section-title">Other Themes</div>{otherTemplates.map((item) => (
                     <div key={item.id} className="theme-modal-item" onClick={() => openDetail(item.id)}>
                       <div><div className="theme-modal-title-row"><div className="theme-modal-title">{item.name}</div><span className="theme-modal-badge other">Other</span></div><div className="theme-modal-sub">{item.template_key || 'template'}</div><div className="theme-modal-sub">{item.description || 'No description'}</div></div>
-                      <div className="theme-modal-actions"><button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); handleAssign(item); }}>{activeTemplateId === item.id ? 'Applied' : 'Apply'}</button></div>
+                      <div className="theme-modal-actions"><button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); handleAssign(item); }}>{activeTemplateId === item.id ? 'Applied' : 'Apply'}</button><button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); openView(item.id); }}>View</button></div>
                     </div>
                   ))}</div>}
                   {filtered.length === 0 && <div className="theme-modal-empty">No themes found.</div>}

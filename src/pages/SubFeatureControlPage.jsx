@@ -298,10 +298,6 @@ export default function SubFeatureControlPage() {
         />
 
         <section className="fc-panel">
-          <div className="fc-readonly-note">
-            Source tables: <strong>features</strong> + <strong>sub_features</strong> (view only). Editable table: <strong>sub_feature_flags</strong>.
-          </div>
-
           <div className="fc-controls">
             <label>
               <span>Trust</span>

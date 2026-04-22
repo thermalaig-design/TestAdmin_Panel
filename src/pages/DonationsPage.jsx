@@ -11,6 +11,10 @@ import {
 import './NoticeboardPage.css';
 
 const DONATION_STATUS_OPTIONS = ['active', 'inactive'];
+const DONATION_AMOUNT_TYPE_OPTIONS = ['fixed', 'variable', 'monthly'];
+const DONATION_TYPE_OPTIONS = ['general', 'campaign', 'other'];
+const PARTIAL_MONEY_RE = /^\d*(?:\.\d{0,2})?$/;
+const MONEY_RE = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
 
 function formatDate(value) {
   if (!value) return '-';
@@ -35,6 +39,17 @@ function parseAttachments(value = '') {
 function attachmentsToText(attachments = []) {
   if (!Array.isArray(attachments)) return '';
   return attachments.map((item) => String(item || '').trim()).filter(Boolean).join('\n');
+}
+
+function formatMoney(value) {
+  if (value === null || value === undefined || value === '') return '-';
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  const hasDecimals = Math.round(amount * 100) % 100 !== 0;
+  return amount.toLocaleString('en-IN', {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
 }
 
 export default function DonationsPage() {
@@ -73,6 +88,7 @@ export default function DonationsPage() {
     type: '',
     attachments: '',
   });
+  const [amountWarning, setAmountWarning] = useState('');
 
   const resetForm = () => {
     setForm({
@@ -85,7 +101,25 @@ export default function DonationsPage() {
       attachments: '',
     });
     setFormError('');
+    setAmountWarning('');
     setEditingId(null);
+  };
+
+  const handleAmountChange = (rawValue) => {
+    const value = String(rawValue || '').trim();
+    if (!value) {
+      setAmountWarning('');
+      setForm((prev) => ({ ...prev, amount: '' }));
+      return;
+    }
+
+    if (!PARTIAL_MONEY_RE.test(value)) {
+      setAmountWarning('Enter a valid amount using numbers only (e.g., 345000.54).');
+    } else {
+      setAmountWarning('');
+    }
+
+    setForm((prev) => ({ ...prev, amount: value }));
   };
 
   const goToList = () => {
@@ -209,6 +243,7 @@ export default function DonationsPage() {
     });
     setEditingId(target.id);
     setFormError('');
+    setAmountWarning('');
   }, [isFormRoute, isCreateRoute, isEditRoute, routeEditId, selectedId, donations]);
 
   const handleSave = async () => {
@@ -218,8 +253,14 @@ export default function DonationsPage() {
       return;
     }
 
-    if (form.amount !== '' && !Number.isFinite(Number(form.amount))) {
-      setFormError('Amount must be a valid number.');
+    const amountValue = String(form.amount || '').trim();
+    if (amountValue !== '' && !MONEY_RE.test(amountValue)) {
+      setFormError('Enter a valid amount using numbers only (e.g., 345000.54).');
+      return;
+    }
+
+    if (amountWarning) {
+      setFormError(amountWarning);
       return;
     }
 
@@ -228,7 +269,7 @@ export default function DonationsPage() {
       trust_id: trustId,
       name: form.name,
       description: form.description,
-      amount: form.amount,
+      amount: amountValue,
       amount_type: form.amount_type,
       status: form.status || 'active',
       type: form.type,
@@ -351,27 +392,42 @@ export default function DonationsPage() {
                     <label>
                       <span>Amount</span>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
+                        className={amountWarning ? 'dn-input-error' : ''}
                         value={form.amount}
-                        onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+                        onChange={(e) => handleAmountChange(e.target.value)}
                         placeholder="Enter amount"
                       />
+                      {amountWarning && <small className="dn-input-warning">{amountWarning}</small>}
                     </label>
                     <label>
                       <span>Amount Type</span>
-                      <input
+                      <select
                         value={form.amount_type}
                         onChange={(e) => setForm((prev) => ({ ...prev, amount_type: e.target.value }))}
-                        placeholder="fixed / variable / monthly"
-                      />
+                      >
+                        <option value="">Select amount type</option>
+                        {DONATION_AMOUNT_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label>
                       <span>Type</span>
-                      <input
+                      <select
                         value={form.type}
                         onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-                        placeholder="general / campaign / other"
-                      />
+                      >
+                        <option value="">Select type</option>
+                        {DONATION_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label className="nb-span-2">
                       <span>Description</span>
@@ -544,6 +600,17 @@ export default function DonationsPage() {
                         <div>
                           <h3>{selectedDonation.name || '-'}</h3>
                           <p>{selectedDonation.type || selectedDonation.amount_type || 'Donation entry'}</p>
+                          <div className="dn-hero-meta-chips">
+                            {selectedDonation.amount_type ? (
+                              <span className="dn-hero-chip">{selectedDonation.amount_type}</span>
+                            ) : null}
+                            {selectedDonation.type ? (
+                              <span className="dn-hero-chip dn-hero-chip-soft">{selectedDonation.type}</span>
+                            ) : null}
+                            {selectedDonation.amount !== null && selectedDonation.amount !== undefined ? (
+                              <span className="dn-hero-chip dn-hero-chip-money">Rs. {formatMoney(selectedDonation.amount)}</span>
+                            ) : null}
+                          </div>
                           <div className="nb-profile-hero-actions">
                             <button
                               className="nb-secondary-btn"
@@ -599,7 +666,7 @@ export default function DonationsPage() {
                       <div className="nb-profile-detail-grid">
                         <div><span>Name</span><strong>{selectedDonation.name || '-'}</strong></div>
                         <div><span>Status</span><strong>{selectedDonation.status || '-'}</strong></div>
-                        <div><span>Amount</span><strong>{selectedDonation.amount ?? '-'}</strong></div>
+                        <div><span>Amount</span><strong>{selectedDonation.amount !== null && selectedDonation.amount !== undefined ? `Rs. ${formatMoney(selectedDonation.amount)}` : '-'}</strong></div>
                         <div><span>Amount Type</span><strong>{selectedDonation.amount_type || '-'}</strong></div>
                         <div><span>Type</span><strong>{selectedDonation.type || '-'}</strong></div>
                         <div><span>Created Date</span><strong>{formatDate(selectedDonation.created_at)}</strong></div>

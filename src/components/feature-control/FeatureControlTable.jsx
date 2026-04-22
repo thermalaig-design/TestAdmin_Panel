@@ -118,16 +118,16 @@ export default function FeatureControlTable({
                   <div className="fc-status-stack">
                     <button
                       type="button"
-                      className={`fc-toggle ${row.is_enabled ? 'on' : 'off'}`}
+                      className={`fc-toggle ${row.is_enabled ? 'on' : 'off'} ${isBusy ? 'busy' : ''}`}
                       onClick={() => onToggle(row, !row.is_enabled)}
                       disabled={isBusy}
                       aria-pressed={row.is_enabled}
-                      title={row.is_enabled ? 'Disable feature' : 'Enable feature'}
+                      aria-label={isBusy ? 'Saving status' : row.is_enabled ? 'Disable feature' : 'Enable feature'}
+                      title={isBusy ? 'Saving...' : row.is_enabled ? 'Disable feature' : 'Enable feature'}
                     >
                       <span className="fc-toggle-track">
                         <span className="fc-toggle-thumb" />
                       </span>
-                      <span className="fc-toggle-label">{isBusy ? 'Saving...' : row.is_enabled ? 'Enabled' : 'Disabled'}</span>
                     </button>
                     {row.sub_feature_count > 0 && row.is_enabled ? (
                       <button

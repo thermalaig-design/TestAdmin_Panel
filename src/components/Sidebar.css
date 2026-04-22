@@ -91,6 +91,13 @@
   padding: 8px 8px 18px;
   border-bottom: 1px solid rgba(99, 102, 241, 0.09);
   margin-bottom: 4px;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.2s ease;
+}
+
+.sb-brand:hover {
+  background: rgba(79, 70, 229, 0.05);
 }
 
 .sb-brand-logo {

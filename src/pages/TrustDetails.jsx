@@ -19,7 +19,11 @@ function TrustDetails() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const trustId = location.state?.trustId;
+  const trustId = location.state?.trustId || location.state?.trust?.id;
+  const userName = location.state?.userName || 'Admin';
+  const trustFromState = location.state?.trust || null;
+  const sidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
+  const returnTo = location.state?.returnTo || '/dashboard';
   // State
   const [trust, setTrust] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -103,6 +107,16 @@ function TrustDetails() {
     setEditValues({});
   };
 
+  const goBackToDashboard = () => {
+    navigate(returnTo, {
+      state: {
+        userName,
+        trust: trustFromState || trust || null,
+        sidebarNavKey,
+      },
+    });
+  };
+
   const renderEditableField = ({
     field,
     label,
@@ -166,7 +180,7 @@ function TrustDetails() {
     return (
       <div className="trust-details-container">
         <div className="error">{error || 'Trust not found'}</div>
-        <button onClick={() => navigate('/dashboard')} className="back-btn">Back to Dashboard</button>
+        <button onClick={goBackToDashboard} className="back-btn">Back to Dashboard</button>
       </div>
     );
   }
@@ -176,7 +190,7 @@ function TrustDetails() {
       {/* Header */}
       <div className="trust-details-header">
         <div className="trust-details-hero-left">
-          <button onClick={() => navigate('/dashboard')} className="back-btn">
+          <button onClick={goBackToDashboard} className="back-btn">
             &larr; Back
           </button>
           <div className="trust-details-title-group">

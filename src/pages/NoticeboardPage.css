@@ -539,6 +539,74 @@
   margin-top: 10px;
 }
 
+.dn-input-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dn-input-warning::before {
+  content: '!';
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: rgba(217, 119, 6, 0.14);
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.nb-form-grid input.dn-input-error {
+  border-color: rgba(217, 119, 6, 0.5);
+  background: #fffdf6;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+}
+
+.dn-hero-meta-chips {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dn-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(79, 70, 229, 0.26);
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.dn-hero-chip-soft {
+  border-color: rgba(30, 64, 175, 0.24);
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dn-hero-chip-money {
+  border-color: rgba(5, 150, 105, 0.24);
+  background: #ecfdf5;
+  color: #047857;
+  text-transform: none;
+}
+
 .nb-profile-details {
   border: 1px solid #dbeafe;
   border-radius: 16px;

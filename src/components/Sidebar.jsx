@@ -120,6 +120,28 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
     if (isMobile) setMenuOpen(false);
   };
 
+  const openTrustDetails = () => {
+    const trustId = trust?.id || null;
+    if (!trustId) {
+      if (onDashboard) onDashboard();
+      else navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
+      closeMobileMenu();
+      return;
+    }
+
+    navigate('/trust-details', {
+      state: {
+        trustId,
+        trustName,
+        userName,
+        trust,
+        sidebarNavKey: currentSidebarNavKey,
+        returnTo: '/dashboard',
+      },
+    });
+    closeMobileMenu();
+  };
+
   return (
     <>
       <button
@@ -145,7 +167,18 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
       )}
 
       <aside className={`sb-sidebar ${isMobile ? 'mobile' : ''} ${menuOpen ? 'open' : ''}`}>
-        <div className="sb-brand">
+        <div
+          className="sb-brand"
+          role="button"
+          tabIndex={0}
+          onClick={openTrustDetails}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openTrustDetails();
+            }
+          }}
+        >
           <div className="sb-brand-logo">
             <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
               <path d="M16 2L29 9V23L16 30L3 23V9L16 2Z" fill="url(#sbGrad)" />
@@ -165,7 +198,10 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
             <button
               type="button"
               className="sb-close-btn"
-              onClick={closeMobileMenu}
+              onClick={(event) => {
+                event.stopPropagation();
+                closeMobileMenu();
+              }}
               aria-label="Close menu"
             >
               x

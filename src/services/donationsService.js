@@ -3,6 +3,7 @@ import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'Donations';
 const MAX_FETCH = 200;
+const MONEY_RE = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
 
 function normalizeAttachments(value) {
   if (!Array.isArray(value)) return [];
@@ -24,6 +25,15 @@ function normalizeRow(row = {}) {
     updated_at: row.updated_at || null,
     raw: row,
   };
+}
+
+function toMoneyValue(rawAmount) {
+  if (rawAmount === '' || rawAmount === null || rawAmount === undefined) return { value: null, error: null };
+  const normalized = String(rawAmount).trim();
+  if (!MONEY_RE.test(normalized)) {
+    return { value: null, error: { message: 'Amount must be a valid number (example: 345000.54).' } };
+  }
+  return { value: Number(normalized), error: null };
 }
 
 export async function fetchDonationsByTrust(trustId) {
@@ -54,18 +64,15 @@ export async function createDonation(payload = {}) {
     name,
     description: String(payload.description || '').trim() || null,
     attachments: normalizeAttachments(payload.attachments),
-    amount:
-      payload.amount === '' || payload.amount === null || payload.amount === undefined
-        ? null
-        : Number(payload.amount),
+    amount: null,
     amount_type: String(payload.amount_type || '').trim() || null,
     status: String(payload.status || 'active').trim() || 'active',
     type: String(payload.type || '').trim() || null,
   };
 
-  if (row.amount !== null && !Number.isFinite(row.amount)) {
-    return { data: null, error: { message: 'Amount must be a valid number.' } };
-  }
+  const { value: parsedAmount, error: amountError } = toMoneyValue(payload.amount);
+  if (amountError) return { data: null, error: amountError };
+  row.amount = parsedAmount;
 
   const { data, error } = await supabase.from(TABLE_NAME).insert([row]).select('*').single();
   if (!error) invalidateCache('donations:');
@@ -81,14 +88,7 @@ export async function updateDonation(donationId, updates = {}, trustId = null) {
       ? { description: String(updates.description || '').trim() || null }
       : {}),
     ...(updates.attachments !== undefined ? { attachments: normalizeAttachments(updates.attachments) } : {}),
-    ...(updates.amount !== undefined
-      ? {
-          amount:
-            updates.amount === '' || updates.amount === null || updates.amount === undefined
-              ? null
-              : Number(updates.amount),
-        }
-      : {}),
+    ...(updates.amount !== undefined ? { amount: null } : {}),
     ...(updates.amount_type !== undefined
       ? { amount_type: String(updates.amount_type || '').trim() || null }
       : {}),
@@ -97,8 +97,10 @@ export async function updateDonation(donationId, updates = {}, trustId = null) {
     updated_at: new Date().toISOString(),
   };
 
-  if (payload.amount !== undefined && payload.amount !== null && !Number.isFinite(payload.amount)) {
-    return { data: null, error: { message: 'Amount must be a valid number.' } };
+  if (updates.amount !== undefined) {
+    const { value: parsedAmount, error: amountError } = toMoneyValue(updates.amount);
+    if (amountError) return { data: null, error: amountError };
+    payload.amount = parsedAmount;
   }
 
   let query = supabase.from(TABLE_NAME).update(payload).eq('id', donationId);

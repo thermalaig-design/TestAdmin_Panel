@@ -232,6 +232,8 @@ const MODULE_CARDS = [
     label: 'Feature Control',
     description: 'Manage feature access & visibility',
     route: '/feature-control',
+    temporarilyDeactivated: true,
+    deactivationText: 'Temporarily Deactivated',
     gradient: 'linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)',
     icon: (
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
@@ -246,6 +248,8 @@ const MODULE_CARDS = [
     label: 'Sub Feature Control',
     description: 'Manage sub feature labels and visibility',
     route: '/sub-feature-control',
+    temporarilyDeactivated: true,
+    deactivationText: 'Temporarily Deactivated',
     gradient: 'linear-gradient(135deg, #0EA5E9 0%, #1D4ED8 100%)',
     icon: (
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
@@ -737,7 +741,18 @@ export default function Dashboard() {
           <div className="trust-badge-container">
             <div 
               className="trust-badge"
-              onClick={() => navigate('/trust-details', { state: { trustId, trustName: activeTrust?.name } })}
+              onClick={() =>
+                navigate('/trust-details', {
+                  state: {
+                    trustId,
+                    trustName: activeTrust?.name,
+                    userName,
+                    trust: activeTrust,
+                    sidebarNavKey: currentSidebarNavKey,
+                    returnTo: '/dashboard',
+                  },
+                })
+              }
               role="button"
               tabIndex={0}
             >
