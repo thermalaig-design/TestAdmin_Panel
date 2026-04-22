@@ -9,10 +9,10 @@ const DEFAULT_ANIMATIONS = {
 };
 const DEFAULT_THEME_CONFIG = {
   primary_color: '#4a42e8',
-  secondary_color: '#111827',
+  secondary_color: '#a4ccea',
   accent_color: '#4a42e8',
   accent_bg: '#eef2ff',
-  navbar_bg: '#ffffff',
+  navbar_bg: '#1f296f',
   page_bg: 'linear-gradient(180deg,#f6f8fc 0%,#eef2ff 100%)',
 };
 

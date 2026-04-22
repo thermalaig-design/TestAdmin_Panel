@@ -2,7 +2,8 @@ import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'events';
-const EVENTS_BUCKET = 'events';
+const EVENTS_BUCKET = String(import.meta?.env?.VITE_EVENTS_BUCKET || 'events').trim() || 'events';
+const LEGACY_EVENTS_BUCKETS = new Set(['events', 'event', 'events_bucket']);
 const MAX_EVENTS_FETCH = 20;
 
 function uniqueId() {
@@ -28,6 +29,48 @@ function buildEventAttachmentPath(trustId, file) {
   return `${safeTrustId}/${Date.now()}-${uniqueId()}.${ext}`;
 }
 
+function normalizeEventAttachmentUrl(rawUrl) {
+  const url = String(rawUrl || '').trim();
+  if (!url || url.startsWith('data:')) return url;
+
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split('/');
+    const storageIdx = parts.findIndex((part) => part === 'storage');
+    if (storageIdx < 0) return url;
+
+    const objectIdx = parts.findIndex((part, idx) =>
+      part === 'object' &&
+      parts[idx - 2] === 'storage' &&
+      parts[idx - 1] === 'v1'
+    );
+    if (objectIdx < 0) return url;
+
+    const modeIdx = objectIdx + 1;
+    const bucketIdx = objectIdx + 2;
+    const mode = String(parts[modeIdx] || '').trim();
+    const bucketInUrl = String(parts[bucketIdx] || '').trim();
+    if (!bucketInUrl) return url;
+
+    if (mode === 'sign') {
+      parts[modeIdx] = 'public';
+      parsed.pathname = parts.join('/');
+      parsed.search = '';
+      return parsed.toString();
+    }
+
+    if (bucketInUrl !== EVENTS_BUCKET && LEGACY_EVENTS_BUCKETS.has(bucketInUrl)) {
+      parts[bucketIdx] = EVENTS_BUCKET;
+      parsed.pathname = parts.join('/');
+      return parsed.toString();
+    }
+  } catch {
+    return url;
+  }
+
+  return url;
+}
+
 function normalizeRow(row = {}) {
   return {
     id: row.id,
@@ -35,7 +78,9 @@ function normalizeRow(row = {}) {
     type: row.type,
     title: row.title || '',
     description: row.description || '',
-    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    attachments: Array.isArray(row.attachments)
+      ? row.attachments.map(normalizeEventAttachmentUrl).filter(Boolean)
+      : [],
     location: row.location || '',
     startEventDate: row.startEventDate || null,
     startTime: row.startTime ?? row.start_time ?? null,
@@ -99,7 +144,18 @@ export async function uploadEventAttachment(file, { trustId = null } = {}) {
       contentType: file.type || undefined,
     });
 
-  if (uploadError) return { data: null, error: uploadError };
+  if (uploadError) {
+    if (String(uploadError.message || '').toLowerCase().includes('bucket not found')) {
+      return {
+        data: null,
+        error: {
+          ...uploadError,
+          message: `Storage bucket "${EVENTS_BUCKET}" not found. Create this bucket in Supabase Storage or set VITE_EVENTS_BUCKET correctly.`,
+        },
+      };
+    }
+    return { data: null, error: uploadError };
+  }
 
   const { data: publicData } = supabase
     .storage
@@ -109,7 +165,7 @@ export async function uploadEventAttachment(file, { trustId = null } = {}) {
   return {
     data: {
       path,
-      publicUrl: publicData?.publicUrl || null,
+      publicUrl: normalizeEventAttachmentUrl(publicData?.publicUrl || null),
     },
     error: null,
   };
@@ -122,7 +178,9 @@ export async function createEvent(payload = {}) {
     trust_id: payload.trust_id,
     title: String(payload.title || '').trim(),
     description: String(payload.description || '').trim() || null,
-    attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+    attachments: Array.isArray(payload.attachments)
+      ? payload.attachments.map(normalizeEventAttachmentUrl).filter(Boolean)
+      : [],
     location: String(payload.location || '').trim() || null,
     startEventDate: payload.startEventDate || null,
     startTime: payload.startTime || null,
@@ -152,7 +210,11 @@ export async function updateEvent(eventId, updates = {}, trustId = null) {
       ? { description: String(updates.description || '').trim() || null }
       : {}),
     ...(updates.attachments !== undefined
-      ? { attachments: Array.isArray(updates.attachments) ? updates.attachments : [] }
+      ? {
+        attachments: Array.isArray(updates.attachments)
+          ? updates.attachments.map(normalizeEventAttachmentUrl).filter(Boolean)
+          : [],
+      }
       : {}),
     ...(updates.location !== undefined
       ? { location: String(updates.location || '').trim() || null }

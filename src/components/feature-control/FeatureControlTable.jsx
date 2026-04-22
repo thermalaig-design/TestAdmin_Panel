@@ -115,30 +115,36 @@ export default function FeatureControlTable({
                 </td>
                 <td className="fc-order-col">{row.quick_order ?? '-'}</td>
                 <td className="fc-status-col">
-                  <button
-                    type="button"
-                    className={`fc-toggle ${row.is_enabled ? 'on' : 'off'}`}
-                    onClick={() => onToggle(row, !row.is_enabled)}
-                    disabled={isBusy}
-                    aria-pressed={row.is_enabled}
-                    title={row.is_enabled ? 'Disable feature' : 'Enable feature'}
-                  >
-                    <span className="fc-toggle-track">
-                      <span className="fc-toggle-thumb" />
-                    </span>
-                    <span className="fc-toggle-label">{isBusy ? 'Saving...' : row.is_enabled ? 'Enabled' : 'Disabled'}</span>
-                  </button>
+                  <div className="fc-status-stack">
+                    <button
+                      type="button"
+                      className={`fc-toggle ${row.is_enabled ? 'on' : 'off'}`}
+                      onClick={() => onToggle(row, !row.is_enabled)}
+                      disabled={isBusy}
+                      aria-pressed={row.is_enabled}
+                      title={row.is_enabled ? 'Disable feature' : 'Enable feature'}
+                    >
+                      <span className="fc-toggle-track">
+                        <span className="fc-toggle-thumb" />
+                      </span>
+                      <span className="fc-toggle-label">{isBusy ? 'Saving...' : row.is_enabled ? 'Enabled' : 'Disabled'}</span>
+                    </button>
+                    {row.sub_feature_count > 0 && row.is_enabled ? (
+                      <button
+                        className="fc-btn fc-btn-subscreens fc-btn-action fc-inline-subscreens"
+                        type="button"
+                        onClick={() => onOpenSubScreens(row)}
+                      >
+                        Sub Screens
+                      </button>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="fc-actions-col">
                   <div className="fc-actions-cell">
                     <button className="fc-btn fc-btn-edit fc-btn-action" type="button" onClick={() => onEdit(row)}>
                       Edit
                     </button>
-                    {row.sub_feature_count > 0 && row.is_enabled ? (
-                      <button className="fc-btn fc-btn-subscreens fc-btn-action" type="button" onClick={() => onOpenSubScreens(row)}>
-                        Sub Screens
-                      </button>
-                    ) : null}
                   </div>
                 </td>
               </tr>

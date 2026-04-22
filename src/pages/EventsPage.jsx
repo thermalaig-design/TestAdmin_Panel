@@ -193,6 +193,7 @@ export default function EventsPage() {
   const [selectedEventId, setSelectedEventId] = useState('');
   const [statusTab, setStatusTab] = useState('current');
   const [typeFilter, setTypeFilter] = useState('general');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [listSearch, setListSearch] = useState('');
   const [sortBy, setSortBy] = useState('start_date');
   const [currentPage, setCurrentPage] = useState(1);
@@ -340,7 +341,7 @@ export default function EventsPage() {
     [statusTab, pastEvents, currentEvents, upcomingEvents]
   );
 
-  const filteredEvents = useMemo(() => {
+  const baseFilteredEvents = useMemo(() => {
     const term = deferredListSearch.trim().toLowerCase();
     let list = [...scopedEvents];
 
@@ -378,7 +379,7 @@ export default function EventsPage() {
 
   const filteredStatusCounts = useMemo(
     () =>
-      filteredEvents.reduce(
+      baseFilteredEvents.reduce(
         (acc, event) => {
           if (toUiStatus(event?.status) === 'active') acc.active += 1;
           else acc.paused += 1;
@@ -386,8 +387,13 @@ export default function EventsPage() {
         },
         { active: 0, paused: 0 }
       ),
-    [filteredEvents]
+    [baseFilteredEvents]
   );
+
+  const filteredEvents = useMemo(() => {
+    if (statusFilter === 'all') return baseFilteredEvents;
+    return baseFilteredEvents.filter((event) => toUiStatus(event?.status) === statusFilter);
+  }, [baseFilteredEvents, statusFilter]);
 
   const selectedEvent = useMemo(
     () => filteredEvents.find((item) => item.id === selectedEventId) || null,
@@ -406,7 +412,7 @@ export default function EventsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusTab, sortBy, listSearch, typeFilter]);
+  }, [statusTab, sortBy, listSearch, typeFilter, statusFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -930,14 +936,22 @@ export default function EventsPage() {
                   </button>
                 </div>
                 <div className="ev-status-summary">
-                  <div className="ev-status-summary-item active">
+                  <button
+                    type="button"
+                    className={`ev-status-summary-item active ${statusFilter === 'active' ? 'selected' : ''}`}
+                    onClick={() => setStatusFilter((prev) => (prev === 'active' ? 'all' : 'active'))}
+                  >
                     <span>Active</span>
                     <b>{filteredStatusCounts.active}</b>
-                  </div>
-                  <div className="ev-status-summary-item paused">
+                  </button>
+                  <button
+                    type="button"
+                    className={`ev-status-summary-item paused ${statusFilter === 'paused' ? 'selected' : ''}`}
+                    onClick={() => setStatusFilter((prev) => (prev === 'paused' ? 'all' : 'paused'))}
+                  >
                     <span>Paused</span>
                     <b>{filteredStatusCounts.paused}</b>
-                  </div>
+                  </button>
                 </div>
                 <button
                   className="ev-add-btn ev-list-add-btn"

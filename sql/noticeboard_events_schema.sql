@@ -28,6 +28,80 @@ do $$
 begin
   if not exists (
     select 1
+    from storage.buckets
+    where id = 'noticeboard'
+  ) then
+    insert into storage.buckets (id, name, public)
+    values ('noticeboard', 'noticeboard', true);
+  end if;
+end;
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'noticeboard_public_read'
+  ) then
+    create policy noticeboard_public_read
+    on storage.objects
+    for select
+    to public
+    using (bucket_id = 'noticeboard');
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'noticeboard_auth_insert'
+  ) then
+    create policy noticeboard_auth_insert
+    on storage.objects
+    for insert
+    to authenticated
+    with check (bucket_id = 'noticeboard');
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'noticeboard_auth_update'
+  ) then
+    create policy noticeboard_auth_update
+    on storage.objects
+    for update
+    to authenticated
+    using (bucket_id = 'noticeboard')
+    with check (bucket_id = 'noticeboard');
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'noticeboard_auth_delete'
+  ) then
+    create policy noticeboard_auth_delete
+    on storage.objects
+    for delete
+    to authenticated
+    using (bucket_id = 'noticeboard');
+  end if;
+end;
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
     from pg_type t
     join pg_namespace n on n.oid = t.typnamespace
     where t.typname = 'noticeboard_status'

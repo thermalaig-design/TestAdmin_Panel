@@ -299,7 +299,11 @@ export default function FeatureControlPage() {
 
         <section className="fc-panel">
           <div className="fc-readonly-note">
-            Source table: <strong>features</strong> (view only). Editable table: <strong>feature_flags</strong>.
+            {openedFromFeatures20 ? (
+              <>View only</>
+            ) : (
+              <>Source table: <strong>features</strong> (view only). Editable table: <strong>feature_flags</strong>.</>
+            )}
           </div>
 
           <div className="fc-controls">

@@ -12,6 +12,7 @@ const TrustDetails = lazy(() => import('./pages/TrustDetails'));
 const SponsorsPage = lazy(() => import('./pages/SponsorsPage'));
 const MembersPage = lazy(() => import('./pages/MembersPage'));
 const MemberProfilePage = lazy(() => import('./pages/MemberProfilePage'));
+const ExecutiveBodyPage = lazy(() => import('./pages/ExecutiveBodyPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const MarqueePage = lazy(() => import('./pages/MarqueePage'));
 const NoticeboardPage = lazy(() => import('./pages/NoticeboardPage'));
@@ -20,6 +21,7 @@ const EventsPage = lazy(() => import('./pages/EventsPage'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const FacilitiesPage = lazy(() => import('./pages/FacilitiesPage'));
 const ContactUsPage = lazy(() => import('./pages/ContactUsPage'));
+const DonationsPage = lazy(() => import('./pages/DonationsPage'));
 const ThemePage = lazy(() => import('./pages/ThemePage'));
 const FeatureControlPage = lazy(() => import('./pages/FeatureControlPage'));
 const SubFeatureControlPage = lazy(() => import('./pages/SubFeatureControlPage'));
@@ -46,6 +48,7 @@ function App() {
           <Route path="/member"       element={<MembersPage />} />
           <Route path="/member/create_member" element={<MembersPage />} />
           <Route path="/member-profile" element={<MemberProfilePage />} />
+          <Route path="/executive-body" element={<ExecutiveBodyPage />} />
           <Route path="/gallery"      element={<GalleryPage />} />
           <Route path="/gallery/:folderId" element={<GalleryPage />} />
           <Route path="/marquee"      element={<MarqueePage />} />
@@ -63,6 +66,9 @@ function App() {
           <Route path="/contact-us" element={<ContactUsPage />} />
           <Route path="/contact-us/create_contact" element={<ContactUsPage />} />
           <Route path="/contact-us/edit_details" element={<ContactUsPage />} />
+          <Route path="/donations" element={<DonationsPage />} />
+          <Route path="/donations/create_donation" element={<DonationsPage />} />
+          <Route path="/donations/edit_details" element={<DonationsPage />} />
           <Route path="/theme"        element={<ThemePage />} />
           <Route path="/feature-control" element={<FeatureControlPage />} />
           <Route path="/sub-feature-control" element={<SubFeatureControlPage />} />

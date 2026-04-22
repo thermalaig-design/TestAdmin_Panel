@@ -88,7 +88,6 @@ export default function NoticeDetailPage() {
                       href={item.value}
                       target={item.isDataUrl ? undefined : '_blank'}
                       rel={item.isDataUrl ? undefined : 'noreferrer'}
-                      download={item.name}
                       className="nb-attachment-link"
                     >
                       {item.name}

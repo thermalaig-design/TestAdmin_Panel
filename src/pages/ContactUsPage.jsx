@@ -23,6 +23,14 @@ function getInitials(value = '') {
   return safe.charAt(0).toUpperCase();
 }
 
+function getContactCategory(value = '') {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized.includes('complaint')) return 'complaint';
+  if (normalized.includes('sales')) return 'sales';
+  if (normalized.includes('general')) return 'general';
+  return 'general';
+}
+
 export default function ContactUsPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,6 +52,7 @@ export default function ContactUsPage() {
   const [selectedId, setSelectedId] = useState('');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('name');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [editingId, setEditingId] = useState(null);
   const deferredSearch = useDeferredValue(search);
@@ -95,9 +104,24 @@ export default function ContactUsPage() {
     return () => document.removeEventListener('click', closeMenu);
   }, []);
 
+  const categoryCounts = useMemo(() => {
+    return contacts.reduce(
+      (acc, item) => {
+        const category = getContactCategory(item?.facility_name);
+        acc[category] += 1;
+        return acc;
+      },
+      { complaint: 0, sales: 0, general: 0 }
+    );
+  }, [contacts]);
+
   const filteredContacts = useMemo(() => {
     const term = deferredSearch.trim().toLowerCase();
     let list = [...contacts];
+
+    if (categoryFilter !== 'all') {
+      list = list.filter((item) => getContactCategory(item?.facility_name) === categoryFilter);
+    }
 
     if (term) {
       list = list.filter((item) => {
@@ -129,7 +153,7 @@ export default function ContactUsPage() {
     }
 
     return list;
-  }, [contacts, deferredSearch, sortBy]);
+  }, [contacts, deferredSearch, sortBy, categoryFilter]);
 
   const selectedContact = useMemo(
     () => filteredContacts.find((item) => item.id === selectedId) || null,
@@ -148,7 +172,7 @@ export default function ContactUsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, sortBy]);
+  }, [search, sortBy, categoryFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -377,6 +401,41 @@ export default function ContactUsPage() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
+
+                <div className="nb-category-tabs">
+                  <button
+                    type="button"
+                    className={`nb-category-tab ${categoryFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setCategoryFilter('all')}
+                  >
+                    <span>All</span>
+                    <b>{contacts.length}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className={`nb-category-tab ${categoryFilter === 'complaint' ? 'active' : ''}`}
+                    onClick={() => setCategoryFilter('complaint')}
+                  >
+                    <span>Complaint</span>
+                    <b>{categoryCounts.complaint}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className={`nb-category-tab ${categoryFilter === 'sales' ? 'active' : ''}`}
+                    onClick={() => setCategoryFilter('sales')}
+                  >
+                    <span>Sales</span>
+                    <b>{categoryCounts.sales}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className={`nb-category-tab ${categoryFilter === 'general' ? 'active' : ''}`}
+                    onClick={() => setCategoryFilter('general')}
+                  >
+                    <span>General</span>
+                    <b>{categoryCounts.general}</b>
+                  </button>
+                </div>
 
                 <button
                   className="nb-add-btn nb-list-add-btn"

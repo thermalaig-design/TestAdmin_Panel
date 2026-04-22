@@ -921,6 +921,22 @@
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);
 }
 
+.theme-color-auto-btn {
+  border: 1px solid rgba(249, 115, 22, 0.22);
+  background: linear-gradient(135deg, #fff7ed, #fdf2f8);
+  color: #c2410c;
+  border-radius: 10px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.theme-color-auto-btn:hover {
+  transform: translateY(-1px);
+}
+
 .theme-navbar-preview-card {
   padding: 14px;
   border-radius: 20px;

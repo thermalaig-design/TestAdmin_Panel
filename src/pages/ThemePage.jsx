@@ -21,45 +21,33 @@ const pretty = (value, fallback) => JSON.stringify(value ?? fallback, null, 2);
 const DEFAULT_ANIMATIONS = { cards: 'fadeUp', navbar: 'fadeSlideDown', gallery: 'zoomIn' };
 const GRADIENT_OPTIONS = ['none', 'linear', 'radial', 'conic'];
 const DEFAULT_THEME_SECTION_CONFIG = {
-  footer: { bg_color_1: '#ffffff', bg_color_2: null, text_color: '#111827', gradient_type: 'none' },
-  navbar: { blur: 8, opacity: 0.96, bg_color_1: '#ffffff', bg_color_2: null, text_color: '#1f2937', gradient_type: 'none' },
-  marquee: { bg_color_1: '#4a42e8', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
+  footer: { bg_color_1: '#1f296f', bg_color_2: '#c81e1e', text_color: '#ffffff', gradient_type: 'linear' },
+  navbar: { blur: 10, opacity: 1, bg_color_1: '#1f296f', bg_color_2: '#c81e1e', text_color: '#f7f7f7', gradient_type: 'linear' },
+  marquee: { bg_color_1: '#1a1891', bg_color_2: '#c12525', text_color: '#ffffff', gradient_type: 'linear' },
   page_bg: { bg_color_1: '#f6f8fc', bg_color_2: '#eef2ff', gradient_type: 'linear', gradient_angle: 180, gradient_transition: 'ease' },
-  sidebar: { blur: 12, opacity: 0.98, bg_color_1: '#4a42e8', bg_color_2: null, text_color: '#ffffff', button_color: '#4a42e8', gradient_type: 'none', button_text_color: '#ffffff' },
-  typography: {
-    font_family: 'Inter',
-    heading_color: '#111827',
-    body_text_color: '#4b5563',
-    subheading_color: '#4a42e8',
-    component_overrides: {
-      footer_text: '#111827',
-      navbar_text: '#1f2937',
-      marquee_text: '#ffffff',
-      sidebar_text: '#ffffff',
-    },
-  },
+  sidebar: { blur: 12, opacity: 0.98, bg_color_1: '#a4ccea', bg_color_2: '#ebebf4', text_color: '#ffffff', button_color: '#e3e3ee', gradient_type: 'linear', button_text_color: '#ffffff' },
   app_buttons: { bg_color_1: '#4a42e8', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
   advertisement: { bg_color: '#eef2ff', bg_opacity: 1, text_color: '#4a42e8' },
   quick_actions: { bg_color_1: '#ffffff', bg_color_2: null, text_color: '#111827', gradient_type: 'none', icon_bg_color: '#e0e7ff' },
 };
 const THEME_SECTION_FIELDS = {
   footer: [
-    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#fff' },
-    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#fff', allowNull: true },
-    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#000' },
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#1f296f' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#c81e1e', allowNull: true },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
   ],
   navbar: [
     { key: 'blur', label: 'Blur Strength', type: 'number', min: 0, step: 1 },
     { key: 'opacity', label: 'Transparency', type: 'number', min: 0, max: 1, step: 0.01 },
-    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#000000' },
-    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#000000', allowNull: true },
-    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#1f296f' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#c81e1e', allowNull: true },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#f7f7f7' },
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
   ],
   marquee: [
-    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#C0241A' },
-    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#C0241A', allowNull: true },
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#1a1891' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#c12525', allowNull: true },
     { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
   ],
@@ -73,26 +61,16 @@ const THEME_SECTION_FIELDS = {
   sidebar: [
     { key: 'blur', label: 'Blur Strength', type: 'number', min: 0, step: 1 },
     { key: 'opacity', label: 'Transparency', type: 'number', min: 0, max: 1, step: 0.01 },
-    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#2B2F7E' },
-    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#2B2F7E', allowNull: true },
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#a4ccea' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#ebebf4', allowNull: true },
     { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
-    { key: 'button_color', label: 'Button Color', type: 'color', fallback: '#C0241A' },
+    { key: 'button_color', label: 'Button Color', type: 'color', fallback: '#e3e3ee' },
     { key: 'button_text_color', label: 'Button Text Color', type: 'color', fallback: '#ffffff' },
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
   ],
-  typography: [
-    { key: 'font_family', label: 'Font Family', type: 'text' },
-    { key: 'heading_color', label: 'Heading Text Color', type: 'color', fallback: '#1a1a2e' },
-    { key: 'body_text_color', label: 'Body Text Color', type: 'color', fallback: '#374151' },
-    { key: 'subheading_color', label: 'Subheading Color', type: 'color', fallback: '#2B2F7E' },
-    { key: 'component_overrides.footer_text', label: 'Footer Text Color', type: 'color', fallback: '#ffffff' },
-    { key: 'component_overrides.navbar_text', label: 'Navbar Text Color', type: 'color', fallback: '#ffffff' },
-    { key: 'component_overrides.marquee_text', label: 'Marquee Text Color', type: 'color', fallback: '#ffffff' },
-    { key: 'component_overrides.sidebar_text', label: 'Sidebar Text Color', type: 'color', fallback: '#ffffff' },
-  ],
   app_buttons: [
-    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#C0241A' },
-    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#C0241A', allowNull: true },
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#4a42e8' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#4a42e8', allowNull: true },
     { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
     { key: 'icon_color', label: 'Icon Color', type: 'color', fallback: '#ffffff' },
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
@@ -103,10 +81,10 @@ const THEME_SECTION_FIELDS = {
     { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#C0241A' },
   ],
   quick_actions: [
-    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#2B2F7E' },
-    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#2B2F7E', allowNull: true },
-    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#ffffff' },
-    { key: 'icon_bg_color', label: 'Icon Background Color', type: 'color', fallback: '#ffffff' },
+    { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#ffffff' },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#ffffff', allowNull: true },
+    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#111827' },
+    { key: 'icon_bg_color', label: 'Icon Background Color', type: 'color', fallback: '#e0e7ff' },
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
   ],
 };
@@ -116,7 +94,6 @@ const THEME_SECTION_ORDER = [
   { key: 'marquee', label: 'Marquee' },
   { key: 'page_bg', label: 'Page Background' },
   { key: 'sidebar', label: 'Sidebar' },
-  { key: 'typography', label: 'Typography' },
   { key: 'app_buttons', label: 'App Buttons' },
   { key: 'advertisement', label: 'Advertisement' },
   { key: 'quick_actions', label: 'Quick Actions' },
@@ -127,7 +104,6 @@ const THEME_SECTION_HELP = {
   marquee: 'Style for the running announcement strip.',
   page_bg: 'Overall page background appearance.',
   sidebar: 'Color theme for the left menu panel.',
-  typography: 'Control for heading and text colors.',
   app_buttons: 'Common style for buttons and icons.',
   advertisement: 'Background and text for ad/notice boxes.',
   quick_actions: 'Appearance of quick action cards.',
@@ -155,6 +131,53 @@ const createLayoutOrderMap = (layout = []) => {
     nextMap[item.key] = index >= 0 ? index + 1 : '';
   });
   return nextMap;
+};
+const clampChannel = (value) => Math.max(0, Math.min(255, Math.round(value)));
+const expandHex = (value = '') => {
+  const raw = String(value || '').trim().replace('#', '');
+  if (raw.length === 3) {
+    return `#${raw.split('').map((char) => `${char}${char}`).join('')}`.toLowerCase();
+  }
+  if (raw.length === 6) {
+    return `#${raw}`.toLowerCase();
+  }
+  return '';
+};
+const hexToRgb = (hex) => {
+  const normalized = expandHex(hex);
+  if (!HEX_COLOR_RE.test(normalized)) return null;
+  const raw = normalized.replace('#', '');
+  return {
+    r: Number.parseInt(raw.slice(0, 2), 16),
+    g: Number.parseInt(raw.slice(2, 4), 16),
+    b: Number.parseInt(raw.slice(4, 6), 16),
+  };
+};
+const rgbToHex = ({ r, g, b }) =>
+  `#${clampChannel(r).toString(16).padStart(2, '0')}${clampChannel(g).toString(16).padStart(2, '0')}${clampChannel(b).toString(16).padStart(2, '0')}`;
+const mixRgb = (left, right, ratio = 0.5) => ({
+  r: left.r + (right.r - left.r) * ratio,
+  g: left.g + (right.g - left.g) * ratio,
+  b: left.b + (right.b - left.b) * ratio,
+});
+const deriveSecondBackgroundColor = (primaryColor, fallback = '#dbeafe') => {
+  const rgb = hexToRgb(primaryColor);
+  if (!rgb) return fallback;
+  const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+  const target = luminance < 0.55 ? { r: 255, g: 255, b: 255 } : { r: 17, g: 24, b: 39 };
+  const ratio = luminance < 0.55 ? 0.22 : 0.14;
+  return rgbToHex(mixRgb(rgb, target, ratio));
+};
+const normalizeSectionAutoColors = (section = {}) => {
+  if (!section || typeof section !== 'object') return section;
+  const backgroundA = safeText(section.bg_color_1, '').trim();
+  if (!backgroundA || !HEX_COLOR_RE.test(backgroundA)) return section;
+  const backgroundB = safeText(section.bg_color_2, '').trim();
+  if (backgroundB) return section;
+  return {
+    ...section,
+    bg_color_2: deriveSecondBackgroundColor(backgroundA),
+  };
 };
 const previewBg = (theme) => {
   const config = theme?.theme_config && typeof theme.theme_config === 'object' ? theme.theme_config : {};
@@ -207,15 +230,15 @@ const buildLegacyColorFields = (themeConfig) => {
   const angle = Number(pageBg.gradient_angle);
   const gradientAngle = Number.isFinite(angle) ? angle : 160;
   const bgOne = safeText(pageBg.bg_color_1, '#f6f8fc') || '#f6f8fc';
-  const bgTwo = safeText(pageBg.bg_color_2, '#eef2ff') || '#eef2ff';
+  const bgTwo = safeText(pageBg.bg_color_2, '') || deriveSecondBackgroundColor(bgOne, '#eef2ff');
   const fallbackPageBg = gradientType === 'none' ? bgOne : `${gradientType}-gradient(${gradientAngle}deg, ${bgOne} 0%, ${bgTwo} 100%)`;
 
   return {
     primary_color: safeText(config?.app_buttons?.bg_color_1, '#4a42e8') || '#4a42e8',
-    secondary_color: safeText(config?.sidebar?.bg_color_1, '#111827') || '#111827',
+    secondary_color: safeText(config?.sidebar?.bg_color_1, '#a4ccea') || '#a4ccea',
     accent_color: safeText(config?.advertisement?.text_color, '#4a42e8') || '#4a42e8',
     accent_bg: safeText(config?.advertisement?.bg_color, '#eef2ff') || '#eef2ff',
-    navbar_bg: safeText(config?.navbar?.bg_color_1, '#ffffff') || '#ffffff',
+    navbar_bg: safeText(config?.navbar?.bg_color_1, '#1f296f') || '#1f296f',
     page_bg: fallbackPageBg,
   };
 };
@@ -382,14 +405,20 @@ export default function ThemePage() {
       gallery: animationConfig.gallery || DEFAULT_ANIMATIONS.gallery,
     };
     const normalizedThemeConfig = buildThemeConfigForm(themeConfigForm);
-    const legacyThemeColors = buildLegacyColorFields(normalizedThemeConfig);
+    const autoNormalizedThemeConfig = Object.fromEntries(
+      Object.entries(normalizedThemeConfig).map(([sectionKey, sectionValue]) => [
+        sectionKey,
+        normalizeSectionAutoColors(sectionValue),
+      ])
+    );
+    const legacyThemeColors = buildLegacyColorFields(autoNormalizedThemeConfig);
 
     const payload = {
       name: form.name.trim(),
       description: form.description.trim() || null,
       template_key: form.template_key.trim() || 'mahila',
       ...legacyThemeColors,
-      theme_config: normalizedThemeConfig,
+      theme_config: autoNormalizedThemeConfig,
       home_layout: homeLayout,
       animations,
       custom_css: form.custom_css || '',
@@ -438,6 +467,13 @@ export default function ThemePage() {
     if (field.type === 'color') {
       const fallback = field.fallback || '#000000';
       const displayValue = currentValue ?? '';
+      const sectionMainColor = safeText(getNestedValue(sectionValue, 'bg_color_1'), fallback) || fallback;
+      const autoDerived = field.key === 'bg_color_2'
+        ? deriveSecondBackgroundColor(sectionMainColor, fallback)
+        : '';
+      const nativeValue = field.key === 'bg_color_2'
+        ? normalizePickerColor(displayValue || autoDerived, fallback)
+        : normalizePickerColor(displayValue, fallback);
       return (
         <label className="theme-field theme-color-field" key={fieldId}>
           <span>{field.label}</span>
@@ -445,7 +481,7 @@ export default function ThemePage() {
             <input
               className="theme-color-text"
               value={displayValue}
-              placeholder={field.allowNull ? 'null' : fallback}
+              placeholder={field.key === 'bg_color_2' ? 'auto from main color' : (field.allowNull ? 'null' : fallback)}
               onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value || (field.allowNull ? null : fallback))}
             />
             <input
@@ -453,9 +489,19 @@ export default function ThemePage() {
               id={fieldId}
               type="color"
               aria-label={`${field.label} picker`}
-              value={normalizePickerColor(displayValue, fallback)}
+              value={nativeValue}
               onChange={(e) => updateThemeConfigField(sectionKey, field.key, e.target.value)}
             />
+            {field.key === 'bg_color_2' && (
+              <button
+                type="button"
+                className="theme-color-auto-btn"
+                onClick={() => updateThemeConfigField(sectionKey, field.key, null)}
+                title="Auto derive from main background color"
+              >
+                Auto
+              </button>
+            )}
           </div>
         </label>
       );
@@ -507,7 +553,7 @@ export default function ThemePage() {
   const renderSectionPreview = (sectionKey) => {
     const section = themeConfigForm?.[sectionKey] || {};
     const backgroundA = safeText(section.bg_color_1, '') || safeText(section.bg_color, '') || '#ffffff';
-    const backgroundB = safeText(section.bg_color_2, '') || backgroundA;
+    const backgroundB = safeText(section.bg_color_2, '') || deriveSecondBackgroundColor(backgroundA, backgroundA);
     const textColor = safeText(section.text_color, '') || '#111827';
     const gradientType = safeText(section.gradient_type, 'none') || 'none';
     const gradientAngle = Number(section.gradient_angle);
@@ -516,20 +562,6 @@ export default function ThemePage() {
       ? `${gradientType}-gradient(${angle}deg, ${backgroundA} 0%, ${backgroundB} 100%)`
       : backgroundA;
     const iconBg = safeText(section.icon_bg_color, '#e5e7eb') || '#e5e7eb';
-
-    if (sectionKey === 'typography') {
-      const headingColor = safeText(section.heading_color, '#1a1a2e') || '#1a1a2e';
-      const bodyColor = safeText(section.body_text_color, '#374151') || '#374151';
-      const subColor = safeText(section.subheading_color, '#2B2F7E') || '#2B2F7E';
-      const fontFamily = safeText(section.font_family, 'Inter') || 'Inter';
-      return (
-        <div className="theme-config-preview typography">
-          <div style={{ fontFamily, color: headingColor, fontWeight: 800 }}>Heading Preview</div>
-          <div style={{ fontFamily, color: subColor, fontSize: '12px', fontWeight: 700 }}>Subheading Preview</div>
-          <div style={{ fontFamily, color: bodyColor, fontSize: '12px' }}>This is normal body text preview.</div>
-        </div>
-      );
-    }
 
     if (sectionKey === 'navbar') {
       return (

@@ -784,6 +784,46 @@
   font-family: 'Inter', sans-serif;
 }
 
+.sp-input-with-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sp-input-with-actions input {
+  flex: 1;
+}
+
+.sp-input-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.32);
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-input-action-btn:hover {
+  background: #e0e7ff;
+}
+
+.sp-input-action-btn.remove {
+  border-color: rgba(239, 68, 68, 0.32);
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.sp-input-action-btn.remove:hover {
+  background: #fee2e2;
+}
+
 .sp-whatsapp-row {
   display: grid;
   grid-template-columns: 1fr;

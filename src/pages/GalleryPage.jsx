@@ -20,7 +20,7 @@ export default function GalleryPage() {
   const location = useLocation();
   const { folderId: routeFolderId = '' } = useParams();
   const { userName = 'Admin', trust = null } = location.state || {};
-  const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'home-page';
   const trustId = trust?.id || null;
 
   const [folders, setFolders] = useState([]);
@@ -119,7 +119,7 @@ export default function GalleryPage() {
 
   const handleHeaderBack = () => {
     if (routeFolderId) {
-      navigate('/gallery', { state: { userName, trust } });
+      navigate('/gallery', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
       return;
     }
     navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
@@ -411,7 +411,7 @@ export default function GalleryPage() {
     const existing = folders.find((f) => (f.name || '').toLowerCase() === trimmed.toLowerCase());
     if (existing) {
       setSelectedFolderId(existing.id);
-      navigate(`/gallery/${existing.id}`, { state: { userName, trust } });
+      navigate(`/gallery/${existing.id}`, { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
       return;
     }
 
@@ -424,7 +424,7 @@ export default function GalleryPage() {
     const newFolder = data || { id: `local-${trimmed}`, name: trimmed };
     setFolders((prev) => [newFolder, ...prev]);
     setSelectedFolderId(newFolder.id || trimmed);
-    navigate(`/gallery/${newFolder.id || trimmed}`, { state: { userName, trust } });
+    navigate(`/gallery/${newFolder.id || trimmed}`, { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
   };
 
   const handleDeletePhoto = async (photoId) => {
@@ -470,7 +470,7 @@ export default function GalleryPage() {
     setError('');
 
     if (selectedFolderId === folder.id || routeFolderId === folder.id) {
-      navigate('/gallery', { state: { userName, trust } });
+      navigate('/gallery', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
     }
   };
 
@@ -511,7 +511,7 @@ export default function GalleryPage() {
   const handleSelectFolder = async (folder) => {
     if (!folder?.id) return;
     setSelectedFolderId(folder.id);
-    navigate(`/gallery/${folder.id}`, { state: { userName, trust } });
+    navigate(`/gallery/${folder.id}`, { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
   };
 
   return (

@@ -451,12 +451,14 @@ export default function MemberProfilePage() {
   const { userName = 'Admin', trust = null } = location.state || {};
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
+  const preselectedMemberId = String(location.state?.selectedMemberId || location.state?.memberId || '').trim();
+  const shouldOpenEditFromNav = location.state?.openEdit === true;
 
   const [members, setMembers] = useState([]);
   const [directoryMembers, setDirectoryMembers] = useState([]);
   const [directoryTrustId, setDirectoryTrustId] = useState(null);
   const [loadingDirectory, setLoadingDirectory] = useState(false);
-  const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [selectedMemberId, setSelectedMemberId] = useState(preselectedMemberId);
   const [memberSearch, setMemberSearch] = useState('');
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerFilter, setPickerFilter] = useState('all');
@@ -500,6 +502,7 @@ export default function MemberProfilePage() {
   const [familyError, setFamilyError] = useState('');
   const [otherMembershipError, setOtherMembershipError] = useState('');
   const [error, setError] = useState('');
+  const [autoEditPending, setAutoEditPending] = useState(shouldOpenEditFromNav);
   const nationalityOptions = useMemo(() => buildNationalityOptions(), []);
 
   useEffect(() => {
@@ -858,6 +861,13 @@ export default function MemberProfilePage() {
     setSaveError('');
     setIsEditing(true);
   };
+
+  useEffect(() => {
+    if (!autoEditPending) return;
+    if (!profile || isEditing || !canEditDetails) return;
+    handleStartEdit();
+    setAutoEditPending(false);
+  }, [autoEditPending, profile, isEditing, canEditDetails, handleStartEdit]);
 
   const handleCancelEdit = () => {
     if (pendingProfilePhotoPreviewUrl) URL.revokeObjectURL(pendingProfilePhotoPreviewUrl);

@@ -2,7 +2,8 @@ import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'noticeboard';
-const NOTICEBOARD_BUCKET = 'noticeboard';
+const NOTICEBOARD_BUCKET = String(import.meta?.env?.VITE_NOTICEBOARD_BUCKET || 'noticeboard').trim() || 'noticeboard';
+const LEGACY_NOTICEBOARD_BUCKETS = new Set(['noticeboard', 'noticeborad', 'notice_board']);
 const MAX_NOTICE_FETCH = 20;
 
 function uniqueId() {
@@ -16,6 +17,7 @@ function extensionFromFile(file) {
   const fromName = String(file?.name || '').split('.').pop()?.toLowerCase();
   if (fromName && fromName.length <= 5) return fromName;
   const mime = String(file?.type || '').toLowerCase();
+  if (mime.includes('pdf')) return 'pdf';
   if (mime.includes('png')) return 'png';
   if (mime.includes('webp')) return 'webp';
   if (mime.includes('gif')) return 'gif';
@@ -28,6 +30,46 @@ function buildNoticeboardAttachmentPath(trustId, file) {
   return `${safeTrustId}/${Date.now()}-${uniqueId()}.${ext}`;
 }
 
+function normalizeNoticeboardAttachmentUrl(rawUrl) {
+  const url = String(rawUrl || '').trim();
+  if (!url || url.startsWith('data:')) return url;
+
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split('/');
+    const objectIdx = parts.findIndex((part, idx) =>
+      part === 'object' &&
+      parts[idx - 2] === 'storage' &&
+      parts[idx - 1] === 'v1'
+    );
+
+    if (objectIdx < 0) return url;
+
+    const modeIdx = objectIdx + 1;
+    const bucketIdx = objectIdx + 2;
+    const mode = String(parts[modeIdx] || '').trim();
+    const bucketInUrl = String(parts[bucketIdx] || '').trim();
+    if (!bucketInUrl) return url;
+
+    if (mode === 'sign') {
+      parts[modeIdx] = 'public';
+      parsed.pathname = parts.join('/');
+      parsed.search = '';
+      return parsed.toString();
+    }
+
+    if (bucketInUrl !== NOTICEBOARD_BUCKET && LEGACY_NOTICEBOARD_BUCKETS.has(bucketInUrl)) {
+      parts[bucketIdx] = NOTICEBOARD_BUCKET;
+      parsed.pathname = parts.join('/');
+      return parsed.toString();
+    }
+  } catch {
+    return url;
+  }
+
+  return url;
+}
+
 function normalizeRow(row = {}) {
   return {
     id: row.id,
@@ -35,7 +77,9 @@ function normalizeRow(row = {}) {
     type: row.type,
     name: row.name || '',
     description: row.description || '',
-    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    attachments: Array.isArray(row.attachments)
+      ? row.attachments.map(normalizeNoticeboardAttachmentUrl).filter(Boolean)
+      : [],
     start_date: row.start_date || null,
     end_date: row.end_date || null,
     status: row.status || 'active',
@@ -78,8 +122,11 @@ export async function fetchNoticeById(trustId, noticeId) {
 
 export async function uploadNoticeboardAttachment(file, { trustId = null } = {}) {
   if (!file) return { data: null, error: { message: 'No attachment file provided.' } };
-  if (!file.type || !file.type.startsWith('image/')) {
-    return { data: null, error: { message: 'Please select a valid image file.' } };
+  const mimeType = String(file.type || '').toLowerCase();
+  const isAllowedImage = mimeType.startsWith('image/');
+  const isAllowedPdf = mimeType === 'application/pdf';
+  if (!isAllowedImage && !isAllowedPdf) {
+    return { data: null, error: { message: 'Please select a valid image or PDF file.' } };
   }
 
   const path = buildNoticeboardAttachmentPath(trustId, file);
@@ -92,7 +139,18 @@ export async function uploadNoticeboardAttachment(file, { trustId = null } = {})
       contentType: file.type || undefined,
     });
 
-  if (uploadError) return { data: null, error: uploadError };
+  if (uploadError) {
+    if (String(uploadError.message || '').toLowerCase().includes('bucket not found')) {
+      return {
+        data: null,
+        error: {
+          ...uploadError,
+          message: `Storage bucket "${NOTICEBOARD_BUCKET}" not found. Create this bucket in Supabase Storage or set VITE_NOTICEBOARD_BUCKET correctly.`,
+        },
+      };
+    }
+    return { data: null, error: uploadError };
+  }
 
   const { data: publicData } = supabase
     .storage
@@ -102,7 +160,7 @@ export async function uploadNoticeboardAttachment(file, { trustId = null } = {})
   return {
     data: {
       path,
-      publicUrl: publicData?.publicUrl || null,
+      publicUrl: normalizeNoticeboardAttachmentUrl(publicData?.publicUrl || null),
     },
     error: null,
   };
@@ -116,7 +174,9 @@ export async function createNotice(payload = {}) {
     type: payload.type || 'gen',
     name: String(payload.name || '').trim(),
     description: String(payload.description || '').trim() || null,
-    attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+    attachments: Array.isArray(payload.attachments)
+      ? payload.attachments.map(normalizeNoticeboardAttachmentUrl).filter(Boolean)
+      : [],
     start_date: payload.start_date || null,
     end_date: payload.end_date || null,
     status: payload.status || 'active',
@@ -142,7 +202,11 @@ export async function updateNotice(noticeId, updates = {}, trustId = null) {
       ? { description: String(updates.description || '').trim() || null }
       : {}),
     ...(updates.attachments !== undefined
-      ? { attachments: Array.isArray(updates.attachments) ? updates.attachments : [] }
+      ? {
+        attachments: Array.isArray(updates.attachments)
+          ? updates.attachments.map(normalizeNoticeboardAttachmentUrl).filter(Boolean)
+          : [],
+      }
       : {}),
     ...(updates.start_date !== undefined ? { start_date: updates.start_date || null } : {}),
     ...(updates.end_date !== undefined ? { end_date: updates.end_date || null } : {}),

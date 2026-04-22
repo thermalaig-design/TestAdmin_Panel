@@ -55,7 +55,7 @@
   border: 1.5px solid rgba(99, 102, 241, 0.2);
   border-radius: 11px;
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: 13px;
   font-family: 'Inter', sans-serif;
   background: #fff;
   color: #111827;
@@ -72,8 +72,8 @@
 .fc-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
-  min-width: 1240px;
+  table-layout: fixed;
+  min-width: 0;
 }
 
 .fc-table th,
@@ -81,41 +81,47 @@
   padding: 14px 12px;
   border-bottom: 1px solid rgba(99, 102, 241, 0.1);
   text-align: left;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.45;
   color: #1f2937;
   vertical-align: top;
-  word-break: normal;
-  overflow-wrap: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .fc-table th {
   font-size: 13px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   color: #55627a;
   white-space: nowrap;
   background: #f8faff;
 }
 
 .fc-table th:nth-child(1),
-.fc-table td:nth-child(1) { width: 70px; }
+.fc-table td:nth-child(1) { width: 6%; }
 .fc-table th:nth-child(2),
-.fc-table td:nth-child(2) { width: 260px; }
+.fc-table td:nth-child(2) { width: 20%; }
 .fc-table th:nth-child(3),
-.fc-table td:nth-child(3) { width: 180px; }
+.fc-table td:nth-child(3) { width: 13%; }
 .fc-table th:nth-child(4),
-.fc-table td:nth-child(4) { width: 220px; }
+.fc-table td:nth-child(4) { width: 15%; }
 .fc-table th:nth-child(5),
-.fc-table td:nth-child(5) { width: 170px; }
+.fc-table td:nth-child(5) { width: 10%; }
 .fc-table th:nth-child(6),
-.fc-table td:nth-child(6) { width: 110px; }
+.fc-table td:nth-child(6) { width: 8%; }
 .fc-table th:nth-child(7),
-.fc-table td:nth-child(7) { width: 110px; }
+.fc-table td:nth-child(7) { width: 8%; }
 .fc-table th:nth-child(8),
-.fc-table td:nth-child(8) { width: 170px; }
+.fc-table td:nth-child(8) { width: 10%; }
 .fc-table th:nth-child(9),
-.fc-table td:nth-child(9) { width: 210px; }
+.fc-table td:nth-child(9) { width: 10%; }
+
+.fc-table th:nth-child(1),
+.fc-table td:nth-child(1) {
+  padding-left: 8px;
+  padding-right: 8px;
+}
 
 .fc-table tbody tr:hover {
   background: rgba(239, 246, 255, 0.5);
@@ -131,9 +137,9 @@
 }
 
 .fc-icon-preview {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: #ffffff;
@@ -143,7 +149,7 @@
 }
 
 .fc-icon-fallback {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #4f46e5;
   line-height: 1;
@@ -157,7 +163,7 @@
 }
 
 .fc-icon-emoji {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
 }
 
@@ -208,17 +214,19 @@
 .fc-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   border: 1px solid rgba(99, 102, 241, 0.22);
   background: #f8faff;
   border-radius: 999px;
-  padding: 5px 10px;
+  padding: 4px 8px;
   cursor: pointer;
   font-size: 11px;
   font-weight: 700;
   color: #334155;
   white-space: nowrap;
-  min-height: 38px;
+  min-height: 34px;
+  max-width: 120px;
+  justify-content: flex-start;
 }
 
 .fc-toggle:disabled {
@@ -260,19 +268,19 @@
   border: 1px solid rgba(79, 70, 229, 0.28);
   background: #e8edff;
   color: #3348d1;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .fc-btn-edit {
-  min-width: 74px;
+  min-width: 58px;
 }
 
 .fc-btn-subscreens {
-  min-width: 112px;
+  min-width: 88px;
 }
 
 .fc-actions-cell {
@@ -283,8 +291,8 @@
 }
 
 .fc-btn-action {
-  height: 38px;
-  padding: 0 14px;
+  height: 32px;
+  padding: 0 9px;
   border-radius: 10px;
   white-space: nowrap;
   transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
@@ -307,9 +315,25 @@
 
 .fc-actions-col,
 .fc-status-col {
-  word-break: normal;
-  white-space: nowrap;
+  word-break: break-word;
+  white-space: normal;
   vertical-align: middle;
+}
+
+.fc-status-stack {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.fc-inline-subscreens {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.fc-actions-cell {
+  justify-content: center;
 }
 
 .fc-display-col,
@@ -321,6 +345,12 @@
 .fc-tier-col,
 .fc-order-col {
   white-space: nowrap;
+}
+
+.fc-table th:nth-child(7),
+.fc-table td:nth-child(7),
+.fc-order-col {
+  text-align: center;
 }
 
 .fc-btn-primary {
@@ -636,7 +666,7 @@
   }
 
   .fc-table {
-    min-width: 1240px;
+    min-width: 0;
   }
 }
 
@@ -676,3 +706,4 @@
     align-items: flex-start;
   }
 }
+

@@ -302,6 +302,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  cursor: pointer;
+  text-align: left;
 }
 
 .ev-status-summary-item span {
@@ -333,6 +335,10 @@
 .ev-status-summary-item.paused span,
 .ev-status-summary-item.paused b {
   color: #475569;
+}
+
+.ev-status-summary-item.selected {
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2) inset;
 }
 
 .ev-filter-row {

@@ -283,12 +283,39 @@ const MODULE_CARDS = [
       </svg>
     ),
   },
+  {
+    id: 'card-donations',
+    label: 'Donations',
+    description: 'Manage donation forms and entries',
+    route: '/donations',
+    gradient: 'linear-gradient(135deg, #16A34A 0%, #0EA5E9 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="8.5" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.16)" />
+        <path d="M12 7v10M9 10.2c0-1.3 1.2-2.2 3-2.2s3 .9 3 2.2c0 1.2-.96 1.8-2.4 2.15l-1.2.3C9.96 13 9 13.6 9 14.8 9 16.1 10.2 17 12 17s3-.9 3-2.2" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'card-executive-body',
+    label: 'Executive Body',
+    description: 'View trust executive members by role',
+    route: '/executive-body',
+    gradient: 'linear-gradient(135deg, #0F766E 0%, #2563EB 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="7.5" r="3" stroke="white" strokeWidth="1.8" />
+        <path d="M6 19c0-2.9 2.7-5.2 6-5.2s6 2.3 6 5.2" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M4.5 9.5h3M16.5 9.5h3" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
-const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-noticeboard', 'card-events', 'card-facilities', 'card-contact-us', 'card-members']);
+const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-contact-us', 'card-donations', 'card-members']);
 
 const NAV_SECTION_TITLES = {
   dashboard: 'Dashboard',

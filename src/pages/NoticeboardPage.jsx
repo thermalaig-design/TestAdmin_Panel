@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
+import { supabase } from '../lib/supabase';
 import {
   createNotice,
   deleteNotice,
@@ -12,10 +13,13 @@ import {
 import { parseAttachmentItem } from '../utils/attachmentUtils';
 import './NoticeboardPage.css';
 
-const MAX_NOTICE_IMAGE_ATTACHMENTS = 3;
-const MAX_NOTICE_IMAGE_SIZE_BYTES = 20 * 1024;
+const MAX_NOTICE_ATTACHMENTS = 10;
+const MAX_NOTICE_IMAGE_SIZE_BYTES = 25 * 1024;
+const MAX_NOTICE_PDF_SIZE_BYTES = 3 * 1024 * 1024;
 const NOTICE_TYPE_OPTIONS = ['general', 'vip'];
 const NOTICE_STATUS_OPTIONS = ['active', 'paused'];
+const NOTICEBOARD_BUCKET = String(import.meta?.env?.VITE_NOTICEBOARD_BUCKET || 'noticeboard').trim() || 'noticeboard';
+const LEGACY_NOTICEBOARD_BUCKETS = new Set(['noticeboard', 'noticeborad', 'notice_board']);
 
 function toUiFormType(value) {
   return String(value || '').toLowerCase() === 'vip' ? 'vip' : 'general';
@@ -42,6 +46,10 @@ function formatDate(value) {
 
 function isImageFile(file) {
   return String(file?.type || '').toLowerCase().startsWith('image/');
+}
+
+function isPdfFile(file) {
+  return String(file?.type || '').toLowerCase() === 'application/pdf';
 }
 
 function isImageAttachment(item = {}) {
@@ -165,6 +173,64 @@ function toDayTimestamp(dateValue, boundary = 'start') {
     isEnd ? 59 : 0,
     isEnd ? 999 : 0
   ).getTime();
+}
+
+function extractStorageObjectInfo(rawUrl = '') {
+  const value = String(rawUrl || '').trim();
+  if (!value || value.startsWith('data:')) return null;
+
+  try {
+    const parsed = new URL(value);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const objectIdx = parts.findIndex((part, idx) =>
+      part === 'object' &&
+      parts[idx - 2] === 'storage' &&
+      parts[idx - 1] === 'v1'
+    );
+    if (objectIdx < 0) return null;
+
+    const bucket = String(parts[objectIdx + 2] || '').trim();
+    const objectPath = decodeURIComponent(parts.slice(objectIdx + 3).join('/'));
+    if (!bucket || !objectPath) return null;
+    return { bucket, objectPath };
+  } catch {
+    return null;
+  }
+}
+
+async function buildSignedImageUrl(rawUrl = '') {
+  const info = extractStorageObjectInfo(rawUrl);
+  if (!info) return '';
+  const bucket = info.bucket !== NOTICEBOARD_BUCKET && LEGACY_NOTICEBOARD_BUCKETS.has(info.bucket)
+    ? NOTICEBOARD_BUCKET
+    : info.bucket;
+  if (!bucket) return '';
+
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(info.objectPath, 60 * 60);
+  if (error || !data?.signedUrl) return '';
+  return data.signedUrl;
+}
+
+function NoticeAttachmentImage({ src, alt, className }) {
+  const [resolvedSrc, setResolvedSrc] = useState(src);
+  const [retried, setRetried] = useState(false);
+
+  useEffect(() => {
+    setResolvedSrc(src);
+    setRetried(false);
+  }, [src]);
+
+  const handleError = async () => {
+    if (retried) return;
+    setRetried(true);
+    const signedUrl = await buildSignedImageUrl(resolvedSrc || src);
+    if (signedUrl) {
+      setResolvedSrc(signedUrl);
+    }
+  };
+
+  if (!resolvedSrc) return null;
+  return <img src={resolvedSrc} alt={alt} className={className} onError={handleError} />;
 }
 
 export default function NoticeboardPage() {
@@ -517,24 +583,25 @@ export default function NoticeboardPage() {
     setFormError('');
     setAttachmentWarning('');
 
-    const existingImageCount = form.attachments.filter(isImageAttachment).length;
+    const existingAttachmentCount = form.attachments.length;
     const acceptedFiles = [];
     const warningMessages = [];
-    let nextImageCount = existingImageCount;
+    let nextAttachmentCount = existingAttachmentCount;
 
     files.forEach((file) => {
-      if (!isImageFile(file)) {
-        warningMessages.push(`"${file.name}" skipped: only image files are allowed.`);
+      const allowedFile = isImageFile(file) || isPdfFile(file);
+      if (!allowedFile) {
+        warningMessages.push(`"${file.name}" skipped: only image or PDF files are allowed.`);
         return;
       }
 
-      if (nextImageCount >= MAX_NOTICE_IMAGE_ATTACHMENTS) {
-        warningMessages.push(`"${file.name}" skipped: max ${MAX_NOTICE_IMAGE_ATTACHMENTS} images allowed.`);
+      if (nextAttachmentCount >= MAX_NOTICE_ATTACHMENTS) {
+        warningMessages.push(`"${file.name}" skipped: max ${MAX_NOTICE_ATTACHMENTS} attachments allowed.`);
         return;
       }
 
       acceptedFiles.push(file);
-      nextImageCount += 1;
+      nextAttachmentCount += 1;
     });
 
     if (warningMessages.length) {
@@ -547,15 +614,24 @@ export default function NoticeboardPage() {
     try {
       const uploadedItems = [];
       for (const file of acceptedFiles) {
-        const processed = await compressImageToLimit(file, MAX_NOTICE_IMAGE_SIZE_BYTES);
-        if (!processed?.file) {
+        let uploadFile = file;
+        if (isImageFile(file)) {
+          const processed = await compressImageToLimit(file, MAX_NOTICE_IMAGE_SIZE_BYTES);
+          if (!processed?.file) {
+            warningMessages.push(
+              `"${file.name}" skipped: image could not be compressed to ${Math.floor(MAX_NOTICE_IMAGE_SIZE_BYTES / 1024)}KB.`
+            );
+            continue;
+          }
+          uploadFile = processed.file;
+        } else if (isPdfFile(file) && (file.size || 0) > MAX_NOTICE_PDF_SIZE_BYTES) {
           warningMessages.push(
-            `"${file.name}" skipped: image could not be compressed to ${Math.floor(MAX_NOTICE_IMAGE_SIZE_BYTES / 1024)}KB.`
+            `"${file.name}" skipped: PDF must be ${Math.floor(MAX_NOTICE_PDF_SIZE_BYTES / (1024 * 1024))}MB or smaller.`
           );
           continue;
         }
 
-        const { data: uploadData, error: uploadError } = await uploadNoticeboardAttachment(processed.file, { trustId });
+        const { data: uploadData, error: uploadError } = await uploadNoticeboardAttachment(uploadFile, { trustId });
         if (uploadError || !uploadData?.publicUrl) {
           warningMessages.push(`"${file.name}" failed to upload.`);
           continue;
@@ -763,10 +839,11 @@ export default function NoticeboardPage() {
                   <h4 className="nb-section-title">Attachments</h4>
                   <div className="nb-form-grid nb-form-grid-2">
                     <div className="nb-span-full">
-                      <span>Upload image attachments</span>
+                      <span>Upload attachments (Image or PDF)</span>
                       <p className="nb-attachment-limit-note">
-                        Important: You can upload up to {MAX_NOTICE_IMAGE_ATTACHMENTS} images. Each image must be{' '}
-                        {Math.floor(MAX_NOTICE_IMAGE_SIZE_BYTES / 1024)}KB or smaller.
+                        Important: You can upload up to {MAX_NOTICE_ATTACHMENTS} attachments. Images are auto-compressed up to{' '}
+                        {Math.floor(MAX_NOTICE_IMAGE_SIZE_BYTES / 1024)}KB. PDFs must be{' '}
+                        {Math.floor(MAX_NOTICE_PDF_SIZE_BYTES / (1024 * 1024))}MB or smaller.
                       </p>
                       <label
                         className={`nb-attachment-dropzone ${attachmentDragOver ? 'drag' : ''}`}
@@ -784,6 +861,7 @@ export default function NoticeboardPage() {
                         <input
                           type="file"
                           multiple
+                          accept="image/*,.pdf,application/pdf"
                           onChange={handleAttachmentInputChange}
                         />
                         <div className="nb-attachment-drop-inner">
@@ -1075,7 +1153,7 @@ export default function NoticeboardPage() {
                                 <div className="nb-attachment-preview-list">
                                   {attachmentMeta.imageUrls.map((imageUrl, index) => (
                                     <div key={`${imageUrl}-${index}`} className="nb-attachment-preview">
-                                      <img
+                                      <NoticeAttachmentImage
                                         src={imageUrl}
                                         alt={`${selectedNotice.name || 'Notice'} attachment ${index + 1}`}
                                         className="nb-attachment-preview-thumb"
@@ -1114,7 +1192,10 @@ export default function NoticeboardPage() {
                 </button>
                 {previewMeta?.firstImageUrl && (
                   <div className="nb-preview-banner">
-                    <img src={previewMeta.firstImageUrl} alt={previewNotice.name || 'Notice attachment'} />
+                    <NoticeAttachmentImage
+                      src={previewMeta.firstImageUrl}
+                      alt={previewNotice.name || 'Notice attachment'}
+                    />
                   </div>
                 )}
                 <div className="nb-card-top">
@@ -1136,7 +1217,6 @@ export default function NoticeboardPage() {
                         href={item.value}
                         target={item.isDataUrl ? undefined : '_blank'}
                         rel={item.isDataUrl ? undefined : 'noreferrer'}
-                        download={item.name}
                         className="nb-attachment-link"
                       >
                         {item.name}
