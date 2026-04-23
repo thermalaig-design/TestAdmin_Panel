@@ -222,6 +222,42 @@ body.sb-mobile-lock {
 
 .sb-bottom {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sb-switch-trust {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: rgba(99, 102, 241, 0.08);
+  color: #4f46e5;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.sb-switch-trust:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.32);
+  transform: translateX(3px);
+}
+
+.sb-switch-trust:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.sb-bottom-error {
+  font-size: 11px;
+  color: #b91c1c;
+  line-height: 1.4;
+  padding: 0 2px;
 }
 
 .sb-logout {

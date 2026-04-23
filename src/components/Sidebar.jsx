@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import './Sidebar.css';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { fetchLinkedTrusts } from '../services/authService';
+
+const SUPERUSER_SESSION_KEY = 'admin:superuserId';
 
 const navItems = [
   {
@@ -73,13 +76,17 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
   const MOBILE_BREAKPOINT = 980;
   const navigate = useNavigate();
   const location = useLocation();
-  const { userName = 'Admin', trust = null } = location.state || {};
+  const { userName = 'Admin', trust = null, superuserId = null } = location.state || {};
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const currentTrusteesView = location.state?.trusteesView || '';
+  const storedSuperuserId = typeof window !== 'undefined' ? window.sessionStorage.getItem(SUPERUSER_SESSION_KEY) : null;
+  const resolvedSuperuserId = superuserId || trust?.superuser_id || storedSuperuserId || null;
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT
   );
   const [menuOpen, setMenuOpen] = useState(false);
+  const [switchingTrust, setSwitchingTrust] = useState(false);
+  const [switchTrustError, setSwitchTrustError] = useState('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -110,6 +117,11 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
   }, [location.pathname]);
 
   useEffect(() => {
+    if (!resolvedSuperuserId || typeof window === 'undefined') return;
+    window.sessionStorage.setItem(SUPERUSER_SESSION_KEY, String(resolvedSuperuserId));
+  }, [resolvedSuperuserId]);
+
+  useEffect(() => {
     document.body.classList.toggle('sb-mobile-lock', isMobile && menuOpen);
     return () => {
       document.body.classList.remove('sb-mobile-lock');
@@ -120,11 +132,41 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
     if (isMobile) setMenuOpen(false);
   };
 
+  const handleSwitchTrust = async () => {
+    if (switchingTrust) return;
+    if (!resolvedSuperuserId) {
+      setSwitchTrustError('Unable to detect account. Please login again once.');
+      return;
+    }
+
+    setSwitchTrustError('');
+    setSwitchingTrust(true);
+    const { data, error } = await fetchLinkedTrusts(resolvedSuperuserId);
+    if (error) {
+      setSwitchTrustError(error.message || 'Unable to load trusts.');
+      setSwitchingTrust(false);
+      return;
+    }
+
+    closeMobileMenu();
+    navigate('/select-trust', {
+      state: {
+        superuserId: resolvedSuperuserId,
+        userName,
+        trusts: data || [],
+        phone: location.state?.phone || '',
+        fullMobile: location.state?.fullMobile || '',
+        isNewUser: false,
+      },
+    });
+    setSwitchingTrust(false);
+  };
+
   const openTrustDetails = () => {
     const trustId = trust?.id || null;
     if (!trustId) {
       if (onDashboard) onDashboard();
-      else navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
+      else navigate('/dashboard', { state: { userName, trust, superuserId: resolvedSuperuserId, sidebarNavKey: currentSidebarNavKey } });
       closeMobileMenu();
       return;
     }
@@ -135,6 +177,7 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
         trustName,
         userName,
         trust,
+        superuserId: resolvedSuperuserId,
         sidebarNavKey: currentSidebarNavKey,
         returnTo: '/dashboard',
       },
@@ -238,6 +281,7 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
                     state: {
                       userName,
                       trust,
+                      superuserId: resolvedSuperuserId,
                       ...(item.navState || {}),
                       ...(item.navKey ? { sidebarNavKey: item.navKey } : {}),
                     },
@@ -254,6 +298,21 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
         </nav>
 
         <div className="sb-bottom">
+          <button
+            className="sb-switch-trust"
+            onClick={handleSwitchTrust}
+            disabled={switchingTrust}
+            title="Switch Trust"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path d="M7 4h10a3 3 0 0 1 3 3v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <polyline points="17 4 20 7 17 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M17 20H7a3 3 0 0 1-3-3v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <polyline points="7 20 4 17 7 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>{switchingTrust ? 'Switching...' : 'Switch Trust'}</span>
+          </button>
+          {switchTrustError && <div className="sb-bottom-error">{switchTrustError}</div>}
           <button
             className="sb-logout"
             onClick={() => {

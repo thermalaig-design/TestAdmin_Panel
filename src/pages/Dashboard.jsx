@@ -577,7 +577,7 @@ export default function Dashboard() {
   const location = useLocation();
 
   // Data from SelectTrustPage navigation
-  const { userName = 'Admin', trust = null } = location.state || {};
+  const { userName = 'Admin', trust = null, superuserId = null } = location.state || {};
   const trustId = trust?.id || null;
   const [latestTrust, setLatestTrust] = useState(null);
   const activeTrust = latestTrust?.id === trustId ? latestTrust : trust;
@@ -680,6 +680,7 @@ export default function Dashboard() {
             state: {
               userName,
               trust: activeTrust,
+              superuserId,
               sidebarNavKey: 'dashboard',
             },
           })
@@ -748,6 +749,7 @@ export default function Dashboard() {
                     trustName: activeTrust?.name,
                     userName,
                     trust: activeTrust,
+                    superuserId,
                     sidebarNavKey: currentSidebarNavKey,
                     returnTo: '/dashboard',
                   },
@@ -795,6 +797,7 @@ export default function Dashboard() {
                       state: {
                         userName,
                         trust: activeTrust,
+                        superuserId,
                         sidebarNavKey: currentSidebarNavKey,
                         trusteesView: card.id === 'card-logo' ? 'logo' : 'default',
                         dashboardCardId: card.id,
