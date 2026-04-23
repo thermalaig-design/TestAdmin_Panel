@@ -474,6 +474,47 @@
   padding: 16px;
 }
 
+.sp-profile-public-preview {
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 16px;
+  padding: 16px;
+  background: #ffffff;
+  margin-bottom: 14px;
+}
+
+.sp-public-preview-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sp-public-preview-side {
+  min-width: 180px;
+  display: grid;
+  gap: 10px;
+}
+
+.sp-public-owner-tag {
+  margin: 0;
+  font-size: 14px;
+  color: #667085;
+  font-weight: 600;
+}
+
+.sp-profile-hero-actions-preview {
+  margin-top: 0;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sp-profile-hero-actions-preview .sp-icon-btn,
+.sp-profile-hero-actions-preview .sp-role-select {
+  width: auto;
+  min-width: 150px;
+}
+
 .sp-profile-details-head {
   display: flex;
   align-items: center;
@@ -723,7 +764,7 @@
 
 .sp-form-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -909,8 +950,12 @@
   border: 1px solid rgba(99, 102, 241, 0.12);
   box-shadow: 0 10px 30px rgba(99, 102, 241, 0.1);
   padding: 14px;
+  order: -1;
+  align-self: start;
   position: sticky;
-  top: 86px;
+  top: 12px;
+  width: 100%;
+  z-index: 10;
 }
 
 .sp-public-preview-head h4 {
@@ -928,9 +973,12 @@
 
 .sp-public-face {
   border: 1px solid rgba(99, 102, 241, 0.16);
-  border-radius: 14px;
-  padding: 12px;
+  border-radius: 22px;
+  padding: 14px 14px 16px;
   background: linear-gradient(180deg, #fbfcff 0%, #f5f7ff 100%);
+  width: min(100%, 392px);
+  min-height: 190px;
+  margin: 0 auto;
 }
 
 .sp-public-badge-row {
@@ -956,15 +1004,15 @@
 
 .sp-public-main {
   display: grid;
-  grid-template-columns: 64px 1fr;
-  gap: 10px;
+  grid-template-columns: 76px 1fr;
+  gap: 12px;
   align-items: start;
 }
 
 .sp-public-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
   overflow: hidden;
   background: #e8ecff;
   color: #4f46e5;
@@ -981,10 +1029,14 @@
 
 .sp-public-content h5 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.1;
   color: #111827;
   font-weight: 800;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .sp-public-company {
@@ -1012,7 +1064,7 @@
 
 .sp-public-content p {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13px;
   color: #6b7280;
   line-height: 1.45;
   display: -webkit-box;
@@ -1409,8 +1461,25 @@
     grid-template-columns: 1fr;
   }
   .sp-public-preview-card {
-    position: static;
-    top: auto;
+    order: -1;
+    position: sticky;
+    top: 8px;
+    max-height: none;
+    width: 100%;
+    z-index: 10;
+  }
+  .sp-public-preview-side {
+    width: 100%;
+    min-width: 0;
+  }
+  .sp-profile-hero-actions-preview {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .sp-profile-hero-actions-preview .sp-icon-btn,
+  .sp-profile-hero-actions-preview .sp-role-select {
+    width: auto;
+    min-width: 0;
   }
 }
 

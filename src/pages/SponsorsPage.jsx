@@ -820,6 +820,15 @@ export default function SponsorsPage() {
   const previewPrimaryContact = form.ContactNumber1?.trim() || '';
   const previewWhatsapp = form.whatsapp_number?.trim() || '';
   const previewWebsite = form.website_url?.trim() || '';
+  const selectedPreviewName = selectedSponsor?.name?.trim() || 'Sponsor Name';
+  const selectedPreviewCompany = selectedSponsor?.company_name?.trim() || 'Company Name';
+  const selectedPreviewCoPartner = selectedSponsor?.coPartner?.trim() || '';
+  const selectedPreviewRole = [selectedSponsor?.position?.trim(), selectedSponsor?.position2?.trim()].filter(Boolean).join(' | ') || 'Role';
+  const selectedPreviewAbout = selectedSponsor?.about?.trim() || 'Sponsor description will appear here.';
+  const selectedPreviewBadge = selectedSponsor?.badge_label?.trim() || 'OFFICIAL SPONSOR';
+  const selectedPreviewPrimaryContact = String(selectedSponsor?.ContactNumber1 || selectedSponsor?.phone || '').trim();
+  const selectedPreviewWhatsapp = String(selectedSponsor?.whatsapp_number || '').trim();
+  const selectedPreviewWebsite = selectedSponsor?.website_url?.trim() || '';
 
   return (
     <div className="sp-root">
@@ -981,18 +990,47 @@ export default function SponsorsPage() {
               <section className="sp-right-panel">
                 {!loading && selectedSponsor && (
                   <>
-                    <div className="sp-profile-hero">
-                      <div className="sp-profile-hero-left">
-                        <div className="sp-card-avatar lg">
-                          {selectedSponsor.photo_url
-                            ? <img src={selectedSponsor.photo_url} alt={selectedSponsor.name} />
-                            : <span>{initials(selectedSponsor.name)}</span>
-                          }
-                        </div>
-                        <div>
-                          <h3>{selectedSponsor.name}</h3>
-                          <p>{canEditSponsorId(selectedSponsor.id) ? 'My Sponsor' : 'Other Sponsor'}</p>
-                          <div className="sp-profile-hero-actions">
+                    <div className="sp-profile-public-preview">
+                      <div className="sp-public-preview-head">
+                        <h4>Public Facing Card Preview</h4>
+                        <p>App card size preview</p>
+                      </div>
+                      <div className="sp-public-preview-body">
+                        <article className="sp-public-face">
+                          <div className="sp-public-badge-row">
+                            <span className="sp-public-badge">{selectedPreviewBadge}</span>
+                          </div>
+                          <div className="sp-public-main">
+                            <div className="sp-public-avatar">
+                              {selectedSponsor.photo_url ? (
+                                <img src={selectedSponsor.photo_url} alt={selectedPreviewName} />
+                              ) : (
+                                <span>{initials(selectedPreviewName)}</span>
+                              )}
+                            </div>
+                            <div className="sp-public-content">
+                              <h5>{selectedPreviewCompany}</h5>
+                              <div className="sp-public-company">
+                                <span>{selectedPreviewName}</span>
+                                {selectedPreviewCoPartner && <span className="sp-public-company-sep">|</span>}
+                                {selectedPreviewCoPartner && <span>{selectedPreviewCoPartner}</span>}
+                              </div>
+                              <div className="sp-public-role">{selectedPreviewRole}</div>
+                              <p>{selectedPreviewAbout}</p>
+                            </div>
+                          </div>
+                          <div className="sp-public-actions">
+                            {selectedPreviewPrimaryContact && <span>{selectedPreviewPrimaryContact}</span>}
+                            {selectedPreviewWhatsapp && <span>WhatsApp</span>}
+                            {selectedPreviewWebsite && <span>Website</span>}
+                          </div>
+                        </article>
+
+                        <div className="sp-public-preview-side">
+                          <p className="sp-public-owner-tag">
+                            {canEditSponsorId(selectedSponsor.id) ? 'My Sponsor' : 'Other Sponsor'}
+                          </p>
+                          <div className="sp-profile-hero-actions sp-profile-hero-actions-preview">
                             <select
                               className={`sp-role-select ${flashActiveBySponsorId[selectedSponsor.id] ? 'active' : 'inactive'}`}
                               value={flashActiveBySponsorId[selectedSponsor.id] ? 'active' : 'inactive'}
@@ -1062,7 +1100,7 @@ export default function SponsorsPage() {
                   </div>
 
                   <div className="sp-form-section">
-                    <div className="sp-form-section-title">Public Face Card</div>
+                    <div className="sp-form-section-title">Public Facing Card</div>
                     <div className="sp-grid">
                       <label className="sp-field">
                         <span>Name *</span>
@@ -1422,7 +1460,7 @@ export default function SponsorsPage() {
 
                 <aside className="sp-public-preview-card">
                   <div className="sp-public-preview-head">
-                    <h4>Public Face Card Preview</h4>
+                    <h4>Public Facing Card Preview</h4>
                     <p>Only public-facing card preview</p>
                   </div>
                   <article className="sp-public-face">
