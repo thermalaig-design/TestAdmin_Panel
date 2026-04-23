@@ -6,6 +6,7 @@ import {
   createFacility,
   deleteFacility,
   fetchFacilitiesByTrust,
+  resolveFacilitiesAttachmentUrl,
   updateFacility,
   uploadFacilitiesAttachment,
 } from '../services/facilitiesService';
@@ -48,7 +49,7 @@ function isImageAttachment(item = {}) {
   const value = String(item?.value || '').toLowerCase();
   const name = String(item?.name || '').toLowerCase();
   if (value.startsWith('data:image/')) return true;
-  return /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/.test(name);
+  return /\.(png|jpe?g|jfif|gif|webp|bmp|svg)(\?.*)?$/.test(name);
 }
 
 function loadImageFromFile(file) {
@@ -74,14 +75,16 @@ function canvasToBlob(canvas, type, quality) {
 }
 
 async function compressImageToLimit(file, maxBytes) {
-  if ((file?.size || 0) <= maxBytes) return { file };
-
   const image = await loadImageFromFile(file);
   const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
   const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   if (!context) return null;
+  const baseName = String(file?.name || 'attachment')
+    .replace(/\.[^/.]+$/, '')
+    .trim();
+  const outputName = `${baseName || 'attachment'}.jpg`;
 
   for (let scaleStep = 0; scaleStep < 9; scaleStep += 1) {
     const scale = Math.pow(0.82, scaleStep);
@@ -95,7 +98,8 @@ async function compressImageToLimit(file, maxBytes) {
     for (let quality = 0.82; quality >= 0.2; quality -= 0.08) {
       const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
       if (blob && blob.size <= maxBytes) {
-        return { file: blob };
+        const normalizedFile = new File([blob], outputName, { type: 'image/jpeg' });
+        return { file: normalizedFile };
       }
     }
   }
@@ -140,6 +144,27 @@ function formatTypeLabel(value) {
   if (normalized === 'vip') return 'VIP';
   if (normalized === 'gen' || normalized === 'general') return 'general';
   return normalized || '-';
+}
+
+function FacilityAttachmentImage({ src, alt, className }) {
+  const [resolvedSrc, setResolvedSrc] = useState(src);
+  const [retried, setRetried] = useState(false);
+
+  useEffect(() => {
+    setResolvedSrc(src);
+    setRetried(false);
+  }, [src]);
+
+  const handleError = async () => {
+    if (retried) return;
+    setRetried(true);
+    const { data } = await resolveFacilitiesAttachmentUrl(resolvedSrc || src);
+    const nextUrl = String(data?.signedUrl || '').trim();
+    if (nextUrl) setResolvedSrc(nextUrl);
+  };
+
+  if (!resolvedSrc) return null;
+  return <img src={resolvedSrc} alt={alt} className={className} onError={handleError} />;
 }
 
 export default function FacilitiesPage() {
@@ -474,7 +499,8 @@ export default function FacilitiesPage() {
 
         const { data: uploadData, error: uploadError } = await uploadFacilitiesAttachment(processed.file, { trustId });
         if (uploadError || !uploadData?.publicUrl) {
-          warningMessages.push(`"${file.name}" failed to upload.`);
+          const reason = uploadError?.message ? `: ${uploadError.message}` : '';
+          warningMessages.push(`"${file.name}" failed to upload${reason}.`);
           continue;
         }
 
@@ -509,6 +535,23 @@ export default function FacilitiesPage() {
       ...prev,
       attachments: prev.attachments.filter((_, itemIndex) => itemIndex !== index),
     }));
+  };
+
+  const handleOpenAttachment = async (event, rawUrl) => {
+    const value = String(rawUrl || '').trim();
+    if (!value) return;
+
+    event.preventDefault();
+    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    const { data } = await resolveFacilitiesAttachmentUrl(value);
+    const nextUrl = String(data?.signedUrl || value).trim();
+
+    if (popup) {
+      popup.location.href = nextUrl;
+      return;
+    }
+
+    window.open(nextUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleDeleteFacility = async (Facility) => {
@@ -612,19 +655,24 @@ export default function FacilitiesPage() {
                         placeholder="Enter Facility title"
                       />
                     </label>
-                    <label>
+                    <div>
                       <span>Type</span>
-                      <select
-                        value={form.type}
-                        onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-                      >
+                      <div className="dn-choice-row" role="radiogroup" aria-label="Facility Type">
                         {FACILITY_TYPE_OPTIONS.map((typeValue) => (
-                          <option key={typeValue} value={typeValue}>
-                            {typeValue === 'vip' ? 'VIP' : 'general'}
-                          </option>
+                          <button
+                            key={typeValue}
+                            type="button"
+                            role="radio"
+                            aria-checked={form.type === typeValue}
+                            className={`dn-choice-btn ${form.type === typeValue ? 'active' : ''}`}
+                            onClick={() => setForm((prev) => ({ ...prev, type: typeValue }))}
+                          >
+                            <span className="dn-choice-dot" aria-hidden="true" />
+                            <span className="dn-choice-label">{typeValue === 'vip' ? 'VIP' : 'general'}</span>
+                          </button>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    </div>
                     <label>
                       <span>Status</span>
                       <select
@@ -971,7 +1019,7 @@ export default function FacilitiesPage() {
                                 <div className="nb-attachment-preview-list">
                                   {attachmentMeta.imageUrls.map((imageUrl, index) => (
                                     <div key={`${imageUrl}-${index}`} className="nb-attachment-preview">
-                                      <img
+                                      <FacilityAttachmentImage
                                         src={imageUrl}
                                         alt={`${selectedFacility.name || 'Facility'} attachment ${index + 1}`}
                                         className="nb-attachment-preview-thumb"
@@ -1010,7 +1058,10 @@ export default function FacilitiesPage() {
                 </button>
                 {previewMeta?.firstImageUrl && (
                   <div className="nb-preview-banner">
-                    <img src={previewMeta.firstImageUrl} alt={previewFacility.name || 'Facility attachment'} />
+                    <FacilityAttachmentImage
+                      src={previewMeta.firstImageUrl}
+                      alt={previewFacility.name || 'Facility attachment'}
+                    />
                   </div>
                 )}
                 <div className="nb-card-top">
@@ -1027,6 +1078,10 @@ export default function FacilitiesPage() {
                       <a
                         key={`${item.value}-${index}`}
                         href={item.value}
+                        onClick={(event) => {
+                          if (item.isDataUrl) return;
+                          handleOpenAttachment(event, item.value);
+                        }}
                         target={item.isDataUrl ? undefined : '_blank'}
                         rel={item.isDataUrl ? undefined : 'noreferrer'}
                         download={item.name}

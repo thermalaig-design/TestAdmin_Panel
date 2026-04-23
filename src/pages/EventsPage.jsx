@@ -703,19 +703,24 @@ export default function EventsPage() {
                         placeholder="Venue / address"
                       />
                     </label>
-                    <label>
+                    <div>
                       <span>Type</span>
-                      <select
-                        value={form.type}
-                        onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-                      >
+                      <div className="ev-choice-row" role="radiogroup" aria-label="Event Type">
                         {EVENT_TYPES.map((typeValue) => (
-                          <option key={typeValue} value={typeValue}>
-                            {formatTypeLabel(typeValue)}
-                          </option>
+                          <button
+                            key={typeValue}
+                            type="button"
+                            role="radio"
+                            aria-checked={form.type === typeValue}
+                            className={`ev-choice-btn ${form.type === typeValue ? 'active' : ''}`}
+                            onClick={() => setForm((prev) => ({ ...prev, type: typeValue }))}
+                          >
+                            <span className="ev-choice-dot" aria-hidden="true" />
+                            <span className="ev-choice-label">{formatTypeLabel(typeValue)}</span>
+                          </button>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    </div>
                     <label>
                       <span>Status</span>
                       <select

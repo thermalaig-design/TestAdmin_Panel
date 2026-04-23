@@ -237,6 +237,7 @@ export default function SponsorsPage() {
   const [showAddress3, setShowAddress3] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [numberWarning, setNumberWarning] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const deferredListSearch = useDeferredValue(listSearch);
   const deferredPickerSearch = useDeferredValue(searchTerm);
@@ -424,6 +425,7 @@ export default function SponsorsPage() {
     setShowAddress2(false);
     setShowAddress3(false);
     setSaveError('');
+    setNumberWarning('');
     if (!showForm) setShowForm(true);
   }, [isCreateMode, location.key, showForm]);
 
@@ -436,6 +438,7 @@ export default function SponsorsPage() {
       setShowEmail3(false);
       setShowAddress2(false);
       setShowAddress3(false);
+      setNumberWarning('');
       return;
     }
     if (selectedSponsor) {
@@ -481,6 +484,7 @@ export default function SponsorsPage() {
       const hasAddress3 = !!String(selectedSponsor.address3 || '').trim();
       setShowAddress2(hasAddress2 || hasAddress3);
       setShowAddress3(hasAddress3);
+      setNumberWarning('');
     } else {
       setForm(createEmptyForm());
       setShowContact2(false);
@@ -489,6 +493,7 @@ export default function SponsorsPage() {
       setShowEmail3(false);
       setShowAddress2(false);
       setShowAddress3(false);
+      setNumberWarning('');
     }
   }, [selectedSponsor, flashMap, isCreateMode]);
 
@@ -576,6 +581,7 @@ export default function SponsorsPage() {
     setShowAddress2(false);
     setShowAddress3(false);
     setSaveError('');
+    setNumberWarning('');
     setShowForm(true);
     navigate('/sponsor/create_sponsor', {
       state: { userName, trust, sponsorFormMode: 'create', sponsorFormNonce: Date.now() },
@@ -587,9 +593,17 @@ export default function SponsorsPage() {
     setSelectedId(sponsorId);
     setShowForm(true);
     setSaveError('');
+    setNumberWarning('');
     navigate('/sponsor/edit_sponsor', {
       state: { userName, trust, editSponsorId: sponsorId },
     });
+  };
+
+  const handleNumericInputChange = (field, rawValue, label, maxLength = 15) => {
+    const raw = String(rawValue ?? '');
+    const sanitized = sanitizeDigits(raw, maxLength);
+    setNumberWarning(/\D/.test(raw) ? `Only numbers are allowed in ${label}.` : '');
+    setForm((prev) => ({ ...prev, [field]: sanitized }));
   };
 
 
@@ -744,7 +758,7 @@ export default function SponsorsPage() {
       ref_no: isEditMode
         ? (selectedSponsor?.ref_no ?? null)
         : (Math.max(0, ...sponsors.map(s => Number(s.ref_no) || 0)) + 1),
-      ContactNumber1: form.ContactNumber1.trim() || null,
+      ContactNumber1: sanitizeDigits(form.ContactNumber1, 15) || null,
       contactNumber2: contactNumber2Digits ? Number(contactNumber2Digits) : null,
       contactNumber3: contactNumber3Digits ? Number(contactNumber3Digits) : null,
       email_id1: form.email_id1.trim() || null,
@@ -796,6 +810,15 @@ export default function SponsorsPage() {
     }
     setSaving(false);
   };
+
+  const previewName = form.name?.trim() || 'Sponsor Name';
+  const previewCompany = form.company_name?.trim() || 'Company Name';
+  const previewRole = [form.position?.trim(), form.position2?.trim()].filter(Boolean).join(' • ') || 'Role';
+  const previewAbout = form.about?.trim() || 'Sponsor description will appear here.';
+  const previewBadge = form.badge_label?.trim() || 'OFFICIAL SPONSOR';
+  const previewPrimaryContact = form.ContactNumber1?.trim() || '';
+  const previewWhatsapp = form.whatsapp_number?.trim() || '';
+  const previewWebsite = form.website_url?.trim() || '';
 
   return (
     <div className="sp-root">
@@ -1031,357 +1054,402 @@ export default function SponsorsPage() {
 
           {(isCreateMode || isEditRoute || showForm) && (
             <section className="sp-form">
-              <div className="sp-form-card">
-              <div className="sp-form-title">
-                {formMode === 'edit' ? 'Edit Sponsor' : 'Add Sponsor'}
-              </div>
+              <div className="sp-form-layout">
+                <div className="sp-form-card">
+                  <div className="sp-form-title">
+                    {formMode === 'edit' ? 'Edit Sponsor' : 'Add Sponsor'}
+                  </div>
 
-              <div className="sp-grid">
-                <label className="sp-field">
-                  <span>Name *</span>
-                  <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>Position</span>
-                  <input value={form.position} onChange={e => setForm(p => ({ ...p, position: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>Position 2</span>
-                  <input value={form.position2} onChange={e => setForm(p => ({ ...p, position2: e.target.value }))} />
-                </label>
-                <label className="sp-field sp-span-2">
-                  <span>About</span>
-                  <textarea rows="3" value={form.about} onChange={e => setForm(p => ({ ...p, about: e.target.value }))} />
-                </label>
+                  <div className="sp-form-section">
+                    <div className="sp-form-section-title">Public Face Card</div>
+                    <div className="sp-grid">
+                      <label className="sp-field">
+                        <span>Name *</span>
+                        <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>Company Name *</span>
+                        <input value={form.company_name} onChange={e => setForm(p => ({ ...p, company_name: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>Position</span>
+                        <input value={form.position} onChange={e => setForm(p => ({ ...p, position: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>Position 2</span>
+                        <input value={form.position2} onChange={e => setForm(p => ({ ...p, position2: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>Co Partner</span>
+                        <input value={form.coPartner} onChange={e => setForm(p => ({ ...p, coPartner: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>Badge Label</span>
+                        <input value={form.badge_label} onChange={e => setForm(p => ({ ...p, badge_label: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>Website URL</span>
+                        <input value={form.website_url} onChange={e => setForm(p => ({ ...p, website_url: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>Catalog URL</span>
+                        <input value={form.catalog_url} onChange={e => setForm(p => ({ ...p, catalog_url: e.target.value }))} />
+                      </label>
+                      <label className="sp-field sp-span-2">
+                        <span>About</span>
+                        <textarea rows="3" value={form.about} onChange={e => setForm(p => ({ ...p, about: e.target.value }))} />
+                      </label>
+                      <div className="sp-field sp-span-2">
+                        <span>Photo URL (drag & drop)</span>
+                        <p className="sp-upload-note">Max file size: 25 KB</p>
+                        <label
+                          className={`sp-drop ${dragOver ? 'drag' : ''}`}
+                          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                          onDragLeave={() => setDragOver(false)}
+                          onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+                        >
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={e => handleFile(e.target.files?.[0])}
+                          />
+                          <div className="sp-drop-inner">
+                            <span>Drag & drop image here</span>
+                            <span className="sp-drop-sub">or click to upload</span>
+                          </div>
+                        </label>
+                        {form.photo_url && (
+                          <div className="sp-photo-preview">
+                            <img src={form.photo_url} alt="Preview" />
+                            <button className="sp-link" type="button" onClick={() => setForm(p => ({ ...p, photo_url: '' }))}>
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                <div className="sp-field sp-span-2">
-                  <span>Photo URL (drag & drop)</span>
-                  <p className="sp-upload-note">Max file size: 25 KB</p>
-                  <label
-                    className={`sp-drop ${dragOver ? 'drag' : ''}`}
-                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
-                  >
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={e => handleFile(e.target.files?.[0])}
-                    />
-                    <div className="sp-drop-inner">
-                      <span>Drag & drop image here</span>
-                      <span className="sp-drop-sub">or click to upload</span>
+                  <div className="sp-form-section">
+                    <div className="sp-form-section-title">Company Details Card</div>
+                    <div className="sp-grid">
+                      <label className="sp-field">
+                        <span>Contact Number 1</span>
+                        <div className="sp-input-with-actions">
+                          <input
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={form.ContactNumber1}
+                            onChange={e => handleNumericInputChange('ContactNumber1', e.target.value, 'Contact Number 1', 15)}
+                          />
+                          {!showContact2 && (
+                            <button
+                              type="button"
+                              className="sp-input-action-btn"
+                              title="Add Contact Number 2"
+                              onClick={() => setShowContact2(true)}
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                      </label>
+                      <label className="sp-field">
+                        <span>Email ID 1</span>
+                        <div className="sp-input-with-actions">
+                          <input value={form.email_id1} onChange={e => setForm(p => ({ ...p, email_id1: e.target.value }))} />
+                          {!showEmail2 && (
+                            <button
+                              type="button"
+                              className="sp-input-action-btn"
+                              title="Add Email ID 2"
+                              onClick={() => setShowEmail2(true)}
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                      </label>
+                      {showContact2 && (
+                        <label className="sp-field">
+                          <span>Contact Number 2</span>
+                          <div className="sp-input-with-actions">
+                            <input
+                              type="tel"
+                              inputMode="numeric"
+                              value={form.contactNumber2}
+                              onChange={e => handleNumericInputChange('contactNumber2', e.target.value, 'Contact Number 2', 15)}
+                            />
+                            {!showContact3 && (
+                              <button
+                                type="button"
+                                className="sp-input-action-btn"
+                                title="Add Contact Number 3"
+                                onClick={() => setShowContact3(true)}
+                              >
+                                +
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="sp-input-action-btn remove"
+                              title="Remove Contact Number 2"
+                              onClick={() => {
+                                setForm((p) => ({
+                                  ...p,
+                                  contactNumber2: '',
+                                  contactNumber3: '',
+                                }));
+                                setShowContact2(false);
+                                setShowContact3(false);
+                              }}
+                            >
+                              -
+                            </button>
+                          </div>
+                        </label>
+                      )}
+                      {showEmail2 && (
+                        <label className="sp-field">
+                          <span>Email ID 2</span>
+                          <div className="sp-input-with-actions">
+                            <input value={form.emailId2} onChange={e => setForm(p => ({ ...p, emailId2: e.target.value }))} />
+                            {!showEmail3 && (
+                              <button
+                                type="button"
+                                className="sp-input-action-btn"
+                                title="Add Email ID 3"
+                                onClick={() => setShowEmail3(true)}
+                              >
+                                +
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="sp-input-action-btn remove"
+                              title="Remove Email ID 2"
+                              onClick={() => {
+                                setForm((p) => ({ ...p, emailId2: '', emailId3: '' }));
+                                setShowEmail2(false);
+                                setShowEmail3(false);
+                              }}
+                            >
+                              -
+                            </button>
+                          </div>
+                        </label>
+                      )}
+                      {showEmail3 && (
+                        <label className="sp-field">
+                          <span>Email ID 3</span>
+                          <div className="sp-input-with-actions">
+                            <input value={form.emailId3} onChange={e => setForm(p => ({ ...p, emailId3: e.target.value }))} />
+                            <button
+                              type="button"
+                              className="sp-input-action-btn remove"
+                              title="Remove Email ID 3"
+                              onClick={() => {
+                                setForm((p) => ({ ...p, emailId3: '' }));
+                                setShowEmail3(false);
+                              }}
+                            >
+                              -
+                            </button>
+                          </div>
+                        </label>
+                      )}
+                      {showContact3 && (
+                        <label className="sp-field">
+                          <span>Contact Number 3</span>
+                          <div className="sp-input-with-actions">
+                            <input
+                              type="tel"
+                              inputMode="numeric"
+                              value={form.contactNumber3}
+                              onChange={e => handleNumericInputChange('contactNumber3', e.target.value, 'Contact Number 3', 15)}
+                            />
+                            <button
+                              type="button"
+                              className="sp-input-action-btn remove"
+                              title="Remove Contact Number 3"
+                              onClick={() => {
+                                setForm((p) => ({ ...p, contactNumber3: '' }));
+                                setShowContact3(false);
+                              }}
+                            >
+                              -
+                            </button>
+                          </div>
+                        </label>
+                      )}
+                      <label className="sp-field sp-span-2">
+                        <span>Address 1</span>
+                        <div className="sp-input-with-actions">
+                          <input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
+                          {!showAddress2 && (
+                            <button
+                              type="button"
+                              className="sp-input-action-btn"
+                              title="Add Address 2"
+                              onClick={() => setShowAddress2(true)}
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                      </label>
+                      {showAddress2 && (
+                        <label className="sp-field sp-span-2">
+                          <span>Address 2</span>
+                          <div className="sp-input-with-actions">
+                            <input value={form.address2} onChange={e => setForm(p => ({ ...p, address2: e.target.value }))} />
+                            {!showAddress3 && (
+                              <button
+                                type="button"
+                                className="sp-input-action-btn"
+                                title="Add Address 3"
+                                onClick={() => setShowAddress3(true)}
+                              >
+                                +
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="sp-input-action-btn remove"
+                              title="Remove Address 2"
+                              onClick={() => {
+                                setForm((p) => ({ ...p, address2: '', address3: '' }));
+                                setShowAddress2(false);
+                                setShowAddress3(false);
+                              }}
+                            >
+                              -
+                            </button>
+                          </div>
+                        </label>
+                      )}
+                      {showAddress3 && (
+                        <label className="sp-field sp-span-2">
+                          <span>Address 3</span>
+                          <div className="sp-input-with-actions">
+                            <input value={form.address3} onChange={e => setForm(p => ({ ...p, address3: e.target.value }))} />
+                            <button
+                              type="button"
+                              className="sp-input-action-btn remove"
+                              title="Remove Address 3"
+                              onClick={() => {
+                                setForm((p) => ({ ...p, address3: '' }));
+                                setShowAddress3(false);
+                              }}
+                            >
+                              -
+                            </button>
+                          </div>
+                        </label>
+                      )}
+                      <label className="sp-field">
+                        <span>City</span>
+                        <input value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>State</span>
+                        <input value={form.state} onChange={e => setForm(p => ({ ...p, state: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>WhatsApp No</span>
+                        <div className="sp-whatsapp-row">
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            autoComplete="tel-national"
+                            pattern="[0-9]*"
+                            maxLength={13}
+                            placeholder="WhatsApp number"
+                            value={form.whatsapp_number}
+                            onChange={(e) => handleNumericInputChange('whatsapp_number', e.target.value, 'WhatsApp number', 13)}
+                            onKeyDown={(e) => {
+                              if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                          />
+                        </div>
+                      </label>
+                      <label className="sp-field">
+                        <span>Facebook</span>
+                        <input value={form.facebook} onChange={e => setForm(p => ({ ...p, facebook: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>Instagram</span>
+                        <input value={form.instagram} onChange={e => setForm(p => ({ ...p, instagram: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>X</span>
+                        <input value={form.X} onChange={e => setForm(p => ({ ...p, X: e.target.value }))} />
+                      </label>
+                      <label className="sp-field">
+                        <span>LinkedIn</span>
+                        <input value={form.linkedin} onChange={e => setForm(p => ({ ...p, linkedin: e.target.value }))} />
+                      </label>
                     </div>
-                  </label>
-                  {form.photo_url && (
-                    <div className="sp-photo-preview">
-                      <img src={form.photo_url} alt="Preview" />
-                      <button className="sp-link" type="button" onClick={() => setForm(p => ({ ...p, photo_url: '' }))}>
-                        Remove
-                      </button>
-                    </div>
-                  )}
+                  </div>
+
+                  {numberWarning && <div className="sp-warning">{numberWarning}</div>}
+                  {saveError && <div className="sp-error">{saveError}</div>}
+
+                  <div className="sp-form-actions">
+                    <button
+                      className="sp-secondary"
+                      onClick={() => {
+                        if (isCreateMode || isEditRoute) {
+                          navigate('/sponsor', { state: { userName, trust } });
+                          return;
+                        }
+                        setShowForm(false);
+                        setSelectedId(null);
+                        setSaveError('');
+                      }}
+                      type="button"
+                    >
+                      Close
+                    </button>
+                    <button className="sp-primary" onClick={handleSave} disabled={saving} type="button">
+                      {saving ? 'Saving...' : 'Save Sponsor'}
+                    </button>
+                  </div>
                 </div>
 
-                <label className="sp-field">
-                  <span>Company Name *</span>
-                  <input value={form.company_name} onChange={e => setForm(p => ({ ...p, company_name: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>Co Partner</span>
-                  <input value={form.coPartner} onChange={e => setForm(p => ({ ...p, coPartner: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>Contact Number 1</span>
-                  <div className="sp-input-with-actions">
-                    <input value={form.ContactNumber1} onChange={e => setForm(p => ({ ...p, ContactNumber1: e.target.value }))} />
-                    {!showContact2 && (
-                      <button
-                        type="button"
-                        className="sp-input-action-btn"
-                        title="Add Contact Number 2"
-                        onClick={() => setShowContact2(true)}
-                      >
-                        +
-                      </button>
-                    )}
+                <aside className="sp-public-preview-card">
+                  <div className="sp-public-preview-head">
+                    <h4>Public Face Card Preview</h4>
+                    <p>Only public-facing card preview</p>
                   </div>
-                </label>
-                <label className="sp-field">
-                  <span>Email ID 1</span>
-                  <div className="sp-input-with-actions">
-                    <input value={form.email_id1} onChange={e => setForm(p => ({ ...p, email_id1: e.target.value }))} />
-                    {!showEmail2 && (
-                      <button
-                        type="button"
-                        className="sp-input-action-btn"
-                        title="Add Email ID 2"
-                        onClick={() => setShowEmail2(true)}
-                      >
-                        +
-                      </button>
-                    )}
-                  </div>
-                </label>
-                {showContact2 && (
-                  <label className="sp-field">
-                    <span>Contact Number 2</span>
-                    <div className="sp-input-with-actions">
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        value={form.contactNumber2}
-                        onChange={e => setForm(p => ({ ...p, contactNumber2: sanitizeDigits(e.target.value, 15) }))}
-                      />
-                      {!showContact3 && (
-                        <button
-                          type="button"
-                          className="sp-input-action-btn"
-                          title="Add Contact Number 3"
-                          onClick={() => setShowContact3(true)}
-                        >
-                          +
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="sp-input-action-btn remove"
-                        title="Remove Contact Number 2"
-                        onClick={() => {
-                          setForm((p) => ({
-                            ...p,
-                            contactNumber2: '',
-                            contactNumber3: '',
-                          }));
-                          setShowContact2(false);
-                          setShowContact3(false);
-                        }}
-                      >
-                        -
-                      </button>
+                  <article className="sp-public-face">
+                    <div className="sp-public-badge-row">
+                      <span className="sp-public-badge">{previewBadge}</span>
                     </div>
-                  </label>
-                )}
-                {showEmail2 && (
-                  <label className="sp-field">
-                    <span>Email ID 2</span>
-                    <div className="sp-input-with-actions">
-                      <input value={form.emailId2} onChange={e => setForm(p => ({ ...p, emailId2: e.target.value }))} />
-                      {!showEmail3 && (
-                        <button
-                          type="button"
-                          className="sp-input-action-btn"
-                          title="Add Email ID 3"
-                          onClick={() => setShowEmail3(true)}
-                        >
-                          +
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="sp-input-action-btn remove"
-                        title="Remove Email ID 2"
-                        onClick={() => {
-                          setForm((p) => ({ ...p, emailId2: '', emailId3: '' }));
-                          setShowEmail2(false);
-                          setShowEmail3(false);
-                        }}
-                      >
-                        -
-                      </button>
-                    </div>
-                  </label>
-                )}
-                {showEmail3 && (
-                  <label className="sp-field">
-                    <span>Email ID 3</span>
-                    <div className="sp-input-with-actions">
-                      <input value={form.emailId3} onChange={e => setForm(p => ({ ...p, emailId3: e.target.value }))} />
-                      <button
-                        type="button"
-                        className="sp-input-action-btn remove"
-                        title="Remove Email ID 3"
-                        onClick={() => {
-                          setForm((p) => ({ ...p, emailId3: '' }));
-                          setShowEmail3(false);
-                        }}
-                      >
-                        -
-                      </button>
-                    </div>
-                  </label>
-                )}
-                {showContact3 && (
-                  <>
-                    <label className="sp-field">
-                      <span>Contact Number 3</span>
-                      <div className="sp-input-with-actions">
-                        <input
-                          type="tel"
-                          inputMode="numeric"
-                          value={form.contactNumber3}
-                          onChange={e => setForm(p => ({ ...p, contactNumber3: sanitizeDigits(e.target.value, 15) }))}
-                        />
-                        <button
-                          type="button"
-                        className="sp-input-action-btn remove"
-                        title="Remove Contact Number 3"
-                        onClick={() => {
-                          setForm((p) => ({ ...p, contactNumber3: '' }));
-                          setShowContact3(false);
-                        }}
-                      >
-                          -
-                        </button>
+                    <div className="sp-public-main">
+                      <div className="sp-public-avatar">
+                        {form.photo_url ? (
+                          <img src={form.photo_url} alt={previewName} />
+                        ) : (
+                          <span>{initials(previewName)}</span>
+                        )}
                       </div>
-                    </label>
-                  </>
-                )}
-                <label className="sp-field sp-span-2">
-                  <span>Address 1</span>
-                  <div className="sp-input-with-actions">
-                    <input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
-                    {!showAddress2 && (
-                      <button
-                        type="button"
-                        className="sp-input-action-btn"
-                        title="Add Address 2"
-                        onClick={() => setShowAddress2(true)}
-                      >
-                        +
-                      </button>
-                    )}
-                  </div>
-                </label>
-                {showAddress2 && (
-                  <label className="sp-field sp-span-2">
-                    <span>Address 2</span>
-                    <div className="sp-input-with-actions">
-                      <input value={form.address2} onChange={e => setForm(p => ({ ...p, address2: e.target.value }))} />
-                      {!showAddress3 && (
-                        <button
-                          type="button"
-                          className="sp-input-action-btn"
-                          title="Add Address 3"
-                          onClick={() => setShowAddress3(true)}
-                        >
-                          +
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="sp-input-action-btn remove"
-                        title="Remove Address 2"
-                        onClick={() => {
-                          setForm((p) => ({ ...p, address2: '', address3: '' }));
-                          setShowAddress2(false);
-                          setShowAddress3(false);
-                        }}
-                      >
-                        -
-                      </button>
+                      <div className="sp-public-content">
+                        <h5>{previewName}</h5>
+                        <div className="sp-public-company">{previewCompany}</div>
+                        <div className="sp-public-role">{previewRole}</div>
+                        <p>{previewAbout}</p>
+                      </div>
                     </div>
-                  </label>
-                )}
-                {showAddress3 && (
-                  <label className="sp-field sp-span-2">
-                    <span>Address 3</span>
-                    <div className="sp-input-with-actions">
-                      <input value={form.address3} onChange={e => setForm(p => ({ ...p, address3: e.target.value }))} />
-                      <button
-                        type="button"
-                        className="sp-input-action-btn remove"
-                        title="Remove Address 3"
-                        onClick={() => {
-                          setForm((p) => ({ ...p, address3: '' }));
-                          setShowAddress3(false);
-                        }}
-                      >
-                        -
-                      </button>
+                    <div className="sp-public-actions">
+                      {previewPrimaryContact && <span>{previewPrimaryContact}</span>}
+                      {previewWhatsapp && <span>WhatsApp</span>}
+                      {previewWebsite && <span>Website</span>}
                     </div>
-                  </label>
-                )}
-                <label className="sp-field">
-                  <span>City</span>
-                  <input value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>State</span>
-                  <input value={form.state} onChange={e => setForm(p => ({ ...p, state: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>WhatsApp No</span>
-                  <div className="sp-whatsapp-row">
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      autoComplete="tel-national"
-                      pattern="[0-9]*"
-                      maxLength={13}
-                      placeholder="WhatsApp number"
-                      value={form.whatsapp_number}
-                      onChange={(e) => setForm((p) => ({ ...p, whatsapp_number: sanitizeDigits(e.target.value, 13) }))}
-                      onKeyDown={(e) => {
-                        if (['e', 'E', '+', '-', '.'].includes(e.key)) {
-                          e.preventDefault();
-                        }
-                      }}
-                    />
-                  </div>
-                </label>
-                <label className="sp-field">
-                  <span>Website URL</span>
-                  <input value={form.website_url} onChange={e => setForm(p => ({ ...p, website_url: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>Catalog URL</span>
-                  <input value={form.catalog_url} onChange={e => setForm(p => ({ ...p, catalog_url: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>Facebook</span>
-                  <input value={form.facebook} onChange={e => setForm(p => ({ ...p, facebook: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>Instagram</span>
-                  <input value={form.instagram} onChange={e => setForm(p => ({ ...p, instagram: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>X</span>
-                  <input value={form.X} onChange={e => setForm(p => ({ ...p, X: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>LinkedIn</span>
-                  <input value={form.linkedin} onChange={e => setForm(p => ({ ...p, linkedin: e.target.value }))} />
-                </label>
-                <label className="sp-field">
-                  <span>Badge Label</span>
-                  <input value={form.badge_label} onChange={e => setForm(p => ({ ...p, badge_label: e.target.value }))} />
-                </label>
-              </div>
-
-              {saveError && <div className="sp-error">{saveError}</div>}
-
-              <div className="sp-form-actions">
-                <button
-                  className="sp-secondary"
-                  onClick={() => {
-                    if (isCreateMode || isEditRoute) {
-                      navigate('/sponsor', { state: { userName, trust } });
-                      return;
-                    }
-                    setShowForm(false);
-                    setSelectedId(null);
-                    setSaveError('');
-                  }}
-                  type="button"
-                >
-                  Close
-                </button>
-                <button className="sp-primary" onClick={handleSave} disabled={saving} type="button">
-                  {saving ? 'Saving...' : 'Save Sponsor'}
-                </button>
-              </div>
+                  </article>
+                </aside>
               </div>
             </section>
           )}

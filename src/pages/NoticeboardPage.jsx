@@ -771,19 +771,24 @@ export default function NoticeboardPage() {
                         placeholder="Enter notice title"
                       />
                     </label>
-                    <label>
+                    <div>
                       <span>Type</span>
-                      <select
-                        value={form.type}
-                        onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-                      >
+                      <div className="dn-choice-row" role="radiogroup" aria-label="Notice Type">
                         {NOTICE_TYPE_OPTIONS.map((typeValue) => (
-                          <option key={typeValue} value={typeValue}>
-                            {typeValue === 'vip' ? 'VIP' : 'general'}
-                          </option>
+                          <button
+                            key={typeValue}
+                            type="button"
+                            role="radio"
+                            aria-checked={form.type === typeValue}
+                            className={`dn-choice-btn ${form.type === typeValue ? 'active' : ''}`}
+                            onClick={() => setForm((prev) => ({ ...prev, type: typeValue }))}
+                          >
+                            <span className="dn-choice-dot" aria-hidden="true" />
+                            <span className="dn-choice-label">{typeValue === 'vip' ? 'VIP' : 'general'}</span>
+                          </button>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    </div>
                     <label>
                       <span>Status</span>
                       <select

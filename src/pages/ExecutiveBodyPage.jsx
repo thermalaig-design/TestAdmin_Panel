@@ -2,33 +2,32 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import PageHeader from '../components/PageHeader';
-import { fetchRegisteredMembersDirectory } from '../services/membersService';
+import { createMemberRole, fetchMemberRolesByTrust, fetchRegisteredMembersByTrust, updateMemberRole } from '../services/membersService';
 import './ExecutiveBodyPage.css';
 
-const TITLE_FIELD_OPTIONS = [
-  { value: 'name', label: 'Name' },
-  { value: 'membership_number', label: 'Membership Number' },
-  { value: 'role', label: 'Role' },
-  { value: 'company_name', label: 'Company Name' },
+const ROLE_TYPE_OPTIONS = [
+  { value: 'all', label: 'All Types' },
+  { value: 'committee', label: 'Committee' },
+  { value: 'elected', label: 'Elected' },
 ];
-
-const SUBTITLE_FIELD_OPTIONS = [
-  { value: 'role', label: 'Role' },
-  { value: 'membership_number', label: 'Membership Number' },
-  { value: 'mobile', label: 'Mobile' },
-  { value: 'email', label: 'Email' },
-  { value: 'joined_date', label: 'Joined Date' },
-  { value: 'company_name', label: 'Company Name' },
-];
+const LEFT_PAGE_SIZE = 8;
 
 function toText(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim();
 }
 
-function getRoleLabel(value) {
-  const role = toText(value);
-  return role || 'Unassigned';
+function initials(name = '') {
+  const text = toText(name);
+  if (!text) return 'M';
+  return (
+    text
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((item) => item[0]?.toUpperCase() || '')
+      .join('') || 'M'
+  );
 }
 
 function formatDate(value) {
@@ -39,22 +38,10 @@ function formatDate(value) {
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function getFieldValue(member = {}, field) {
-  const value = member?.[field];
-  if (field === 'joined_date') return formatDate(value);
-  if (field === 'role') return getRoleLabel(value);
-  return toText(value) || '-';
-}
-
-function initials(name = '') {
-  const text = toText(name);
-  if (!text) return 'M';
-  return text
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((item) => item[0]?.toUpperCase() || '')
-    .join('') || 'M';
+function formatRoleType(value) {
+  const normalized = toText(value).toLowerCase();
+  if (!normalized) return '-';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 export default function ExecutiveBodyPage() {
@@ -64,26 +51,24 @@ export default function ExecutiveBodyPage() {
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'quick-actions';
   const trustId = trust?.id || null;
 
-  const [members, setMembers] = useState([]);
+  const [roleMembers, setRoleMembers] = useState([]);
+  const [registeredMembers, setRegisteredMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [selectedMemberId, setSelectedMemberId] = useState('');
-  const [titleField, setTitleField] = useState('name');
-  const [subtitleField, setSubtitleField] = useState('role');
-  const openMemberProfile = (openEdit = false) => {
-    if (!selectedMember?.member_id) return;
-    navigate('/member-profile', {
-      state: {
-        userName,
-        trust,
-        sidebarNavKey: currentSidebarNavKey,
-        selectedMemberId: selectedMember.member_id,
-        openEdit,
-      },
-    });
-  };
+  const [sortBy, setSortBy] = useState('name_asc');
+  const [roleTypeFilter, setRoleTypeFilter] = useState('all');
+  const [selectedGroupKey, setSelectedGroupKey] = useState('');
+  const [leftPage, setLeftPage] = useState(1);
+  const [editRoleId, setEditRoleId] = useState('');
+  const [editForm, setEditForm] = useState({ role_type: 'committee', title: '', subtitle: '' });
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({ reg_id: '', role_type: 'committee', title: '', subtitle: '' });
+  const [createError, setCreateError] = useState('');
+  const [createSaving, setCreateSaving] = useState(false);
+  const normalizedTrustId = String(trustId || '');
 
   useEffect(() => {
     if (!trustId) {
@@ -91,113 +76,283 @@ export default function ExecutiveBodyPage() {
       return;
     }
 
+    let cancelled = false;
+
     const load = async () => {
       setLoading(true);
       setError('');
-      const { data, error: fetchError } = await fetchRegisteredMembersDirectory(trustId);
+      const { data: roleData, error: fetchError } = await fetchMemberRolesByTrust(trustId);
+
       if (fetchError) {
-        setError(fetchError.message || 'Unable to load executive body members.');
-        setMembers([]);
+        if (cancelled) return;
+        setError(fetchError.message || 'Unable to load executive body roles.');
+        setRoleMembers([]);
+        setRegisteredMembers([]);
         setLoading(false);
         return;
       }
 
-      const trustMembers = (data || []).filter((item) => String(item?.trust_id || '') === String(trustId));
-      setMembers(trustMembers);
-      setSelectedMemberId((prev) => prev || trustMembers[0]?.id || '');
+      const trustOnlyRoleData = (roleData || []).filter(
+        (item) => String(item?.member?.trust_id || '') === normalizedTrustId
+      );
+
+      if (cancelled) return;
+      setRoleMembers(trustOnlyRoleData);
+      setSelectedGroupKey((prev) => prev || toText(trustOnlyRoleData?.[0]?.title).toLowerCase() || '');
       setLoading(false);
+
+      // Lazy load: this data is needed mainly for create modal dropdown, so don't block initial paint.
+      const { data: registeredData } = await fetchRegisteredMembersByTrust(trustId);
+      if (cancelled) return;
+      const trustOnlyRegisteredData = (registeredData || []).filter(
+        (item) => String(item?.trust_id || '') === normalizedTrustId
+      );
+      setRegisteredMembers(trustOnlyRegisteredData);
     };
 
     load();
-  }, [navigate, trustId, userName, trust, currentSidebarNavKey]);
 
-  const roleCounts = useMemo(() => {
-    const counts = members.reduce((acc, member) => {
-      const key = getRoleLabel(member?.role);
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, trustId, trust, userName, currentSidebarNavKey, normalizedTrustId]);
 
-    const entries = Object.entries(counts).sort((left, right) => left[0].localeCompare(right[0], undefined, { sensitivity: 'base' }));
-    return { total: members.length, entries };
-  }, [members]);
-  const roleTypeOptions = useMemo(
-    () => [
-      { value: 'all', label: `All Roles (${roleCounts.total})` },
-      ...roleCounts.entries.map(([roleName, count]) => ({
-        value: roleName,
-        label: `${roleName} (${count})`,
-      })),
-    ],
-    [roleCounts]
-  );
-  const titleFieldOptions = useMemo(
-    () =>
-      TITLE_FIELD_OPTIONS.filter((option) =>
-        members.some((member) => toText(member?.[option.value]))
-      ),
-    [members]
-  );
-  const subtitleFieldOptions = useMemo(
-    () =>
-      SUBTITLE_FIELD_OPTIONS.filter((option) =>
-        members.some((member) => toText(member?.[option.value]))
-      ),
-    [members]
-  );
-
-  const filteredMembers = useMemo(() => {
+  const filteredRoleMembers = useMemo(() => {
     const term = toText(search).toLowerCase();
-    return members
-      .filter((member) => {
-        const roleName = getRoleLabel(member?.role);
-        if (roleFilter !== 'all' && roleName !== roleFilter) return false;
+    return (roleMembers || [])
+      .filter((item) => {
+        const roleType = toText(item?.role_type).toLowerCase();
+        if (roleTypeFilter !== 'all' && roleType !== roleTypeFilter) return false;
         if (!term) return true;
 
+        const member = item?.member || {};
         const searchable = [
+          item?.title,
+          item?.subtitle,
+          item?.role_type,
           member?.name,
+          member?.role,
           member?.membership_number,
           member?.mobile,
           member?.email,
           member?.company_name,
-          roleName,
-        ].map((value) => toText(value).toLowerCase());
+        ]
+          .map((value) => toText(value).toLowerCase())
+          .filter(Boolean);
 
         return searchable.some((value) => value.includes(term));
       })
-      .sort((left, right) => toText(left?.name).localeCompare(toText(right?.name), undefined, { sensitivity: 'base' }));
-  }, [members, roleFilter, search]);
+      .sort((left, right) =>
+        toText(left?.member?.name).localeCompare(toText(right?.member?.name), undefined, { sensitivity: 'base' })
+      );
+  }, [roleMembers, roleTypeFilter, search]);
+
+  const roleTypeCounts = useMemo(() => {
+    const counts = { all: (roleMembers || []).length, committee: 0, elected: 0 };
+    (roleMembers || []).forEach((item) => {
+      const roleType = toText(item?.role_type).toLowerCase();
+      if (roleType === 'committee') counts.committee += 1;
+      if (roleType === 'elected') counts.elected += 1;
+    });
+    return counts;
+  }, [roleMembers]);
+
+  const groupedRoleMembers = useMemo(() => {
+    const groups = new Map();
+    filteredRoleMembers.forEach((item) => {
+      const key = toText(item?.title).toLowerCase() || `untitled-${item?.id}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          groupKey: key,
+          title: toText(item?.title) || 'Member',
+          count: 0,
+          roleTypes: new Set(),
+          representative: item,
+        });
+      }
+      const group = groups.get(key);
+      group.count += 1;
+      group.roleTypes.add(toText(item?.role_type).toLowerCase());
+    });
+    return Array.from(groups.values()).map((group) => {
+      const roleTypeLabel =
+        group.roleTypes.size > 1
+          ? 'Mixed'
+          : formatRoleType(Array.from(group.roleTypes)[0] || '');
+      return {
+        ...group,
+        roleTypeLabel,
+      };
+    }).sort((left, right) => {
+      const base = toText(left?.title).localeCompare(toText(right?.title), undefined, { sensitivity: 'base' });
+      return sortBy === 'name_desc' ? -base : base;
+    });
+  }, [filteredRoleMembers, sortBy]);
 
   useEffect(() => {
-    if (!filteredMembers.length) {
-      setSelectedMemberId('');
+    if (!groupedRoleMembers.length) {
+      setSelectedGroupKey('');
       return;
     }
-    const exists = filteredMembers.some((item) => String(item?.id) === String(selectedMemberId));
-    if (!exists) {
-      setSelectedMemberId(filteredMembers[0]?.id || '');
-    }
-  }, [filteredMembers, selectedMemberId]);
-  useEffect(() => {
-    if (!titleFieldOptions.length) return;
-    if (!titleFieldOptions.some((option) => option.value === titleField)) {
-      setTitleField(titleFieldOptions[0].value);
-    }
-  }, [titleField, titleFieldOptions]);
-  useEffect(() => {
-    if (!subtitleFieldOptions.length) return;
-    if (!subtitleFieldOptions.some((option) => option.value === subtitleField)) {
-      setSubtitleField(subtitleFieldOptions[0].value);
-    }
-  }, [subtitleField, subtitleFieldOptions]);
+    const exists = groupedRoleMembers.some((item) => item.groupKey === selectedGroupKey);
+    if (!exists) setSelectedGroupKey(groupedRoleMembers[0]?.groupKey || '');
+  }, [groupedRoleMembers, selectedGroupKey]);
 
-  const selectedMember = useMemo(
-    () => filteredMembers.find((item) => String(item?.id) === String(selectedMemberId)) || null,
-    [filteredMembers, selectedMemberId]
+  const selectedRoleMember = useMemo(
+    () => groupedRoleMembers.find((item) => item.groupKey === selectedGroupKey) || null,
+    [groupedRoleMembers, selectedGroupKey]
   );
 
-  const titleValue = selectedMember ? getFieldValue(selectedMember, titleField) : '-';
-  const subtitleValue = selectedMember ? getFieldValue(selectedMember, subtitleField) : '-';
+  const registeredMemberOptions = useMemo(() => {
+    const base = (registeredMembers || []).length
+      ? registeredMembers
+      : (roleMembers || []).map((item) => item?.member).filter(Boolean);
+    const unique = new Map();
+    base.forEach((member) => {
+      const id = String(member?.id || member?.registration_id || '').trim();
+      if (!id) return;
+      if (!unique.has(id)) unique.set(id, member);
+    });
+    return Array.from(unique.values())
+      .filter((item) => String(item?.trust_id || '') === normalizedTrustId)
+      .sort((left, right) =>
+      toText(left?.name).localeCompare(toText(right?.name), undefined, { sensitivity: 'base' })
+    );
+  }, [registeredMembers, roleMembers, normalizedTrustId]);
+
+  const leftTotalPages = Math.max(1, Math.ceil(groupedRoleMembers.length / LEFT_PAGE_SIZE));
+
+  useEffect(() => {
+    setLeftPage((prev) => Math.min(Math.max(prev, 1), leftTotalPages));
+  }, [leftTotalPages]);
+
+  useEffect(() => {
+    if (!selectedGroupKey) return;
+    const selectedIndex = groupedRoleMembers.findIndex((item) => item.groupKey === selectedGroupKey);
+    if (selectedIndex < 0) return;
+    const targetPage = Math.floor(selectedIndex / LEFT_PAGE_SIZE) + 1;
+    setLeftPage(targetPage);
+  }, [groupedRoleMembers, selectedGroupKey]);
+
+  const paginatedRoleMembers = useMemo(() => {
+    const start = (leftPage - 1) * LEFT_PAGE_SIZE;
+    return groupedRoleMembers.slice(start, start + LEFT_PAGE_SIZE);
+  }, [groupedRoleMembers, leftPage]);
+
+  const selectedCommitteeMembers = useMemo(() => {
+    const selectedTitle = toText(selectedRoleMember?.title).toLowerCase();
+    if (!selectedTitle) return selectedRoleMember ? [selectedRoleMember] : [];
+    const rows = (filteredRoleMembers || [])
+      .filter((item) => toText(item?.title).toLowerCase() === selectedTitle)
+      .sort((left, right) =>
+        toText(left?.member?.name).localeCompare(toText(right?.member?.name), undefined, { sensitivity: 'base' })
+      );
+    return sortBy === 'name_desc' ? [...rows].reverse() : rows;
+  }, [filteredRoleMembers, selectedRoleMember, sortBy]);
+
+  const startEditRole = (roleItem) => {
+    if (!roleItem?.id) return;
+    setEditRoleId(String(roleItem.id));
+    setEditForm({
+      role_type: toText(roleItem?.role_type).toLowerCase() || 'committee',
+      title: toText(roleItem?.title),
+      subtitle: toText(roleItem?.subtitle),
+    });
+    setEditError('');
+  };
+
+  const closeEditRole = () => {
+    setEditRoleId('');
+    setEditError('');
+    setEditSaving(false);
+  };
+
+  const openCreateRole = () => {
+    setCreateForm({
+      reg_id: String(selectedRoleMember?.reg_id || ''),
+      role_type: toText(selectedRoleMember?.role_type).toLowerCase() || 'committee',
+      title: toText(selectedRoleMember?.title),
+      subtitle: '',
+    });
+    setCreateError('');
+    setCreateOpen(true);
+  };
+
+  const closeCreateRole = () => {
+    setCreateOpen(false);
+    setCreateError('');
+    setCreateSaving(false);
+  };
+
+  const saveEditedRole = async () => {
+    if (!editRoleId) return;
+    if (!toText(editForm.title)) {
+      setEditError('Title is required.');
+      return;
+    }
+    setEditSaving(true);
+    setEditError('');
+    const { data, error: updateError } = await updateMemberRole(editRoleId, editForm);
+    if (updateError) {
+      setEditError(updateError.message || 'Unable to update member role.');
+      setEditSaving(false);
+      return;
+    }
+    setRoleMembers((prev) =>
+      (prev || []).map((item) =>
+        String(item?.id) === String(editRoleId)
+          ? {
+              ...item,
+              role_type: data?.role_type ?? item.role_type,
+              title: data?.title ?? item.title,
+              subtitle: data?.subtitle ?? item.subtitle,
+            }
+          : item
+      )
+    );
+    setEditSaving(false);
+    closeEditRole();
+  };
+
+  const saveCreatedRole = async () => {
+    if (!toText(createForm.reg_id)) {
+      setCreateError('Please select a member.');
+      return;
+    }
+    if (!toText(createForm.title)) {
+      setCreateError('Title is required.');
+      return;
+    }
+    setCreateSaving(true);
+    setCreateError('');
+    const payload = {
+      reg_id: createForm.reg_id,
+      role_type: createForm.role_type,
+      title: createForm.title,
+      subtitle: createForm.subtitle,
+    };
+    const { data, error: createRoleError } = await createMemberRole(payload);
+    if (createRoleError) {
+      setCreateError(createRoleError.message || 'Unable to create executive member role.');
+      setCreateSaving(false);
+      return;
+    }
+
+    const selectedMember = registeredMemberOptions.find((item) => String(item?.id) === String(data?.reg_id)) || null;
+    const createdRole = {
+      id: data?.id,
+      reg_id: data?.reg_id,
+      role_type: data?.role_type || '',
+      title: data?.title || '',
+      subtitle: data?.subtitle || '',
+      created_at: data?.created_at || null,
+      member: selectedMember,
+    };
+    setRoleMembers((prev) => [createdRole, ...(prev || [])]);
+    setSelectedGroupKey(toText(createdRole.title).toLowerCase() || '');
+    setCreateSaving(false);
+    closeCreateRole();
+  };
 
   if (!trustId) return null;
 
@@ -212,108 +367,238 @@ export default function ExecutiveBodyPage() {
       <main className="eb-main">
         <PageHeader
           title="Executive Body"
-          subtitle="Trust-specific members from reg_members"
+          subtitle="Trust members from member_roles table"
           onBack={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         />
 
         <section className="eb-panel">
           <div className="eb-top-filters">
             <label className="eb-field">
-              <span>Search Member</span>
+              <span>Search</span>
               <input
-                placeholder="Search name, role, mobile, email..."
+                placeholder="Search title, member, role, mobile..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
+              <div className="eb-inline-sort">
+                <span>Sort By</span>
+                <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                  <option value="name_asc">Name A-Z</option>
+                  <option value="name_desc">Name Z-A</option>
+                </select>
+              </div>
             </label>
-            <label className="eb-field">
+            <div className="eb-field">
               <span>Role Type</span>
-              <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
-                {roleTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+              <div className="eb-role-type-group" role="group" aria-label="Role Type Filter">
+                {ROLE_TYPE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`eb-role-type-btn ${roleTypeFilter === option.value ? 'active' : ''}`}
+                    onClick={() => setRoleTypeFilter(option.value)}
+                  >
+                    {option.label} ({roleTypeCounts[option.value] ?? 0})
+                  </button>
                 ))}
-              </select>
-            </label>
-            <label className="eb-field">
-              <span>Title</span>
-              <select value={titleField} onChange={(event) => setTitleField(event.target.value)}>
-                {titleFieldOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <small>{titleValue}</small>
-            </label>
-            <label className="eb-field">
-              <span>Subtitle</span>
-              <select value={subtitleField} onChange={(event) => setSubtitleField(event.target.value)}>
-                {subtitleFieldOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <small>{subtitleValue}</small>
-            </label>
+              </div>
+            </div>
           </div>
 
           {loading && <div className="eb-empty">Loading executive body...</div>}
           {!loading && error && <div className="eb-error">{error}</div>}
+
           {!loading && !error && (
             <div className="eb-layout">
               <aside className="eb-left">
                 <div className="eb-left-head">
                   <h3>Members</h3>
-                  <span>{filteredMembers.length}</span>
+                  <span>{groupedRoleMembers.length}</span>
                 </div>
-                {filteredMembers.length === 0 && (
-                  <div className="eb-empty">No members found for selected filters.</div>
+                <button type="button" className="eb-btn eb-btn-primary eb-create-role-btn" onClick={openCreateRole}>
+                  + Create Executive Member
+                </button>
+                {!filteredRoleMembers.length && <div className="eb-empty">No member_roles found for this trust.</div>}
+                {paginatedRoleMembers.map((item) => {
+                  const titleText = toText(item?.title) || 'Member';
+                  const roleTypeText = item.roleTypeLabel || '-';
+                  return (
+                    <button
+                      key={item.groupKey}
+                      type="button"
+                      className={`eb-member-item ${selectedGroupKey === item.groupKey ? 'active' : ''}`}
+                      onClick={() => setSelectedGroupKey(item.groupKey)}
+                    >
+                      <div className="eb-avatar">{initials(titleText)}</div>
+                      <div className="eb-member-meta">
+                        <strong>{titleText}{item.count > 1 ? ` (${item.count})` : ''}</strong>
+                        <span>{roleTypeText}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+                {groupedRoleMembers.length > LEFT_PAGE_SIZE && (
+                  <div className="eb-pagination">
+                    <button
+                      type="button"
+                      className="eb-btn eb-btn-secondary"
+                      onClick={() => setLeftPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={leftPage === 1}
+                    >
+                      Prev
+                    </button>
+                    <span>
+                      Page {leftPage} of {leftTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      className="eb-btn eb-btn-secondary"
+                      onClick={() => setLeftPage((prev) => Math.min(prev + 1, leftTotalPages))}
+                      disabled={leftPage === leftTotalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
                 )}
-                {filteredMembers.map((member) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    className={`eb-member-item ${String(selectedMemberId) === String(member.id) ? 'active' : ''}`}
-                    onClick={() => setSelectedMemberId(member.id)}
-                  >
-                    <div className="eb-avatar">{initials(member?.name)}</div>
-                    <div className="eb-member-meta">
-                      <strong>{toText(member?.name) || 'Member'}</strong>
-                      <span>{getRoleLabel(member?.role)}</span>
-                    </div>
-                  </button>
-                ))}
               </aside>
 
               <section className="eb-right">
-                {!selectedMember && <div className="eb-empty">Select a member to view profile.</div>}
-                {selectedMember && (
+                {!selectedRoleMember && <div className="eb-empty">Select a member to view details.</div>}
+                {selectedRoleMember && (
                   <article className="eb-profile-card">
-                    <div className="eb-profile-top">
-                      <div className="eb-profile-top-left">
-                        <div className="eb-profile-avatar">{initials(selectedMember?.name)}</div>
-                        <div>
-                          <h3>{titleValue}</h3>
-                          <p>{subtitleValue}</p>
+                    <div className="eb-committee-list-wrap">
+                      <div className="eb-committee-head">
+                        <h4>{toText(selectedRoleMember?.title) || 'Committee Members'}</h4>
+                        <span>{selectedCommitteeMembers.length}</span>
+                      </div>
+                      {!selectedCommitteeMembers.length && (
+                        <div className="eb-empty">No members found in this committee.</div>
+                      )}
+                      {selectedCommitteeMembers.map((item) => (
+                        <div key={item.id} className="eb-committee-row">
+                          <div className="eb-committee-col name">{toText(item?.member?.name) || '-'}</div>
+                          <div className="eb-committee-col subtitle">{toText(item?.subtitle) || '-'}</div>
+                          <div className="eb-committee-col role">{toText(item?.member?.role) || '-'}</div>
+                          <div className="eb-committee-col membership">{toText(item?.member?.membership_number) || '-'}</div>
+                          <div className="eb-committee-col mobile">{toText(item?.member?.mobile) || '-'}</div>
+                          <div className="eb-committee-actions">
+                            <button type="button" className="eb-btn eb-btn-primary" onClick={() => startEditRole(item)}>
+                              Edit
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="eb-profile-actions">
-                        <button type="button" className="eb-btn eb-btn-primary" onClick={() => openMemberProfile(true)}>
-                          Edit Details
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="eb-profile-grid">
-                      <div><span>Name</span><strong>{toText(selectedMember?.name) || '-'}</strong></div>
-                      <div><span>Role</span><strong>{getRoleLabel(selectedMember?.role)}</strong></div>
-                      <div><span>Membership Number</span><strong>{toText(selectedMember?.membership_number) || '-'}</strong></div>
-                      <div><span>Joined Date</span><strong>{formatDate(selectedMember?.joined_date)}</strong></div>
-                      <div><span>Status</span><strong>{selectedMember?.is_active ? 'Active' : 'Inactive'}</strong></div>
-                      <div><span>Mobile</span><strong>{toText(selectedMember?.mobile) || '-'}</strong></div>
-                      <div><span>Email</span><strong>{toText(selectedMember?.email) || '-'}</strong></div>
-                      <div><span>Company</span><strong>{toText(selectedMember?.company_name) || '-'}</strong></div>
+                      ))}
                     </div>
                   </article>
                 )}
               </section>
+            </div>
+          )}
+
+          {editRoleId && (
+            <div className="eb-modal-backdrop" onClick={closeEditRole}>
+              <div className="eb-modal-card" onClick={(event) => event.stopPropagation()}>
+                <h4>Edit Member Role</h4>
+                <div className="eb-modal-grid">
+                  <label className="eb-field">
+                    <span>Role Type</span>
+                    <select
+                      value={editForm.role_type}
+                      onChange={(event) => setEditForm((prev) => ({ ...prev, role_type: event.target.value }))}
+                    >
+                      <option value="committee">Committee</option>
+                      <option value="elected">Elected</option>
+                    </select>
+                  </label>
+                  <label className="eb-field">
+                    <span>Title</span>
+                    <input
+                      value={editForm.title}
+                      onChange={(event) => setEditForm((prev) => ({ ...prev, title: event.target.value }))}
+                    />
+                  </label>
+                  <label className="eb-field">
+                    <span>Subtitle</span>
+                    <input
+                      value={editForm.subtitle}
+                      onChange={(event) => setEditForm((prev) => ({ ...prev, subtitle: event.target.value }))}
+                    />
+                  </label>
+                </div>
+                {editError && <div className="eb-error">{editError}</div>}
+                <div className="eb-modal-actions">
+                  <button type="button" className="eb-btn eb-btn-secondary" onClick={closeEditRole}>
+                    Cancel
+                  </button>
+                  <button type="button" className="eb-btn eb-btn-primary" onClick={saveEditedRole} disabled={editSaving}>
+                    {editSaving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {createOpen && (
+            <div className="eb-modal-backdrop" onClick={closeCreateRole}>
+              <div className="eb-modal-card" onClick={(event) => event.stopPropagation()}>
+                <h4>Create Executive Member</h4>
+                <div className="eb-modal-grid">
+                  <label className="eb-field">
+                    <span>Member</span>
+                    <select
+                      value={createForm.reg_id}
+                      onChange={(event) => setCreateForm((prev) => ({ ...prev, reg_id: event.target.value }))}
+                    >
+                      <option value="">Select member</option>
+                      {registeredMemberOptions.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {toText(member?.name) || 'Member'} ({toText(member?.membership_number) || '-'})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="eb-field">
+                    <span>Role Type</span>
+                    <select
+                      value={createForm.role_type}
+                      onChange={(event) => setCreateForm((prev) => ({ ...prev, role_type: event.target.value }))}
+                    >
+                      <option value="committee">Committee</option>
+                      <option value="elected">Elected</option>
+                    </select>
+                  </label>
+                  <label className="eb-field">
+                    <span>Title</span>
+                    <input
+                      value={createForm.title}
+                      onChange={(event) => setCreateForm((prev) => ({ ...prev, title: event.target.value }))}
+                      placeholder="e.g. Fundraising Committee"
+                    />
+                  </label>
+                  <label className="eb-field">
+                    <span>Subtitle</span>
+                    <input
+                      value={createForm.subtitle}
+                      onChange={(event) => setCreateForm((prev) => ({ ...prev, subtitle: event.target.value }))}
+                      placeholder="e.g. Committee"
+                    />
+                  </label>
+                </div>
+                {createError && <div className="eb-error">{createError}</div>}
+                <div className="eb-modal-actions">
+                  <button type="button" className="eb-btn eb-btn-secondary" onClick={closeCreateRole}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="eb-btn eb-btn-primary"
+                    onClick={saveCreatedRole}
+                    disabled={createSaving || !registeredMemberOptions.length}
+                  >
+                    {createSaving ? 'Creating...' : 'Create'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </section>

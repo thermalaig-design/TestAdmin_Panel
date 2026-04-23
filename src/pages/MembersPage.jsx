@@ -44,6 +44,10 @@ const CREATE_NEW_ROLE_VALUE = '__create_new_role__';
 const initials = (value = '') =>
   value.split(' ').map((word) => word[0]).slice(0, 2).join('').toUpperCase() || 'M';
 
+function sanitizeDigits(value) {
+  return String(value ?? '').replace(/\D+/g, '');
+}
+
 function matchesMemberSearch(member = {}, term = '') {
   const normalizedTerm = String(term || '').trim().toLowerCase();
   if (!normalizedTerm) return true;
@@ -177,6 +181,7 @@ export default function MembersPage() {
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
   const [registeringId, setRegisteringId] = useState(null);
+  const [numberWarning, setNumberWarning] = useState('');
   const [loadingDirectory, setLoadingDirectory] = useState(false);
   const [hiddenIds, setHiddenIds] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState('');
@@ -330,22 +335,31 @@ export default function MembersPage() {
         membership_number: selectedMember.membership_number || '',
         role: selectedMember.role || '',
         joined_date: selectedMember.joined_date || '',
-        mobile: selectedMember.mobile || '',
+        mobile: sanitizeDigits(selectedMember.mobile),
         email: selectedMember.email || '',
         address_home: selectedMember.address_home || '',
         address_office: selectedMember.address_office || '',
-        resident_landline: selectedMember.resident_landline || '',
-        office_landline: selectedMember.office_landline || '',
+        resident_landline: sanitizeDigits(selectedMember.resident_landline),
+        office_landline: sanitizeDigits(selectedMember.office_landline),
         is_active: selectedMember.is_active !== false,
       });
       setUseCustomMainRole(
         !!selectedMember.role && !trustRoleOptions.includes(String(selectedMember.role || '').trim())
       );
+      setNumberWarning('');
     } else {
       setForm(EMPTY_FORM);
       setUseCustomMainRole(false);
+      setNumberWarning('');
     }
   }, [selectedMember, trustRoleOptions]);
+
+  const handleNumericFieldChange = (field, rawValue, label) => {
+    const raw = String(rawValue ?? '');
+    const sanitized = sanitizeDigits(raw);
+    setNumberWarning(/\D/.test(raw) ? `Only numbers are allowed in ${label}.` : '');
+    setForm((prev) => ({ ...prev, [field]: sanitized }));
+  };
 
   const openNewMemberForm = () => {
     setShowPicker(false);
@@ -448,12 +462,12 @@ export default function MembersPage() {
       membership_number: form.membership_number.trim() || null,
       role: form.role.trim() || null,
       joined_date: form.joined_date || null,
-      mobile: form.mobile.trim() || null,
+      mobile: sanitizeDigits(form.mobile) || null,
       email: form.email.trim() || null,
       address_home: form.address_home.trim() || null,
       address_office: form.address_office.trim() || null,
-      resident_landline: form.resident_landline.trim() || null,
-      office_landline: form.office_landline.trim() || null,
+      resident_landline: sanitizeDigits(form.resident_landline) || null,
+      office_landline: sanitizeDigits(form.office_landline) || null,
       is_active: !!form.is_active,
     };
 
@@ -694,7 +708,12 @@ export default function MembersPage() {
                     </label>
                     <label className="sp-field">
                       <span>Mobile</span>
-                      <input value={form.mobile} onChange={(e) => setForm((prev) => ({ ...prev, mobile: e.target.value }))} />
+                      <input
+                        value={form.mobile}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        onChange={(e) => handleNumericFieldChange('mobile', e.target.value, 'Mobile')}
+                      />
                     </label>
                     <label className="sp-field">
                       <span>Email</span>
@@ -702,11 +721,21 @@ export default function MembersPage() {
                     </label>
                     <label className="sp-field">
                       <span>Resident Landline</span>
-                      <input value={form.resident_landline} onChange={(e) => setForm((prev) => ({ ...prev, resident_landline: e.target.value }))} />
+                      <input
+                        value={form.resident_landline}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        onChange={(e) => handleNumericFieldChange('resident_landline', e.target.value, 'Resident Landline')}
+                      />
                     </label>
                     <label className="sp-field">
                       <span>Office Landline</span>
-                      <input value={form.office_landline} onChange={(e) => setForm((prev) => ({ ...prev, office_landline: e.target.value }))} />
+                      <input
+                        value={form.office_landline}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        onChange={(e) => handleNumericFieldChange('office_landline', e.target.value, 'Office Landline')}
+                      />
                     </label>
                     <label className="sp-field sp-span-2">
                       <span>Home Address</span>
@@ -717,6 +746,7 @@ export default function MembersPage() {
                       <input value={form.address_office} onChange={(e) => setForm((prev) => ({ ...prev, address_office: e.target.value }))} />
                     </label>
                   </div>
+                  {numberWarning && <div className="sp-warning">{numberWarning}</div>}
                 </div>
 
                 <div className="sp-form-section">

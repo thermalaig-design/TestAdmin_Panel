@@ -84,6 +84,15 @@ const FAMILY_BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 
 const PROFILE_GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const PROFILE_BLOOD_GROUP_OPTIONS = FAMILY_BLOOD_GROUP_OPTIONS;
 const PROFILE_MARITAL_STATUS_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed'];
+const PROFILE_CHILDREN_OPTIONS = Array.from({ length: 10 }, (_, index) => String(index + 1));
+const PROFILE_NUMERIC_FIELD_KEYS = new Set([
+  'mobile',
+  'resident_landline',
+  'office_landline',
+  'whatsapp',
+  'emergency_contact_number',
+  'spouse_contact',
+]);
 const PROFILE_PHOTO_MAX_BYTES = 25 * 1024;
 const FALLBACK_REGION_CODES = [
   'IN', 'US', 'GB', 'CA', 'AU', 'AE', 'DE', 'FR', 'IT', 'ES', 'JP', 'SG', 'MY', 'TH', 'NZ', 'ZA',
@@ -153,6 +162,10 @@ function writeDirectoryCache(trustId, members = []) {
 function toText(value) {
   if (value === null || value === undefined) return '';
   return String(value);
+}
+
+function sanitizeDigits(value) {
+  return String(value ?? '').replace(/\D+/g, '');
 }
 
 function regionNameFromCode(code = '') {
@@ -256,13 +269,13 @@ function buildEditForm(source = {}) {
     membership_number: toText(source.membership_number),
     role: toText(source.role),
     joined_date: toText(source.joined_date),
-    mobile: toText(source.mobile),
+    mobile: sanitizeDigits(source.mobile),
     email: toText(source.email),
     home_address: toText(source.address_home),
     company_name: toText(source.company_name),
     address_office: toText(source.address_office),
-    resident_landline: toText(source.resident_landline),
-    office_landline: toText(source.office_landline),
+    resident_landline: sanitizeDigits(source.resident_landline),
+    office_landline: sanitizeDigits(source.office_landline),
     gender: toText(source.gender),
     date_of_birth: toText(source.date_of_birth),
     blood_group: toText(source.blood_group),
@@ -270,15 +283,15 @@ function buildEditForm(source = {}) {
     nationality: normalizeNationality(source.nationality),
     aadhaar_id: toText(source.aadhaar_id),
     emergency_contact_name: toText(source.emergency_contact_name),
-    emergency_contact_number: toText(source.emergency_contact_number),
+    emergency_contact_number: sanitizeDigits(source.emergency_contact_number),
     spouse_name: toText(source.spouse_name),
-    spouse_contact: toText(source.spouse_contact),
+    spouse_contact: sanitizeDigits(source.spouse_contact),
     no_of_children: toText(source.no_of_children),
     facebook: toText(source.facebook),
     twitter: toText(source.twitter),
     instagram: toText(source.instagram),
     linkedin: toText(source.linkedin),
-    whatsapp: toText(source.whatsapp),
+    whatsapp: sanitizeDigits(source.whatsapp),
   };
 }
 
@@ -304,7 +317,7 @@ function buildFamilyForm(source = {}) {
     gender: toText(source.gender),
     age: toText(source.age),
     blood_group: toText(source.blood_group),
-    contact_no: toText(source.contact_no),
+    contact_no: sanitizeDigits(source.contact_no),
     email: toText(source.email),
     address: toText(source.address),
   };
@@ -473,6 +486,8 @@ export default function MemberProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [numberWarning, setNumberWarning] = useState('');
+  const [familyNumberWarning, setFamilyNumberWarning] = useState('');
   const [editForm, setEditForm] = useState(() => buildEditForm());
   const [pendingProfilePhotoFile, setPendingProfilePhotoFile] = useState(null);
   const [pendingProfilePhotoPreviewUrl, setPendingProfilePhotoPreviewUrl] = useState('');
@@ -832,6 +847,15 @@ export default function MemberProfilePage() {
     if (key === 'nationality') return normalizeNationality(profile?.[key]);
     return toText(profile?.[key]);
   };
+  const handleEditFieldChange = (key, rawValue) => {
+    const isNumericField = PROFILE_NUMERIC_FIELD_KEYS.has(key);
+    const raw = String(rawValue ?? '');
+    const value = isNumericField ? sanitizeDigits(raw) : raw;
+    if (isNumericField) {
+      setNumberWarning(/\D/.test(raw) ? `Only numbers are allowed in ${String(key).replace(/_/g, ' ')}.` : '');
+    }
+    setEditForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   const getBasicDetailFieldOptions = (key) => {
     if (key === 'gender') {
@@ -859,6 +883,7 @@ export default function MemberProfilePage() {
       !!profile.role && !trustRoleOptions.includes(String(profile.role || '').trim())
     );
     setSaveError('');
+    setNumberWarning('');
     setIsEditing(true);
   };
 
@@ -876,6 +901,7 @@ export default function MemberProfilePage() {
     setEditForm(buildEditForm(profile || {}));
     setUseCustomEditRole(false);
     setSaveError('');
+    setNumberWarning('');
     setIsEditing(false);
   };
 
@@ -913,12 +939,12 @@ export default function MemberProfilePage() {
           membership_number: editForm.membership_number.trim() || null,
           role: editForm.role.trim() || null,
           joined_date: editForm.joined_date || null,
-          mobile: editForm.mobile.trim() || null,
+          mobile: sanitizeDigits(editForm.mobile) || null,
           email: editForm.email.trim() || null,
           address_home: editForm.home_address.trim() || null,
           address_office: editForm.address_office.trim() || null,
-          resident_landline: editForm.resident_landline.trim() || null,
-          office_landline: editForm.office_landline.trim() || null,
+          resident_landline: sanitizeDigits(editForm.resident_landline) || null,
+          office_landline: sanitizeDigits(editForm.office_landline) || null,
           gender: editForm.gender.trim() || null,
           date_of_birth: editForm.date_of_birth || null,
           blood_group: editForm.blood_group.trim() || null,
@@ -926,15 +952,15 @@ export default function MemberProfilePage() {
           nationality: editForm.nationality.trim() || null,
           aadhaar_id: editForm.aadhaar_id.trim() || null,
           emergency_contact_name: editForm.emergency_contact_name.trim() || null,
-          emergency_contact_number: editForm.emergency_contact_number.trim() || null,
+          emergency_contact_number: sanitizeDigits(editForm.emergency_contact_number) || null,
           spouse_name: editForm.spouse_name.trim() || null,
-          spouse_contact: editForm.spouse_contact.trim() || null,
+          spouse_contact: sanitizeDigits(editForm.spouse_contact) || null,
           no_of_children: editForm.no_of_children.trim() || null,
           facebook: editForm.facebook.trim() || null,
           twitter: editForm.twitter.trim() || null,
           instagram: editForm.instagram.trim() || null,
           linkedin: editForm.linkedin.trim() || null,
-          whatsapp: editForm.whatsapp.trim() || null,
+          whatsapp: sanitizeDigits(editForm.whatsapp) || null,
           is_active: profile.is_active !== false,
         }
       : {
@@ -1010,6 +1036,7 @@ export default function MemberProfilePage() {
   const handleStartFamilyAdd = () => {
     if (!canEditFamily) return;
     setFamilyError('');
+    setFamilyNumberWarning('');
     setFamilyForm(buildFamilyForm());
     setIsFamilyEditing(true);
   };
@@ -1017,6 +1044,7 @@ export default function MemberProfilePage() {
   const handleStartFamilyEdit = (member) => {
     if (!canEditFamily) return;
     setFamilyError('');
+    setFamilyNumberWarning('');
     setFamilyForm(buildFamilyForm(member));
     setIsFamilyEditing(true);
   };
@@ -1024,6 +1052,7 @@ export default function MemberProfilePage() {
   const handleCancelFamilyEdit = () => {
     setFamilyForm(buildFamilyForm());
     setFamilyError('');
+    setFamilyNumberWarning('');
     setIsFamilyEditing(false);
   };
 
@@ -1047,7 +1076,7 @@ export default function MemberProfilePage() {
       gender: familyForm.gender || null,
       age: familyForm.age || null,
       blood_group: familyForm.blood_group || null,
-      contact_no: familyForm.contact_no || null,
+      contact_no: sanitizeDigits(familyForm.contact_no) || null,
       email: familyForm.email || null,
       address: familyForm.address || null,
     };
@@ -1355,6 +1384,8 @@ export default function MemberProfilePage() {
               {error && <div className="mp-error-card">{error}</div>}
               {saveError && <div className="mp-error-card">{saveError}</div>}
               {familyError && <div className="mp-error-card">{familyError}</div>}
+              {numberWarning && <div className="mp-warning-card">{numberWarning}</div>}
+              {familyNumberWarning && <div className="mp-warning-card">{familyNumberWarning}</div>}
 
               {!loadingMembers && profile && (
                 <>
@@ -1552,7 +1583,7 @@ export default function MemberProfilePage() {
                                     }}
                                     onChange={(event) => {
                                       if (!isFieldEditable(field.key)) return;
-                                      setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
+                                      handleEditFieldChange(field.key, event.target.value);
                                     }}
                                     readOnly={!isFieldEditable(field.key)}
                                   />
@@ -1571,9 +1602,11 @@ export default function MemberProfilePage() {
                                 <span>{field.label}</span>
                                 <input
                                   value={getProfileFieldValue(field.key)}
+                                  inputMode={PROFILE_NUMERIC_FIELD_KEYS.has(field.key) ? 'numeric' : undefined}
+                                  pattern={PROFILE_NUMERIC_FIELD_KEYS.has(field.key) ? '[0-9]*' : undefined}
                                   onChange={(event) => {
                                     if (!isFieldEditable(field.key)) return;
-                                    setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
+                                    handleEditFieldChange(field.key, event.target.value);
                                   }}
                                   readOnly={!isFieldEditable(field.key)}
                                 />
@@ -1604,7 +1637,34 @@ export default function MemberProfilePage() {
                                         }}
                                         disabled={!isFieldEditable(field.key)}
                                       />
-                                    ) : section.title === 'Basic Details' && ['gender', 'blood_group', 'marital_status', 'nationality'].includes(field.key) ? (
+                                    ) : section.title === 'Basic Details' && field.key === 'gender' ? (
+                                      <div className="mp-choice-row" role="radiogroup" aria-label="Gender">
+                                        {(() => {
+                                          const currentValue = getProfileFieldValue(field.key);
+                                          const hasCurrent = PROFILE_GENDER_OPTIONS.includes(currentValue);
+                                          const safeOptions = hasCurrent || !currentValue
+                                            ? PROFILE_GENDER_OPTIONS
+                                            : [currentValue, ...PROFILE_GENDER_OPTIONS];
+                                          return safeOptions.map((option) => (
+                                            <button
+                                              key={`${field.key}-${option}`}
+                                              type="button"
+                                              role="radio"
+                                              aria-checked={currentValue === option}
+                                              className={`mp-choice-btn ${currentValue === option ? 'active' : ''}`}
+                                              onClick={() => {
+                                                if (!isFieldEditable(field.key)) return;
+                                                setEditForm((prev) => ({ ...prev, [field.key]: option }));
+                                              }}
+                                              disabled={!isFieldEditable(field.key)}
+                                            >
+                                              <span className="mp-choice-dot" aria-hidden="true" />
+                                              <span className="mp-choice-label">{option}</span>
+                                            </button>
+                                          ));
+                                        })()}
+                                      </div>
+                                    ) : section.title === 'Basic Details' && ['blood_group', 'marital_status', 'nationality'].includes(field.key) ? (
                                       <select
                                         value={getProfileFieldValue(field.key)}
                                         onChange={(event) => {
@@ -1628,12 +1688,37 @@ export default function MemberProfilePage() {
                                           ));
                                         })()}
                                       </select>
-                                    ) : (
-                                      <input
+                                    ) : field.key === 'no_of_children' ? (
+                                      <select
                                         value={getProfileFieldValue(field.key)}
                                         onChange={(event) => {
                                           if (!isFieldEditable(field.key)) return;
                                           setEditForm((prev) => ({ ...prev, [field.key]: event.target.value }));
+                                        }}
+                                        disabled={!isFieldEditable(field.key)}
+                                      >
+                                        <option value="">Select</option>
+                                        {(() => {
+                                          const currentValue = getProfileFieldValue(field.key);
+                                          const hasCurrent = PROFILE_CHILDREN_OPTIONS.includes(currentValue);
+                                          const safeOptions = hasCurrent || !currentValue
+                                            ? PROFILE_CHILDREN_OPTIONS
+                                            : [currentValue, ...PROFILE_CHILDREN_OPTIONS];
+                                          return safeOptions.map((option) => (
+                                            <option key={`${field.key}-${option}`} value={option}>
+                                              {option}
+                                            </option>
+                                          ));
+                                        })()}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        value={getProfileFieldValue(field.key)}
+                                        inputMode={PROFILE_NUMERIC_FIELD_KEYS.has(field.key) ? 'numeric' : undefined}
+                                        pattern={PROFILE_NUMERIC_FIELD_KEYS.has(field.key) ? '[0-9]*' : undefined}
+                                        onChange={(event) => {
+                                          if (!isFieldEditable(field.key)) return;
+                                          handleEditFieldChange(field.key, event.target.value);
                                         }}
                                         readOnly={!isFieldEditable(field.key)}
                                       />
@@ -1716,13 +1801,21 @@ export default function MemberProfilePage() {
                             </label>
                             <label>
                               <span>Gender</span>
-                              <select
-                                value={familyForm.gender}
-                                onChange={(event) => setFamilyForm((prev) => ({ ...prev, gender: event.target.value }))}
-                              >
-                                <option value="">Select</option>
-                                {FAMILY_GENDER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                              </select>
+                              <div className="mp-choice-row" role="radiogroup" aria-label="Family Gender">
+                                {FAMILY_GENDER_OPTIONS.map((option) => (
+                                  <button
+                                    key={option}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={familyForm.gender === option}
+                                    className={`mp-choice-btn ${familyForm.gender === option ? 'active' : ''}`}
+                                    onClick={() => setFamilyForm((prev) => ({ ...prev, gender: option }))}
+                                  >
+                                    <span className="mp-choice-dot" aria-hidden="true" />
+                                    <span className="mp-choice-label">{option}</span>
+                                  </button>
+                                ))}
+                              </div>
                             </label>
                             <label>
                               <span>Age</span>
@@ -1747,7 +1840,13 @@ export default function MemberProfilePage() {
                               <span>Contact No</span>
                               <input
                                 value={familyForm.contact_no}
-                                onChange={(event) => setFamilyForm((prev) => ({ ...prev, contact_no: event.target.value }))}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                onChange={(event) => {
+                                  const raw = String(event.target.value ?? '');
+                                  setFamilyNumberWarning(/\D/.test(raw) ? 'Only numbers are allowed in family contact number.' : '');
+                                  setFamilyForm((prev) => ({ ...prev, contact_no: sanitizeDigits(raw) }));
+                                }}
                               />
                             </label>
                             <label>

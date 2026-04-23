@@ -2,7 +2,9 @@ import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'facilities';
-const FACILITIES_BUCKET = 'facilities';
+const FACILITIES_BUCKET = String(import.meta?.env?.VITE_FACILITIES_BUCKET || 'facilities').trim() || 'facilities';
+const LEGACY_FACILITIES_BUCKETS = new Set(['facilities']);
+const FACILITY_SIGNED_URL_TTL_SECONDS = 60 * 60;
 const MAX_FETCH = 50;
 
 function uniqueId() {
@@ -14,7 +16,10 @@ function uniqueId() {
 
 function extensionFromFile(file) {
   const fromName = String(file?.name || '').split('.').pop()?.toLowerCase();
-  if (fromName && fromName.length <= 5) return fromName;
+  if (fromName) {
+    if (fromName === 'jpeg' || fromName === 'jpg' || fromName === 'jfif') return 'jpg';
+    if (fromName.length <= 5) return fromName;
+  }
   const mime = String(file?.type || '').toLowerCase();
   if (mime.includes('png')) return 'png';
   if (mime.includes('webp')) return 'webp';
@@ -26,6 +31,65 @@ function buildAttachmentPath(trustId, file) {
   const ext = extensionFromFile(file);
   const safeTrustId = String(trustId || 'misc').replace(/[^a-zA-Z0-9_-]/g, '') || 'misc';
   return `${safeTrustId}/${Date.now()}-${uniqueId()}.${ext}`;
+}
+
+function extractStorageObjectInfo(rawUrl = '') {
+  const value = String(rawUrl || '').trim();
+  if (!value || value.startsWith('data:')) return null;
+
+  try {
+    const parsed = new URL(value);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const objectIdx = parts.findIndex((part, idx) =>
+      part === 'object' &&
+      parts[idx - 2] === 'storage' &&
+      parts[idx - 1] === 'v1'
+    );
+    if (objectIdx < 0) return null;
+
+    const bucket = String(parts[objectIdx + 2] || '').trim();
+    const objectPath = decodeURIComponent(parts.slice(objectIdx + 3).join('/'));
+    if (!bucket || !objectPath) return null;
+    return { bucket, objectPath };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeFacilitiesBucket(bucket = '') {
+  if (bucket === FACILITIES_BUCKET) return bucket;
+  if (LEGACY_FACILITIES_BUCKETS.has(bucket)) return FACILITIES_BUCKET;
+  return bucket;
+}
+
+export async function resolveFacilitiesAttachmentUrl(rawUrl = '', expiresIn = FACILITY_SIGNED_URL_TTL_SECONDS) {
+  const info = extractStorageObjectInfo(rawUrl);
+  if (!info) return { data: { signedUrl: String(rawUrl || '').trim() }, error: null };
+
+  const bucket = normalizeFacilitiesBucket(info.bucket);
+  if (!bucket) return { data: { signedUrl: String(rawUrl || '').trim() }, error: null };
+
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(info.objectPath, expiresIn);
+  if (error || !data?.signedUrl) {
+    return { data: { signedUrl: String(rawUrl || '').trim() }, error };
+  }
+
+  return { data: { signedUrl: data.signedUrl }, error: null };
+}
+
+async function refreshAttachmentsWithSignedUrls(attachments = []) {
+  if (!Array.isArray(attachments) || !attachments.length) return [];
+
+  const resolved = await Promise.all(
+    attachments.map(async (item) => {
+      const raw = String(item || '').trim();
+      if (!raw || raw.startsWith('data:')) return raw;
+      const { data } = await resolveFacilitiesAttachmentUrl(raw);
+      return String(data?.signedUrl || raw).trim();
+    })
+  );
+
+  return resolved.filter(Boolean);
 }
 
 function normalizeRow(row = {}) {
@@ -57,7 +121,17 @@ export async function fetchFacilitiesByTrust(trustId) {
         .order('created_at', { ascending: false })
         .range(0, MAX_FETCH - 1);
 
-      return { data: (data || []).map(normalizeRow), error };
+      if (error) return { data: [], error };
+
+      const normalizedRows = await Promise.all(
+        (data || []).map(async (row) => {
+          const normalized = normalizeRow(row);
+          const refreshedAttachments = await refreshAttachmentsWithSignedUrls(normalized.attachments);
+          return { ...normalized, attachments: refreshedAttachments };
+        })
+      );
+
+      return { data: normalizedRows, error: null };
     },
     12000
   );
@@ -76,13 +150,35 @@ export async function uploadFacilitiesAttachment(file, { trustId = null } = {}) 
     contentType: file.type || undefined,
   });
 
-  if (uploadError) return { data: null, error: uploadError };
+  if (uploadError) {
+    if (String(uploadError.message || '').toLowerCase().includes('bucket not found')) {
+      return {
+        data: null,
+        error: {
+          ...uploadError,
+          message: `Storage bucket "${FACILITIES_BUCKET}" not found. Create this bucket in Supabase Storage or set VITE_FACILITIES_BUCKET correctly.`,
+        },
+      };
+    }
+    return { data: null, error: uploadError };
+  }
 
-  const { data: publicData } = supabase.storage.from(FACILITIES_BUCKET).getPublicUrl(path);
+  const { data: signedData, error: signError } = await supabase
+    .storage
+    .from(FACILITIES_BUCKET)
+    .createSignedUrl(path, FACILITY_SIGNED_URL_TTL_SECONDS);
+
+  if (signError || !signedData?.signedUrl) {
+    return {
+      data: null,
+      error: signError || { message: 'Uploaded image but failed to generate signed URL.' },
+    };
+  }
+
   return {
     data: {
       path,
-      publicUrl: publicData?.publicUrl || null,
+      publicUrl: signedData.signedUrl || null,
     },
     error: null,
   };
@@ -91,12 +187,16 @@ export async function uploadFacilitiesAttachment(file, { trustId = null } = {}) 
 export async function createFacility(payload = {}) {
   if (!payload.trust_id) return { data: null, error: { message: 'No trust id provided.' } };
 
+  const normalizedAttachments = await refreshAttachmentsWithSignedUrls(
+    Array.isArray(payload.attachments) ? payload.attachments : []
+  );
+
   const row = {
     trust_id: payload.trust_id,
     type: payload.type || 'gen',
     name: String(payload.name || '').trim(),
     description: String(payload.description || '').trim() || null,
-    attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+    attachments: normalizedAttachments,
     status: payload.status || 'active',
     created_by: payload.created_by || null,
   };
@@ -109,13 +209,18 @@ export async function createFacility(payload = {}) {
 export async function updateFacility(facilityId, updates = {}, trustId = null) {
   if (!facilityId) return { data: null, error: { message: 'No facility id provided.' } };
 
+  const normalizedAttachments =
+    updates.attachments !== undefined
+      ? await refreshAttachmentsWithSignedUrls(Array.isArray(updates.attachments) ? updates.attachments : [])
+      : undefined;
+
   const payload = {
     ...(updates.name !== undefined ? { name: String(updates.name || '').trim() } : {}),
     ...(updates.description !== undefined
       ? { description: String(updates.description || '').trim() || null }
       : {}),
     ...(updates.attachments !== undefined
-      ? { attachments: Array.isArray(updates.attachments) ? updates.attachments : [] }
+      ? { attachments: normalizedAttachments || [] }
       : {}),
     ...(updates.status !== undefined ? { status: updates.status } : {}),
     ...(updates.type !== undefined ? { type: updates.type } : {}),

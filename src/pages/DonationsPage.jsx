@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
@@ -8,13 +8,15 @@ import {
   fetchDonationsByTrust,
   updateDonation,
 } from '../services/donationsService';
+import { parseAttachmentItem } from '../utils/attachmentUtils';
 import './NoticeboardPage.css';
 
 const DONATION_STATUS_OPTIONS = ['active', 'inactive'];
 const DONATION_AMOUNT_TYPE_OPTIONS = ['fixed', 'variable', 'monthly'];
-const DONATION_TYPE_OPTIONS = ['general', 'campaign', 'other'];
+const DONATION_TYPE_OPTIONS = ['general', 'vip'];
 const PARTIAL_MONEY_RE = /^\d*(?:\.\d{0,2})?$/;
 const MONEY_RE = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
+const MAX_DONATION_IMAGE_SIZE_BYTES = 25 * 1024;
 
 function formatDate(value) {
   if (!value) return '-';
@@ -52,6 +54,69 @@ function formatMoney(value) {
   });
 }
 
+function isImageFile(file) {
+  return String(file?.type || '').toLowerCase().startsWith('image/');
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Unable to process selected image.'));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Unable to read selected image.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function compressImageToLimit(file, maxBytes) {
+  if ((file?.size || 0) <= maxBytes) return { file };
+
+  const image = await loadImageFromFile(file);
+  const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
+  const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
+  for (let scaleStep = 0; scaleStep < 10; scaleStep += 1) {
+    const scale = Math.pow(0.8, scaleStep);
+    const targetWidth = Math.max(120, Math.round(baseWidth * scale));
+    const targetHeight = Math.max(120, Math.round(baseHeight * scale));
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    context.clearRect(0, 0, targetWidth, targetHeight);
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    for (let quality = 0.82; quality >= 0.18; quality -= 0.07) {
+      const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
+      if (blob && blob.size <= maxBytes) return { file: blob };
+    }
+  }
+
+  return null;
+}
+
 export default function DonationsPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -76,6 +141,10 @@ export default function DonationsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [editingId, setEditingId] = useState(null);
+  const [attachmentDragOver, setAttachmentDragOver] = useState(false);
+  const [attachmentWarning, setAttachmentWarning] = useState('');
+  const [processingAttachment, setProcessingAttachment] = useState(false);
+  const attachmentInputRef = useRef(null);
   const deferredSearch = useDeferredValue(search);
   const PAGE_SIZE = 10;
 
@@ -102,6 +171,8 @@ export default function DonationsPage() {
     });
     setFormError('');
     setAmountWarning('');
+    setAttachmentWarning('');
+    setAttachmentDragOver(false);
     setEditingId(null);
   };
 
@@ -264,6 +335,8 @@ export default function DonationsPage() {
       return;
     }
 
+    const attachmentValues = parseAttachments(form.attachments).slice(0, 1);
+
     setSaving(true);
     const payload = {
       trust_id: trustId,
@@ -273,7 +346,7 @@ export default function DonationsPage() {
       amount_type: form.amount_type,
       status: form.status || 'active',
       type: form.type,
-      attachments: parseAttachments(form.attachments),
+      attachments: attachmentValues,
     };
 
     if (editingId) {
@@ -329,11 +402,58 @@ export default function DonationsPage() {
     });
     setEditingId(item.id);
     setFormError('');
+    setAttachmentWarning('');
     setActiveMenuId(null);
     navigate(`/donations/edit_details?id=${item.id}`, {
       state: { userName, trust, editId: item.id, sidebarNavKey: currentSidebarNavKey },
     });
   };
+
+  const handleAttachmentFile = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    const file = files[0];
+    setFormError('');
+
+    if (files.length > 1) {
+      setAttachmentWarning('Only one image is allowed. First selected image is used.');
+    } else {
+      setAttachmentWarning('');
+    }
+
+    if (!isImageFile(file)) {
+      setAttachmentWarning('Only image files are allowed for donation attachment.');
+      return;
+    }
+
+    setProcessingAttachment(true);
+    try {
+      const processed = await compressImageToLimit(file, MAX_DONATION_IMAGE_SIZE_BYTES);
+      if (!processed?.file) {
+        setAttachmentWarning(`Image could not be compressed to ${Math.floor(MAX_DONATION_IMAGE_SIZE_BYTES / 1024)}KB.`);
+        return;
+      }
+
+      const outputBlob = processed.file;
+      if ((outputBlob.size || 0) > MAX_DONATION_IMAGE_SIZE_BYTES) {
+        setAttachmentWarning(`Image must be ${Math.floor(MAX_DONATION_IMAGE_SIZE_BYTES / 1024)}KB or smaller.`);
+        return;
+      }
+
+      const dataUrl = await blobToDataUrl(outputBlob);
+      setForm((prev) => ({ ...prev, attachments: dataUrl }));
+    } catch (uploadError) {
+      setFormError(uploadError?.message || 'Unable to process selected image.');
+    } finally {
+      setProcessingAttachment(false);
+    }
+  };
+
+  const selectedAttachment = useMemo(() => {
+    const firstValue = parseAttachments(form.attachments)[0] || '';
+    return parseAttachmentItem(firstValue, 0);
+  }, [form.attachments]);
 
   if (!trustId) return null;
 
@@ -401,34 +521,42 @@ export default function DonationsPage() {
                       />
                       {amountWarning && <small className="dn-input-warning">{amountWarning}</small>}
                     </label>
-                    <label>
+                    <div>
                       <span>Amount Type</span>
-                      <select
-                        value={form.amount_type}
-                        onChange={(e) => setForm((prev) => ({ ...prev, amount_type: e.target.value }))}
-                      >
-                        <option value="">Select amount type</option>
+                      <div className="dn-choice-row" role="radiogroup" aria-label="Amount Type">
                         {DONATION_AMOUNT_TYPE_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
+                          <button
+                            key={option}
+                            type="button"
+                            role="radio"
+                            aria-checked={form.amount_type === option}
+                            className={`dn-choice-btn ${form.amount_type === option ? 'active' : ''}`}
+                            onClick={() => setForm((prev) => ({ ...prev, amount_type: option }))}
+                          >
+                            <span className="dn-choice-dot" aria-hidden="true" />
+                            <span className="dn-choice-label">{option}</span>
+                          </button>
                         ))}
-                      </select>
-                    </label>
-                    <label>
+                      </div>
+                    </div>
+                    <div>
                       <span>Type</span>
-                      <select
-                        value={form.type}
-                        onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-                      >
-                        <option value="">Select type</option>
+                      <div className="dn-choice-row" role="radiogroup" aria-label="Donation Type">
                         {DONATION_TYPE_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
+                          <button
+                            key={option}
+                            type="button"
+                            role="radio"
+                            aria-checked={form.type === option}
+                            className={`dn-choice-btn ${form.type === option ? 'active' : ''}`}
+                            onClick={() => setForm((prev) => ({ ...prev, type: option }))}
+                          >
+                            <span className="dn-choice-dot" aria-hidden="true" />
+                            <span className="dn-choice-label">{option}</span>
+                          </button>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    </div>
                     <label className="nb-span-2">
                       <span>Description</span>
                       <textarea
@@ -438,15 +566,53 @@ export default function DonationsPage() {
                         placeholder="Enter description"
                       />
                     </label>
-                    <label className="nb-span-2">
-                      <span>Attachments (one URL per line)</span>
-                      <textarea
-                        rows={4}
-                        value={form.attachments}
-                        onChange={(e) => setForm((prev) => ({ ...prev, attachments: e.target.value }))}
-                        placeholder="https://.../file-1.jpg"
-                      />
-                    </label>
+                    <div className="nb-span-2">
+                      <span>Attachment (single image)</span>
+                      <p className="nb-attachment-limit-note">
+                        Image upload only. Max size {Math.floor(MAX_DONATION_IMAGE_SIZE_BYTES / 1024)}KB. Larger images are auto-compressed.
+                      </p>
+                      <label
+                        className={`nb-attachment-dropzone ${attachmentDragOver ? 'drag' : ''}`}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          setAttachmentDragOver(true);
+                        }}
+                        onDragLeave={() => setAttachmentDragOver(false)}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          setAttachmentDragOver(false);
+                          handleAttachmentFile(event.dataTransfer.files);
+                        }}
+                      >
+                        <input
+                          ref={attachmentInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            handleAttachmentFile(event.target.files);
+                            event.target.value = '';
+                          }}
+                        />
+                        <div className="nb-attachment-drop-inner">
+                          <span>{processingAttachment ? 'Processing image...' : 'Drag & drop image here'}</span>
+                          <span className="nb-attachment-drop-sub">or click to choose file</span>
+                        </div>
+                      </label>
+                      {attachmentWarning && <div className="nb-warning-inline">{attachmentWarning}</div>}
+                      {selectedAttachment?.value && (
+                        <div className="nb-attachment-pill-list">
+                          <div className="nb-attachment-pill">
+                            <span className="nb-attachment-pill-name">{selectedAttachment.name || 'Attachment image'}</span>
+                            <button
+                              type="button"
+                              onClick={() => setForm((prev) => ({ ...prev, attachments: '' }))}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </section>
               </div>
@@ -680,13 +846,31 @@ export default function DonationsPage() {
                         <h4>Attachments</h4>
                         {selectedDonation.attachments?.length ? (
                           <ul className="nb-attachment-list">
-                            {selectedDonation.attachments.map((item) => (
-                              <li key={item}>
-                                <a href={item} target="_blank" rel="noreferrer">
-                                  {item}
-                                </a>
-                              </li>
-                            ))}
+                            {selectedDonation.attachments.map((item, index) => {
+                              const parsed = parseAttachmentItem(item, index);
+                              if (!parsed?.value) return null;
+                              const isImage = String(parsed.value).toLowerCase().startsWith('data:image/');
+                              return (
+                                <li key={`${parsed.value}-${index}`}>
+                                  {isImage ? (
+                                    <div className="nb-attachment-preview">
+                                      <img
+                                        src={parsed.value}
+                                        alt={parsed.name || 'Donation attachment'}
+                                        className="nb-attachment-preview-thumb"
+                                      />
+                                      <a href={parsed.value} target="_blank" rel="noreferrer" className="nb-attachment-link">
+                                        {parsed.name || 'View image'}
+                                      </a>
+                                    </div>
+                                  ) : (
+                                    <a href={parsed.value} target="_blank" rel="noreferrer" className="nb-attachment-link">
+                                      {parsed.name || parsed.value}
+                                    </a>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ul>
                         ) : (
                           <p>-</p>

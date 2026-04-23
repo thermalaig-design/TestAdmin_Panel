@@ -6,8 +6,10 @@ const MEMBER_TABLE_CANDIDATES = ['members', 'Members'];
 const MEMBER_PROFILE_TABLE_CANDIDATES = ['member_profiles'];
 const FAMILY_MEMBERS_TABLE_CANDIDATES = ['family_members'];
 const OTHER_MEMBERSHIPS_TABLE_CANDIDATES = ['other_memberships'];
+const MEMBER_ROLES_TABLE = 'member_roles';
 const PROFILE_PHOTO_BUCKET = 'profile_photo';
 const MEMBER_FETCH_CHUNK_SIZE = 100;
+const MEMBER_ROLE_FETCH_CHUNK_SIZE = 50;
 const TABLE_PAGE_SIZE = 1000;
 
 let resolvedRegisteredTable = null;
@@ -864,4 +866,144 @@ export async function fetchMemberProfileView({ registrationId = null, memberId =
     error: null,
   };
   }, 10000);
+}
+
+function normalizeMemberRoleRow(row = {}, registeredMemberMap = new Map()) {
+  const regId = pickFirst(row, ['reg_id']);
+  const member = registeredMemberMap.get(String(regId)) || null;
+  return {
+    id: pickFirst(row, ['id']),
+    reg_id: regId || null,
+    role_type: pickFirst(row, ['role_type']) || '',
+    title: pickFirst(row, ['title']) || '',
+    subtitle: pickFirst(row, ['subtitle']) || '',
+    created_at: pickFirst(row, ['created_at']) || null,
+    member,
+  };
+}
+
+export async function createMemberRole(payload = {}) {
+  const regId = String(payload?.reg_id || '').trim();
+  if (!regId) return { data: null, error: { message: 'Registered member is required.' } };
+
+  const normalizedTitle = String(payload?.title || '').trim();
+  if (!normalizedTitle) return { data: null, error: { message: 'Title is required.' } };
+
+  const now = new Date().toISOString();
+  const insertPayload = {
+    reg_id: regId,
+    role_type: String(payload?.role_type || '').trim() || null,
+    title: normalizedTitle,
+    subtitle: String(payload?.subtitle || '').trim() || null,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const { data, error } = await supabase
+    .from(MEMBER_ROLES_TABLE)
+    .insert([insertPayload])
+    .select('*')
+    .single();
+
+  if (error) return { data: null, error };
+  invalidateMemberCaches();
+  return {
+    data: {
+      id: pickFirst(data, ['id']),
+      reg_id: pickFirst(data, ['reg_id']),
+      role_type: pickFirst(data, ['role_type']) || '',
+      title: pickFirst(data, ['title']) || '',
+      subtitle: pickFirst(data, ['subtitle']) || '',
+      created_at: pickFirst(data, ['created_at']) || null,
+    },
+    error: null,
+  };
+}
+
+export async function updateMemberRole(roleId, updates = {}) {
+  if (!roleId) return { data: null, error: { message: 'Role id is required.' } };
+
+  const payload = {
+    ...(updates.role_type !== undefined ? { role_type: String(updates.role_type || '').trim() || null } : {}),
+    ...(updates.title !== undefined ? { title: String(updates.title || '').trim() || null } : {}),
+    ...(updates.subtitle !== undefined ? { subtitle: String(updates.subtitle || '').trim() || null } : {}),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from(MEMBER_ROLES_TABLE)
+    .update(payload)
+    .eq('id', roleId)
+    .select('*')
+    .single();
+
+  if (error) return { data: null, error };
+  invalidateMemberCaches();
+  return {
+    data: {
+      id: pickFirst(data, ['id']),
+      role_type: pickFirst(data, ['role_type']) || '',
+      title: pickFirst(data, ['title']) || '',
+      subtitle: pickFirst(data, ['subtitle']) || '',
+      created_at: pickFirst(data, ['created_at']) || null,
+    },
+    error: null,
+  };
+}
+
+async function fetchMemberRoleRowsByRegistrationIds(registrationIds = []) {
+  const uniqueRegistrationIds = [...new Set((registrationIds || []).filter(Boolean))];
+  if (!uniqueRegistrationIds.length) return { data: [], error: null };
+
+  const idChunks = chunkValues(uniqueRegistrationIds, MEMBER_ROLE_FETCH_CHUNK_SIZE);
+  const allRoleRows = [];
+
+  for (const chunk of idChunks) {
+    const { data, error } = await supabase
+      .from(MEMBER_ROLES_TABLE)
+      .select('*')
+      .in('reg_id', chunk)
+      .order('created_at', { ascending: false, nullsFirst: false });
+
+    if (error) return { data: [], error };
+    allRoleRows.push(...(data || []));
+  }
+
+  allRoleRows.sort((left, right) => {
+    const leftCreatedAt = pickFirst(left, ['created_at']);
+    const rightCreatedAt = pickFirst(right, ['created_at']);
+
+    if (!leftCreatedAt && !rightCreatedAt) return 0;
+    if (!leftCreatedAt) return 1;
+    if (!rightCreatedAt) return -1;
+    return String(rightCreatedAt).localeCompare(String(leftCreatedAt));
+  });
+
+  return { data: allRoleRows, error: null };
+}
+
+export async function fetchMemberRolesByTrust(trustId) {
+  if (!trustId) return { data: [], error: null };
+  const cacheKey = `members:member-roles:${trustId}`;
+  const normalizedTrustId = String(trustId);
+
+  return cachedQuery(cacheKey, async () => {
+    const { data: registeredMembers, error: registeredError } = await fetchRegisteredMembersByTrust(trustId);
+    if (registeredError) return { data: [], error: registeredError };
+
+    const registrationIds = (registeredMembers || []).map((item) => item?.id).filter(Boolean);
+    if (!registrationIds.length) return { data: [], error: null };
+
+    const { data: roleRows, error } = await fetchMemberRoleRowsByRegistrationIds(registrationIds);
+
+    if (error) return { data: [], error };
+
+    const registeredMemberMap = new Map((registeredMembers || []).map((item) => [String(item.id), item]));
+    const normalized = (roleRows || [])
+      .map((row) => normalizeMemberRoleRow(row, registeredMemberMap))
+      .filter((item) => item.member && item.reg_id)
+      .filter((item) => String(item?.member?.trust_id || '') === normalizedTrustId);
+
+    return { data: normalized, error: null };
+  }, 12000);
 }

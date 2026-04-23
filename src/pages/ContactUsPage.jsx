@@ -31,6 +31,10 @@ function getContactCategory(value = '') {
   return 'general';
 }
 
+function sanitizeDigits(value) {
+  return String(value ?? '').replace(/\D+/g, '');
+}
+
 export default function ContactUsPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -46,6 +50,7 @@ export default function ContactUsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
+  const [numberWarning, setNumberWarning] = useState('');
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -73,6 +78,7 @@ export default function ContactUsPage() {
       contact_person: '',
     });
     setFormError('');
+    setNumberWarning('');
     setEditingId(null);
   };
 
@@ -204,12 +210,13 @@ export default function ContactUsPage() {
 
     setForm({
       facility_name: target.facility_name || '',
-      contact_number: target.contact_number || '',
+      contact_number: sanitizeDigits(target.contact_number),
       email_id: target.email_id || '',
       contact_person: target.contact_person || '',
     });
     setEditingId(target.id);
     setFormError('');
+    setNumberWarning('');
   }, [isFormRoute, isCreateRoute, isEditRoute, routeEditId, selectedId, contacts]);
 
   const handleSave = async () => {
@@ -223,7 +230,7 @@ export default function ContactUsPage() {
     const payload = {
       trust_id: trustId,
       facility_name: form.facility_name,
-      contact_number: form.contact_number,
+      contact_number: sanitizeDigits(form.contact_number),
       email_id: form.email_id,
       contact_person: form.contact_person,
     };
@@ -272,16 +279,24 @@ export default function ContactUsPage() {
   const handleEdit = (item) => {
     setForm({
       facility_name: item.facility_name || '',
-      contact_number: item.contact_number || '',
+      contact_number: sanitizeDigits(item.contact_number),
       email_id: item.email_id || '',
       contact_person: item.contact_person || '',
     });
     setEditingId(item.id);
     setFormError('');
+    setNumberWarning('');
     setActiveMenuId(null);
     navigate(`/contact-us/edit_details?id=${item.id}`, {
       state: { userName, trust, editId: item.id, sidebarNavKey: currentSidebarNavKey },
     });
+  };
+
+  const handleContactNumberChange = (rawValue) => {
+    const raw = String(rawValue ?? '');
+    const sanitized = sanitizeDigits(raw);
+    setNumberWarning(/\D/.test(raw) ? 'Only numbers are allowed in contact number fields.' : '');
+    setForm((prev) => ({ ...prev, contact_number: sanitized }));
   };
 
   if (!trustId) return null;
@@ -337,7 +352,9 @@ export default function ContactUsPage() {
                       <span>Contact Number</span>
                       <input
                         value={form.contact_number}
-                        onChange={(e) => setForm((prev) => ({ ...prev, contact_number: e.target.value }))}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        onChange={(e) => handleContactNumberChange(e.target.value)}
                         placeholder="Enter contact number"
                       />
                     </label>
@@ -350,6 +367,7 @@ export default function ContactUsPage() {
                       />
                     </label>
                   </div>
+                  {numberWarning && <div className="nb-warning-inline">{numberWarning}</div>}
                 </section>
               </div>
 
