@@ -13,7 +13,6 @@ const EMPTY_FORM = {
   theme_config: {},
   home_layout: '["trustList","sponsors","marquee","gallery","quickActions"]',
   custom_css: '',
-  is_active: true,
 };
 const DEFAULT_NEW_HOME_LAYOUT = ['trustList', 'sponsors', 'marquee', 'gallery', 'quickActions'];
 
@@ -362,7 +361,6 @@ export default function ThemePage() {
       template_key: selectedTemplate.template_key || 'mahila',
       home_layout: pretty(nextHomeLayout, DEFAULT_NEW_HOME_LAYOUT),
       custom_css: selectedTemplate.custom_css || '',
-      is_active: selectedTemplate.is_active !== false,
     });
     setThemeConfigForm(buildThemeConfigForm(selectedTemplate.theme_config));
     setAnimationConfig({
@@ -475,7 +473,6 @@ export default function ThemePage() {
       home_layout: homeLayout,
       animations,
       custom_css: form.custom_css || '',
-      is_active: !!form.is_active,
       trust_id: trustId,
     };
 
@@ -845,7 +842,7 @@ export default function ThemePage() {
 
           <div className="theme-list">
             {loading && <div className="theme-loading">Loading themes...</div>}
-            {!loading && templates.filter((item) => item.is_active !== false).length === 0 && (
+            {!loading && filtered.length === 0 && (
               <div className="theme-empty">
                 <div className="theme-empty-icon">T</div>
                 <h3>No themes yet</h3>
@@ -853,7 +850,7 @@ export default function ThemePage() {
                 <button className="theme-add-btn" onClick={openCreate}>Create Theme</button>
               </div>
             )}
-            {!loading && templates.filter((item) => item.is_active !== false).map((theme) => {
+            {!loading && filtered.map((theme) => {
               const previewData = buildTemplateMobilePreview(theme);
               return (
                 <div key={theme.id} className={`theme-card ${activeTemplateId === theme.id ? 'active' : ''} ${canEdit(theme) ? 'my' : 'other'}`} onClick={() => openDetail(theme.id)}>
@@ -946,7 +943,6 @@ export default function ThemePage() {
                   {renderHomeLayoutField()}
                   {renderAnimationsField()}
                   <label className="theme-field theme-span-2"><span>Custom CSS</span><textarea rows="5" value={form.custom_css} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, custom_css: e.target.value }))} /></label>
-                  <label className="theme-check"><input type="checkbox" checked={form.is_active} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} /><span>Template is active</span></label>
                 </div>
                 <div className="theme-form-actions">
                   <button className="theme-secondary-btn" type="button" onClick={closeThemeForm}>Close</button>

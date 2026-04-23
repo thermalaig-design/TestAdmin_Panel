@@ -989,9 +989,18 @@
 
 .sp-public-company {
   margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
   font-size: 13px;
   color: #4f46e5;
   font-weight: 700;
+}
+
+.sp-public-company-sep {
+  color: #9ca3af;
+  font-weight: 500;
 }
 
 .sp-public-role {

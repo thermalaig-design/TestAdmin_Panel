@@ -53,7 +53,6 @@ function sanitizeTemplatePayload(payload = {}, existingThemeConfig = {}) {
     ...(payload.home_layout !== undefined ? { home_layout: payload.home_layout || DEFAULT_HOME_LAYOUT } : {}),
     ...(payload.animations !== undefined ? { animations: payload.animations || DEFAULT_ANIMATIONS } : {}),
     ...(payload.custom_css !== undefined ? { custom_css: payload.custom_css || '' } : {}),
-    ...(payload.is_active !== undefined ? { is_active: !!payload.is_active } : {}),
     ...(payload.template_key !== undefined ? { template_key: payload.template_key || 'mahila' } : {}),
     ...(payload.trust_id !== undefined ? { trust_id: payload.trust_id ? String(payload.trust_id) : null } : {}),
     theme_config: mergedThemeConfig,

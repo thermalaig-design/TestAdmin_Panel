@@ -813,6 +813,7 @@ export default function SponsorsPage() {
 
   const previewName = form.name?.trim() || 'Sponsor Name';
   const previewCompany = form.company_name?.trim() || 'Company Name';
+  const previewCoPartner = form.coPartner?.trim() || '';
   const previewRole = [form.position?.trim(), form.position2?.trim()].filter(Boolean).join(' • ') || 'Role';
   const previewAbout = form.about?.trim() || 'Sponsor description will appear here.';
   const previewBadge = form.badge_label?.trim() || 'OFFICIAL SPONSOR';
@@ -1437,8 +1438,12 @@ export default function SponsorsPage() {
                         )}
                       </div>
                       <div className="sp-public-content">
-                        <h5>{previewName}</h5>
-                        <div className="sp-public-company">{previewCompany}</div>
+                        <h5>{previewCompany}</h5>
+                        <div className="sp-public-company">
+                          <span>{previewName}</span>
+                          {previewCoPartner && <span className="sp-public-company-sep">|</span>}
+                          {previewCoPartner && <span>{previewCoPartner}</span>}
+                        </div>
                         <div className="sp-public-role">{previewRole}</div>
                         <p>{previewAbout}</p>
                       </div>
