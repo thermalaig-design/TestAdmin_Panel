@@ -204,7 +204,7 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
               }}
               aria-label="Close menu"
             >
-              x
+              ×
             </button>
           )}
         </div>

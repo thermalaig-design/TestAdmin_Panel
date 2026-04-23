@@ -15,6 +15,11 @@
   z-index: 1200;
 }
 
+body.sb-mobile-lock {
+  overflow: hidden;
+  touch-action: none;
+}
+
 .sb-mobile-trigger,
 .sb-backdrop,
 .sb-close-btn {
@@ -258,76 +263,72 @@
   }
 
   .sb-sidebar {
-    width: 100%;
+    width: min(84vw, 330px);
+    max-width: 330px;
     flex: 0 0 auto;
-    position: static;
-    top: auto;
-    height: auto;
-    overflow-y: visible;
-    overflow-x: hidden;
-    border-right: none;
-    border-bottom: 1px solid rgba(99, 102, 241, 0.08);
-  }
-}
-
-@media (max-width: 768px) {
-  .sb-sidebar {
-    position: sticky;
+    position: fixed;
+    left: 0;
     top: 0;
-    z-index: 80;
-    padding: 12px 12px 10px;
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-  }
-
-  .sb-brand {
-    padding: 4px 4px 10px;
-    margin-bottom: 0;
+    bottom: 0;
+    height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-right: 1px solid rgba(99, 102, 241, 0.08);
     border-bottom: none;
+    box-shadow: 14px 0 30px rgba(15, 23, 42, 0.18);
+    transform: translateX(-104%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.24s ease, opacity 0.2s ease;
+    z-index: 1240;
   }
 
-  .sb-brand-sub {
-    display: none;
+  .sb-sidebar.open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
   }
 
-  .sb-section-label {
-    display: none;
+  .sb-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(99, 102, 241, 0.18);
+    background: #F8FAFF;
+    color: #4B5563;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    margin-left: 6px;
+  }
+
+  .sb-close-btn:hover {
+    border-color: rgba(99, 102, 241, 0.34);
+    color: #111827;
+    background: #EEF2FF;
   }
 
   .sb-nav {
-    flex-direction: row;
-    gap: 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
+    flex-direction: column;
+    overflow: visible;
   }
 
   .sb-item {
-    flex: 0 0 auto;
-    min-width: max-content;
-    padding: 9px 12px;
-    border-radius: 10px;
-  }
-
-  .sb-indicator {
-    display: none;
-  }
-
-  .sb-bottom {
-    margin-top: 6px;
+    min-width: 0;
   }
 
   .sb-logout {
-    justify-content: center;
+    justify-content: flex-start;
   }
 }
 
 @media (max-width: 480px) {
   .sb-sidebar {
-    padding: 10px 10px 8px;
+    width: min(90vw, 320px);
+    padding: 12px 10px;
   }
 
   .sb-brand-name {
