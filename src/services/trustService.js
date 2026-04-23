@@ -112,6 +112,31 @@ export async function fetchTrustDetails(trustId) {
 }
 
 /**
+ * Fetch trust names by a list of trust IDs
+ */
+export async function fetchTrustNamesByIds(trustIds = []) {
+  const ids = Array.from(
+    new Set(
+      (Array.isArray(trustIds) ? trustIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (ids.length === 0) return { data: [], error: null };
+
+  const cacheKey = `trust:names:${ids.slice().sort().join(',')}`;
+  return cachedQuery(cacheKey, async () => {
+    const { data, error } = await supabase
+      .from('Trust')
+      .select('id, name')
+      .in('id', ids);
+
+    return { data: data || [], error };
+  }, 20000);
+}
+
+/**
  * Update trust terms_content and privacy_content
  */
 export async function updateTrustContent(trustId, { termsContent, privacyContent }) {

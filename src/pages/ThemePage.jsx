@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
-import { fetchTrustDetails } from '../services/trustService';
+import { fetchTrustDetails, fetchTrustNamesByIds } from '../services/trustService';
 import { assignTemplateToTrust, createTemplate, fetchTemplates, updateTemplate } from '../services/themeService';
 import './ThemePage.css';
 
@@ -295,6 +295,7 @@ export default function ThemePage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [assigningId, setAssigningId] = useState(null);
+  const [trustNameById, setTrustNameById] = useState({});
   const [form, setForm] = useState(EMPTY_FORM);
   const [themeConfigForm, setThemeConfigForm] = useState(buildThemeConfigForm(DEFAULT_THEME_SECTION_CONFIG));
   const [animationConfig, setAnimationConfig] = useState(DEFAULT_ANIMATIONS);
@@ -317,6 +318,23 @@ export default function ThemePage() {
       if (trustErr) setError(trustErr.message || 'Unable to load trust theme.');
       setTemplates(templateData || []);
       setCurrentTrust(trustData || trust);
+      const ownerIds = Array.from(
+        new Set(
+          (templateData || [])
+            .map((item) => String(item?.trust_id || '').trim())
+            .filter(Boolean)
+        )
+      );
+      const { data: ownerTrusts, error: ownerErr } = await fetchTrustNamesByIds(ownerIds);
+      if (!ownerErr) {
+        const nextMap = {};
+        (ownerTrusts || []).forEach((item) => {
+          const id = String(item?.id || '').trim();
+          if (!id) return;
+          nextMap[id] = item?.name || '';
+        });
+        setTrustNameById(nextMap);
+      }
       setLoading(false);
     };
     load();
@@ -344,6 +362,11 @@ export default function ThemePage() {
   const selectedTemplate = useMemo(() => templates.find((item) => item.id === selectedId) || null, [templates, selectedId]);
   const detailTemplate = useMemo(() => templates.find((item) => item.id === detailId) || null, [templates, detailId]);
   const canEdit = (item) => String(item?.trust_id || '') === String(trustId || '');
+  const getThemeTrustName = (item) => {
+    const ownerId = String(item?.trust_id || '').trim();
+    if (!ownerId) return '-';
+    return trustNameById[ownerId] || 'Unknown Trust';
+  };
   useEffect(() => {
     if (!selectedTemplate) {
       setForm(EMPTY_FORM);
@@ -852,8 +875,9 @@ export default function ThemePage() {
             )}
             {!loading && filtered.map((theme) => {
               const previewData = buildTemplateMobilePreview(theme);
+              const isMyTheme = canEdit(theme);
               return (
-                <div key={theme.id} className={`theme-card ${activeTemplateId === theme.id ? 'active' : ''} ${canEdit(theme) ? 'my' : 'other'}`} onClick={() => openDetail(theme.id)}>
+                <div key={theme.id} className={`theme-card ${activeTemplateId === theme.id ? 'active' : ''} ${isMyTheme ? 'my' : 'other'}`} onClick={() => openDetail(theme.id)}>
                   <div className="theme-card-preview" style={{ background: previewBg(theme) }}>
                     <div className="theme-preview-phone" style={{ background: previewData.pageBg }}>
                       <div className="theme-preview-phone-navbar" style={{ background: previewData.navbarBg, color: previewData.navbarText }}>
@@ -879,17 +903,18 @@ export default function ThemePage() {
                   <div className="theme-card-body">
                     <div className="theme-card-title-row">
                       <div className="theme-card-title">{theme.name}</div>
-                      <span className={`theme-card-badge ${canEdit(theme) ? 'my' : 'other'}`}>{canEdit(theme) ? 'My' : 'Other'}</span>
+                      <span className={`theme-card-badge ${isMyTheme ? 'my' : 'other'}`}>{isMyTheme ? 'My' : 'Other'}</span>
                     </div>
                     <div className="theme-card-sub">{theme.template_key || 'template'}</div>
+                    {!isMyTheme && <div className="theme-card-sub">Trust Name: {getThemeTrustName(theme)}</div>}
                     {theme.description && <div className="theme-card-tag">{theme.description}</div>}
                   </div>
                   <div className="theme-card-actions">
                     <button className={`theme-status-btn ${activeTemplateId === theme.id ? 'active' : 'inactive'}`} type="button" onClick={(e) => { e.stopPropagation(); handleAssign(theme); }}>
                       {assigningId === theme.id ? 'Applying...' : activeTemplateId === theme.id ? 'Applied' : 'Apply'}
                     </button>
-                    {canEdit(theme) && <button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); openEdit(theme.id); }}>Edit</button>}
-                    {!canEdit(theme) && <button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); openView(theme.id); }}>View</button>}
+                    {isMyTheme && <button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); openEdit(theme.id); }}>Edit</button>}
+                    {!isMyTheme && <button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); openView(theme.id); }}>View</button>}
                   </div>
                 </div>
               );
@@ -973,7 +998,7 @@ export default function ThemePage() {
                   ))}</div>}
                   {otherTemplates.length > 0 && <div className="theme-modal-section other"><div className="theme-modal-section-title">Other Themes</div>{otherTemplates.map((item) => (
                     <div key={item.id} className="theme-modal-item" onClick={() => openDetail(item.id)}>
-                      <div><div className="theme-modal-title-row"><div className="theme-modal-title">{item.name}</div><span className="theme-modal-badge other">Other</span></div><div className="theme-modal-sub">{item.template_key || 'template'}</div><div className="theme-modal-sub">{item.description || 'No description'}</div></div>
+                      <div><div className="theme-modal-title-row"><div className="theme-modal-title">{item.name}</div><span className="theme-modal-badge other">Other</span></div><div className="theme-modal-sub">{item.template_key || 'template'}</div><div className="theme-modal-sub">Trust Name: {getThemeTrustName(item)}</div><div className="theme-modal-sub">{item.description || 'No description'}</div></div>
                       <div className="theme-modal-actions"><button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); handleAssign(item); }}>{activeTemplateId === item.id ? 'Applied' : 'Apply'}</button><button className="theme-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); openView(item.id); }}>View</button></div>
                     </div>
                   ))}</div>}
@@ -997,6 +1022,7 @@ export default function ThemePage() {
                 </div>
                 <div className="theme-detail-info">
                   <div><strong>Template key:</strong> {detailTemplate.template_key || '-'}</div>
+                  {!canEdit(detailTemplate) && <div><strong>Trust Name:</strong> {getThemeTrustName(detailTemplate)}</div>}
                   <div><strong>Assigned:</strong> {activeTemplateId === detailTemplate.id ? 'Yes' : 'No'}</div>
                 </div>
                 <div className="theme-detail-actions">
