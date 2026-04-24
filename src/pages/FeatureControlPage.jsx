@@ -21,6 +21,36 @@ function normalizeQuickOrder(value) {
   return Number(value);
 }
 
+const APP_CATEGORY_RULES = [
+  { key: 'auth-access', label: 'Extra', keywords: ['login', 'otp', 'auth', 'security', 'password', 'permission', 'role', 'vip', 'appointment', 'opd', 'doctor', 'schedule', 'booking', 'book', 'referral', 'reference', 'report', 'document', 'upload', 'download', 'certificate', 'record', 'birthday', 'wishes', 'wish', 'developer information', 'developer', 'information'] },
+  { key: 'company-details', label: 'Company Details', keywords: ['trust list', 'trustlist', 'trust_list'] },
+  { key: 'app-design', label: 'App Design', keywords: ['app design', 'theme', 'logo', 'branding', 'font', 'ui settings'] },
+  { key: 'content-media', label: 'Home Page', keywords: ['gallery', 'photo', 'image', 'video', 'marquee', 'design', 'theme', 'sponsor', 'banner', 'logo', 'notification'] },
+  { key: 'communication', label: 'Quick Action', keywords: ['notice', 'contact', 'message', 'announcement', 'event', 'events'] },
+  { key: 'finance', label: 'Finance & Donations', keywords: ['donation', 'payment', 'fund', 'finance', 'membership'] },
+  { key: 'reports-data', label: 'Reports & Documents', keywords: ['report', 'document', 'download', 'upload', 'certificate', 'record'] },
+];
+
+function classifyFeatureByApp(row) {
+  const haystack = [
+    row.master_name,
+    row.master_subname,
+    row.display_name,
+    row.tagline,
+    row.route,
+    row.name,
+    row.description,
+  ]
+    .map((value) => String(value || '').toLowerCase())
+    .join(' ');
+
+  const matched = APP_CATEGORY_RULES.find((rule) =>
+    rule.keywords.some((keyword) => haystack.includes(keyword)),
+  );
+
+  return matched || { key: 'general-admin', label: 'Menu' };
+}
+
 export default function FeatureControlPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -41,7 +71,9 @@ export default function FeatureControlPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [quickOrderSort, setQuickOrderSort] = useState('asc');
+  const [activeCategoryView, setActiveCategoryView] = useState(null);
 
   const [togglingMap, setTogglingMap] = useState({});
   const [activeEditRow, setActiveEditRow] = useState(null);
@@ -159,10 +191,15 @@ export default function FeatureControlPage() {
 
   const rowsWithCounts = useMemo(
     () =>
-      rows.map((row) => ({
-        ...row,
-        sub_feature_count: Number(subFeatureCountByFeatureId[String(row.feature_id)] || 0),
-      })),
+      rows.map((row) => {
+        const category = classifyFeatureByApp(row);
+        return {
+          ...row,
+          sub_feature_count: Number(subFeatureCountByFeatureId[String(row.feature_id)] || 0),
+          app_category: category.key,
+          app_category_label: category.label,
+        };
+      }),
     [rows, subFeatureCountByFeatureId],
   );
 
@@ -189,7 +226,12 @@ export default function FeatureControlPage() {
       return true;
     });
 
-    return [...byStatus].sort((left, right) => {
+    const byCategory = byStatus.filter((row) => {
+      if (categoryFilter === 'all') return true;
+      return row.app_category === categoryFilter;
+    });
+
+    return [...byCategory].sort((left, right) => {
       const leftOrder = normalizeQuickOrder(left.quick_order);
       const rightOrder = normalizeQuickOrder(right.quick_order);
       const direction = quickOrderSort === 'desc' ? -1 : 1;
@@ -198,7 +240,56 @@ export default function FeatureControlPage() {
         sensitivity: 'base',
       });
     });
-  }, [rowsWithCounts, searchTerm, statusFilter, quickOrderSort]);
+  }, [rowsWithCounts, searchTerm, statusFilter, categoryFilter, quickOrderSort]);
+
+  const categorySummary = useMemo(() => {
+    const counts = rowsWithCounts.reduce((acc, row) => {
+      const key = row.app_category || 'general-admin';
+      const label = row.app_category_label || 'Menu';
+      const current = acc.get(key) || { key, label, total: 0, enabled: 0 };
+      current.total += 1;
+      if (row.is_enabled) current.enabled += 1;
+      acc.set(key, current);
+      return acc;
+    }, new Map());
+
+    return Array.from(counts.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [rowsWithCounts]);
+
+  useEffect(() => {
+    if (categoryFilter === 'all') return;
+    const exists = categorySummary.some((item) => item.key === categoryFilter);
+    if (!exists) setCategoryFilter('all');
+  }, [categoryFilter, categorySummary]);
+
+  useEffect(() => {
+    if (!activeCategoryView) return;
+    if (activeCategoryView === 'all') return;
+    const exists = categorySummary.some((item) => item.key === activeCategoryView);
+    if (!exists) {
+      setActiveCategoryView(null);
+      setCategoryFilter('all');
+    }
+  }, [activeCategoryView, categorySummary]);
+
+  const activeCategoryMeta = useMemo(() => {
+    if (!activeCategoryView) return null;
+    if (activeCategoryView === 'all') {
+      return { key: 'all', label: 'All Categories', total: rowsWithCounts.length, enabled: rowsWithCounts.filter((row) => row.is_enabled).length };
+    }
+    return categorySummary.find((item) => item.key === activeCategoryView) || null;
+  }, [activeCategoryView, categorySummary, rowsWithCounts]);
+
+  const openCategoryView = (categoryKey) => {
+    const next = categoryKey || 'all';
+    setCategoryFilter(next);
+    setActiveCategoryView(next);
+  };
+
+  const closeCategoryView = () => {
+    setActiveCategoryView(null);
+    setCategoryFilter('all');
+  };
 
   const applyUpdatedFlag = (featureId, updatedFlag) => {
     setRows((prev) =>
@@ -344,12 +435,60 @@ export default function FeatureControlPage() {
             </label>
 
             <label>
+              <span>Category</span>
+              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                <option value="all">all app categories</option>
+                {categorySummary.map((item) => (
+                  <option key={item.key} value={item.key}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
               <span>Sort by Quick Order</span>
               <select value={quickOrderSort} onChange={(event) => setQuickOrderSort(event.target.value)}>
                 <option value="asc">ascending</option>
                 <option value="desc">descending</option>
               </select>
             </label>
+          </div>
+
+          <div className="fc-category-summary" aria-label="Feature category summary">
+            <button
+              type="button"
+              className={`fc-category-card ${activeCategoryView === 'all' ? 'active' : ''}`}
+              onClick={() => openCategoryView('all')}
+            >
+              <div className="fc-category-card-left">
+                <span className="fc-category-card-title">All Categories</span>
+                <span className="fc-category-card-sub">
+                  Showing all features
+                </span>
+              </div>
+              <div className="fc-category-card-right">
+                <strong>{rowsWithCounts.length}</strong>
+              </div>
+            </button>
+            {categorySummary.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`fc-category-card category-${item.key} ${activeCategoryView === item.key ? 'active' : ''}`}
+                onClick={() => openCategoryView(item.key)}
+              >
+                <div className="fc-category-card-left">
+                  <span className="fc-category-card-title">{item.label}</span>
+                  <span className="fc-category-card-sub">
+                    Enabled {item.enabled} of {item.total}
+                  </span>
+                </div>
+                <div className="fc-category-card-right">
+                  <strong>{item.enabled}/{item.total}</strong>
+                </div>
+              </button>
+            ))}
           </div>
 
           {error ? (
@@ -361,16 +500,36 @@ export default function FeatureControlPage() {
             </div>
           ) : null}
 
-          <FeatureControlTable
-            rows={filteredRows}
-            loading={loading}
-            togglingMap={togglingMap}
-            onToggle={handleToggle}
-            onEdit={handleOpenEdit}
-            onOpenSubScreens={handleOpenSubScreens}
-          />
         </section>
       </main>
+
+      {activeCategoryView ? (
+        <div className="fc-category-view-overlay" role="dialog" aria-modal="true" aria-label="Category features">
+          <div className="fc-category-view-panel">
+            <div className="fc-category-view-head">
+              <div>
+                <h3>{activeCategoryMeta?.label || 'Category Features'}</h3>
+                <p>
+                  Showing {filteredRows.length} feature{filteredRows.length === 1 ? '' : 's'}
+                  {activeCategoryMeta?.total ? ` | Enabled ${activeCategoryMeta.enabled}/${activeCategoryMeta.total}` : ''}
+                </p>
+              </div>
+              <button type="button" className="fc-category-view-close" onClick={closeCategoryView} aria-label="Close category view">
+                ×
+              </button>
+            </div>
+
+            <FeatureControlTable
+              rows={filteredRows}
+              loading={loading}
+              togglingMap={togglingMap}
+              onToggle={handleToggle}
+              onEdit={handleOpenEdit}
+              onOpenSubScreens={handleOpenSubScreens}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <FeatureEditModal
         key={activeEditRow ? `${activeEditRow.feature_id}-${activeEditRow.tier}` : 'feature-edit'}
