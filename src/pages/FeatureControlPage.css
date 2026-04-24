@@ -280,9 +280,15 @@
 }
 
 .fc-category-card {
+  --card-accent: #6366f1;
+  --card-grad-start: #2563eb;
+  --card-grad-end: #4f46e5;
   width: 100%;
-  border: 1px solid rgba(99, 102, 241, 0.18);
-  background: linear-gradient(180deg, #ffffff, #f8faff);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background:
+    radial-gradient(140px 80px at 12% -10%, rgba(255, 255, 255, 0.24), transparent 68%),
+    radial-gradient(160px 100px at 92% 18%, rgba(255, 255, 255, 0.16), transparent 72%),
+    linear-gradient(135deg, var(--card-grad-start) 0%, var(--card-grad-end) 100%);
   border-radius: 14px;
   min-height: 58px;
   padding: 10px 14px;
@@ -291,20 +297,57 @@
   justify-content: space-between;
   gap: 12px;
   cursor: pointer;
-  color: #374151;
+  color: #ffffff;
   text-align: left;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.18s ease;
 }
 
 .fc-category-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.12);
+  transform: translateY(-2px) scale(1.002);
+  border-color: rgba(255, 255, 255, 0.34);
+  box-shadow:
+    0 20px 44px color-mix(in srgb, var(--card-accent) 42%, transparent),
+    0 6px 14px rgba(15, 23, 42, 0.18);
 }
 
 .fc-category-card.active {
-  border-color: rgba(79, 70, 229, 0.42);
-  background: linear-gradient(135deg, #eef2ff, #f5f3ff);
-  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.16);
+  border-color: rgba(255, 255, 255, 0.45);
+  background:
+    radial-gradient(140px 80px at 12% -10%, rgba(255, 255, 255, 0.3), transparent 68%),
+    radial-gradient(170px 110px at 92% 18%, rgba(255, 255, 255, 0.2), transparent 72%),
+    linear-gradient(135deg, color-mix(in srgb, var(--card-grad-start) 88%, white) 0%, var(--card-grad-end) 100%);
+  box-shadow:
+    0 22px 46px color-mix(in srgb, var(--card-accent) 44%, transparent),
+    0 6px 14px rgba(15, 23, 42, 0.18);
+}
+
+.fc-category-card:active {
+  transform: translateY(0);
+}
+
+.fc-category-card:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--card-accent) 28%, white),
+    0 14px 28px color-mix(in srgb, var(--card-accent) 34%, transparent);
+}
+
+.fc-category-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.35));
+  z-index: 0;
+}
+
+.fc-category-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .fc-category-card-left {
@@ -315,52 +358,108 @@
 .fc-category-card-title {
   font-size: 17px;
   font-weight: 700;
-  color: #1f2937;
+  color: #ffffff;
   line-height: 1.25;
+  text-shadow: 0 2px 10px rgba(15, 23, 42, 0.2);
 }
 
 .fc-category-card-sub {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.fc-category-card-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
 .fc-category-card-right strong {
   font-size: 16px;
   font-weight: 800;
-  color: #4338ca;
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(15, 23, 42, 0.22);
+}
+
+.fc-category-card-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fc-category-card-arrow {
+  font-size: 14px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
+  opacity: 0.55;
+  transform: translateX(0);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.fc-category-card:hover .fc-category-card-arrow,
+.fc-category-card.active .fc-category-card-arrow,
+.fc-category-card:focus-visible .fc-category-card-arrow {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+.fc-category-card:hover .fc-category-card-hint,
+.fc-category-card.active .fc-category-card-hint,
+.fc-category-card:focus-visible .fc-category-card-hint {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .fc-category-card.category-auth-access {
-  border-left: 4px solid #4f46e5;
+  --card-accent: #7c3aed;
+  --card-grad-start: #7c3aed;
+  --card-grad-end: #2563eb;
 }
 
 .fc-category-card.category-company-details {
-  border-left: 4px solid #2563eb;
+  --card-accent: #0ea5e9;
+  --card-grad-start: #0ea5e9;
+  --card-grad-end: #1d4ed8;
 }
 
 .fc-category-card.category-content-media {
-  border-left: 4px solid #c2410c;
+  --card-accent: #ec4899;
+  --card-grad-start: #ec4899;
+  --card-grad-end: #f97316;
 }
 
 .fc-category-card.category-communication {
-  border-left: 4px solid #a21caf;
+  --card-accent: #0f766e;
+  --card-grad-start: #0f766e;
+  --card-grad-end: #2563eb;
 }
 
 .fc-category-card.category-finance {
-  border-left: 4px solid #15803d;
+  --card-accent: #15803d;
+  --card-grad-start: #16a34a;
+  --card-grad-end: #0ea5e9;
 }
 
 .fc-category-card.category-reports-data {
-  border-left: 4px solid #0e7490;
+  --card-accent: #0e7490;
+  --card-grad-start: #0891b2;
+  --card-grad-end: #6366f1;
 }
 
 .fc-category-card.category-app-design {
-  border-left: 4px solid #1d4ed8;
+  --card-accent: #2563eb;
+  --card-grad-start: #2563eb;
+  --card-grad-end: #4f46e5;
 }
 
 .fc-category-card.category-general-admin {
-  border-left: 4px solid #374151;
+  --card-accent: #8b5cf6;
+  --card-grad-start: #8b5cf6;
+  --card-grad-end: #6366f1;
 }
 
 .fc-category-view-overlay {
@@ -383,11 +482,11 @@
   border-radius: 18px;
   border: 1px solid rgba(99, 102, 241, 0.24);
   box-shadow: 0 20px 44px rgba(15, 23, 42, 0.3);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   padding: 16px;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .fc-category-view-head {
@@ -395,6 +494,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .fc-category-view-head h3 {
@@ -431,8 +531,97 @@
 }
 
 .fc-category-view-panel .fc-table-wrap {
+  flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+.fc-category-controls-wrap {
+  padding: 2px 0 4px;
+  flex-shrink: 0;
+}
+
+.fc-controls.fc-controls-inline {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.12);
+}
+
+.fc-controls.fc-controls-inline label span {
+  font-size: 11px;
+}
+
+.fc-controls.fc-controls-inline select,
+.fc-controls.fc-controls-inline input {
+  padding: 9px 10px;
+  font-size: 12px;
+}
+
+.fc-category-view-panel .fc-table {
+  min-width: 0;
+}
+
+.fc-category-view-panel .fc-table th,
+.fc-category-view-panel .fc-table td {
+  padding: 10px 8px;
+  font-size: 12px;
+}
+
+.fc-category-view-panel .fc-table th {
+  font-size: 11px;
+}
+
+.fc-category-view-panel .fc-feature-name {
+  font-size: 13px;
+}
+
+.fc-category-view-panel .fc-feature-sub {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.fc-category-view-panel .fc-pill {
+  min-width: 72px;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.fc-category-view-panel .fc-toggle {
+  width: 48px;
+  min-width: 48px;
+  height: 28px;
+}
+
+.fc-category-view-panel .fc-toggle-track {
+  width: 34px;
+  height: 18px;
+}
+
+.fc-category-view-panel .fc-toggle-thumb {
+  width: 14px;
+  height: 14px;
+}
+
+.fc-category-view-panel .fc-toggle.on .fc-toggle-thumb {
+  transform: translateX(16px);
+}
+
+.fc-category-view-panel .fc-btn-action {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.fc-category-view-panel .fc-table th:nth-child(7),
+.fc-category-view-panel .fc-table td:nth-child(7) {
+  padding-right: 10px;
+}
+
+.fc-category-view-panel .fc-table th:nth-child(9),
+.fc-category-view-panel .fc-table td:nth-child(9) {
+  padding-left: 10px;
 }
 
 @media (min-width: 1081px) {
@@ -444,10 +633,12 @@
   .fc-category-view-panel {
     width: min(1160px, calc(100vw - 306px));
     margin: 0 auto;
+    padding: 12px;
+    gap: 8px;
   }
 
-  .fc-category-view-panel .fc-table {
-    min-width: 1180px;
+  .fc-controls.fc-controls-inline {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 
@@ -979,6 +1170,10 @@
   }
 
   .fc-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .fc-controls.fc-controls-inline {
     grid-template-columns: 1fr;
   }
 

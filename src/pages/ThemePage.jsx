@@ -809,6 +809,27 @@ export default function ThemePage() {
     };
   }, [themeConfigForm]);
 
+  const previewHomeLayoutCards = useMemo(() => {
+    const ordered = HOME_LAYOUT_OPTIONS
+      .map((item) => ({
+        key: item.key,
+        label: item.label,
+        order: Number(homeLayoutOrder[item.key]) || 0,
+      }))
+      .filter((item) => item.order > 0)
+      .sort((left, right) => left.order - right.order || left.label.localeCompare(right.label));
+
+    return ordered.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+    }));
+  }, [homeLayoutOrder]);
+
+  const previewLayoutSignature = useMemo(
+    () => previewHomeLayoutCards.map((item) => `${item.key}:${item.order}`).join('|'),
+    [previewHomeLayoutCards],
+  );
+
   const renderHomeLayoutField = () => (
     <div className="theme-field theme-span-2" key="home_layout_order">
       <span>Home Layout Order</span>
@@ -1060,21 +1081,39 @@ export default function ThemePage() {
                               Announcement strip running here
                             </div>
                             <div className="theme-live-preview-body">
+                              <div className="theme-live-preview-layout-head">
+                                <strong>Home Layout Preview</strong>
+                                <small>Order changes animate live</small>
+                              </div>
+                              <div className="theme-live-preview-layout-grid" key={previewLayoutSignature}>
+                                {previewHomeLayoutCards.length ? (
+                                  previewHomeLayoutCards.map((item, index) => (
+                                    <div
+                                      key={`${item.key}-${item.order}`}
+                                      className="theme-live-preview-layout-card"
+                                      style={{
+                                        background: combinedPreview.quickBg,
+                                        color: combinedPreview.quickText,
+                                        animationDelay: `${index * 55}ms`,
+                                      }}
+                                    >
+                                      <span className="theme-live-preview-layout-rank" style={{ background: combinedPreview.quickIconBg }}>
+                                        {item.order}
+                                      </span>
+                                      <span className="theme-live-preview-layout-name">{item.label}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="theme-live-preview-layout-empty">
+                                    Set order numbers to preview Home Layout cards.
+                                  </div>
+                                )}
+                              </div>
                               <div
                                 className="theme-live-preview-ad"
                                 style={{ background: combinedPreview.adBg, color: combinedPreview.adText, opacity: combinedPreview.adOpacity }}
                               >
                                 {form.description || 'Description preview area'}
-                              </div>
-                              <div className="theme-live-preview-quick-row">
-                                <div className="theme-live-preview-quick-card" style={{ background: combinedPreview.quickBg, color: combinedPreview.quickText }}>
-                                  <i style={{ background: combinedPreview.quickIconBg }} />
-                                  <span>Directory</span>
-                                </div>
-                                <div className="theme-live-preview-quick-card" style={{ background: combinedPreview.quickBg, color: combinedPreview.quickText }}>
-                                  <i style={{ background: combinedPreview.quickIconBg }} />
-                                  <span>Reports</span>
-                                </div>
                               </div>
                               <button type="button" className="theme-live-preview-action" style={{ background: combinedPreview.buttonBg, color: combinedPreview.buttonText }}>
                                 Main Action

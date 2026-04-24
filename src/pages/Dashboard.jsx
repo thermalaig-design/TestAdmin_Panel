@@ -333,7 +333,7 @@ const MODULE_CARDS = [
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee', 'card-notifications']);
-const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-contact-us', 'card-donations', 'card-members']);
+const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-donations', 'card-members']);
 const MENU_MODULE_CARDS = [
   {
     id: 'menu-card-contact-us',
@@ -361,19 +361,6 @@ const MENU_MODULE_CARDS = [
         <circle cx="18" cy="6" r="2.2" stroke="white" strokeWidth="1.8" />
         <circle cx="18" cy="18" r="2.2" stroke="white" strokeWidth="1.8" />
         <path d="M8 11l7.6-4.1M8 13l7.6 4.1" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    id: 'menu-card-profile',
-    label: 'Profile',
-    description: 'Open member profile',
-    route: '/member-profile',
-    gradient: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
-    icon: (
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="8" r="3.3" stroke="white" strokeWidth="1.8" />
-        <path d="M5 19c0-3.2 2.9-5.8 7-5.8s7 2.6 7 5.8" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     ),
   },

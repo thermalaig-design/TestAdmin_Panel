@@ -54,6 +54,7 @@ function App() {
           <Route path="/my-family" element={<MyFamilyPage />} />
           <Route path="/my-family/create_family_member" element={<MyFamilyPage />} />
           <Route path="/other-membership" element={<OtherMembershipPage />} />
+          <Route path="/other-membership/create_other_membership" element={<OtherMembershipPage />} />
           <Route path="/other-sponsorship" element={<OtherMembershipPage />} />
           <Route path="/executive-body" element={<ExecutiveBodyPage />} />
           <Route path="/gallery"      element={<GalleryPage />} />

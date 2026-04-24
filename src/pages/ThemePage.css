@@ -1019,6 +1019,91 @@
   flex: 1;
 }
 
+.theme-live-preview-layout-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.theme-live-preview-layout-head strong {
+  font-size: 10px;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.theme-live-preview-layout-head small {
+  font-size: 8px;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+.theme-live-preview-layout-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.theme-live-preview-layout-card {
+  min-height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  padding: 5px 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  animation: theme-layout-card-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: transform 0.24s ease, box-shadow 0.24s ease;
+}
+
+.theme-live-preview-layout-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.14);
+}
+
+.theme-live-preview-layout-rank {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  color: #111827;
+  flex-shrink: 0;
+}
+
+.theme-live-preview-layout-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.theme-live-preview-layout-empty {
+  border-radius: 8px;
+  border: 1px dashed rgba(107, 114, 128, 0.35);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 8px;
+  font-size: 9px;
+  line-height: 1.3;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+@keyframes theme-layout-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .theme-live-preview-ad {
   border-radius: 9px;
   padding: 8px;

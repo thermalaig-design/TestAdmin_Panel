@@ -22,14 +22,18 @@ function normalizeQuickOrder(value) {
 }
 
 const APP_CATEGORY_RULES = [
-  { key: 'auth-access', label: 'Extra', keywords: ['login', 'otp', 'auth', 'security', 'password', 'permission', 'role', 'vip', 'appointment', 'opd', 'doctor', 'schedule', 'booking', 'book', 'referral', 'reference', 'report', 'document', 'upload', 'download', 'certificate', 'record', 'birthday', 'wishes', 'wish', 'developer information', 'developer', 'information'] },
+  { key: 'auth-access', label: 'Extra', keywords: ['login', 'otp', 'auth', 'security', 'password', 'permission', 'role', 'vip', 'appointment', 'opd', 'doctor', 'schedule', 'booking', 'book', 'referral', 'reference', 'report', 'document', 'upload', 'download', 'certificate', 'record', 'birthday', 'wishes', 'wish'] },
   { key: 'company-details', label: 'Company Details', keywords: ['trust list', 'trustlist', 'trust_list'] },
-  { key: 'app-design', label: 'App Design', keywords: ['app design', 'theme', 'logo', 'branding', 'font', 'ui settings'] },
   { key: 'content-media', label: 'Home Page', keywords: ['gallery', 'photo', 'image', 'video', 'marquee', 'design', 'theme', 'sponsor', 'banner', 'logo', 'notification'] },
-  { key: 'communication', label: 'Quick Action', keywords: ['notice', 'contact', 'message', 'announcement', 'event', 'events'] },
-  { key: 'finance', label: 'Finance & Donations', keywords: ['donation', 'payment', 'fund', 'finance', 'membership'] },
-  { key: 'reports-data', label: 'Reports & Documents', keywords: ['report', 'document', 'download', 'upload', 'certificate', 'record'] },
+  { key: 'communication', label: 'Quick Action', keywords: ['notice', 'message', 'announcement', 'event', 'events', 'donation', 'executive body', 'executive_body', 'facilities', 'facility', 'feature_profile', 'my profile', 'user profile', 'profile'] },
+  { key: 'general-admin', label: 'Menu', keywords: ['othermembership', 'other membership', 'developer_information', 'developer information'] },
 ];
+
+const CATEGORY_DEFINITIONS = APP_CATEGORY_RULES.reduce((acc, item) => {
+  if (acc.some((entry) => entry.key === item.key)) return acc;
+  acc.push({ key: item.key, label: item.label });
+  return acc;
+}, []);
 
 function classifyFeatureByApp(row) {
   const haystack = [
@@ -243,17 +247,20 @@ export default function FeatureControlPage() {
   }, [rowsWithCounts, searchTerm, statusFilter, categoryFilter, quickOrderSort]);
 
   const categorySummary = useMemo(() => {
-    const counts = rowsWithCounts.reduce((acc, row) => {
+    const counts = new Map(
+      CATEGORY_DEFINITIONS.map((item) => [item.key, { key: item.key, label: item.label, total: 0, enabled: 0 }]),
+    );
+
+    rowsWithCounts.forEach((row) => {
       const key = row.app_category || 'general-admin';
       const label = row.app_category_label || 'Menu';
-      const current = acc.get(key) || { key, label, total: 0, enabled: 0 };
+      const current = counts.get(key) || { key, label, total: 0, enabled: 0 };
       current.total += 1;
       if (row.is_enabled) current.enabled += 1;
-      acc.set(key, current);
-      return acc;
-    }, new Map());
+      counts.set(key, current);
+    });
 
-    return Array.from(counts.values()).sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(counts.values());
   }, [rowsWithCounts]);
 
   useEffect(() => {
@@ -282,6 +289,13 @@ export default function FeatureControlPage() {
 
   const openCategoryView = (categoryKey) => {
     const next = categoryKey || 'all';
+
+    if (activeCategoryView === next) {
+      setActiveCategoryView(null);
+      setCategoryFilter('all');
+      return;
+    }
+
     setCategoryFilter(next);
     setActiveCategoryView(next);
   };
@@ -290,6 +304,73 @@ export default function FeatureControlPage() {
     setActiveCategoryView(null);
     setCategoryFilter('all');
   };
+
+  const handleCategoryFilterChange = (nextValue) => {
+    setCategoryFilter(nextValue);
+    if (activeCategoryView) {
+      setActiveCategoryView(nextValue === 'all' ? 'all' : nextValue);
+    }
+  };
+
+  const renderControls = (extraClass = '') => (
+    <div className={`fc-controls${extraClass ? ` ${extraClass}` : ''}`}>
+      <label>
+        <span>Trust</span>
+        <select value={selectedTrustId} onChange={(event) => setSelectedTrustId(event.target.value)}>
+          {trustOptions.map((item) => (
+            <option key={item.id} value={item.id}>{item.name}</option>
+          ))}
+        </select>
+      </label>
+
+      <label>
+        <span>Tier</span>
+        <select value={selectedTier} onChange={(event) => setSelectedTier(event.target.value)}>
+          <option value="general">general</option>
+          <option value="vip">vip</option>
+        </select>
+      </label>
+
+      <label className="fc-search">
+        <span>Search</span>
+        <input
+          type="text"
+          placeholder="Search feature, display name, route..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+        />
+      </label>
+
+      <label>
+        <span>Status</span>
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <option value="all">all</option>
+          <option value="enabled">enabled</option>
+          <option value="disabled">disabled</option>
+        </select>
+      </label>
+
+      <label>
+        <span>Category</span>
+        <select value={categoryFilter} onChange={(event) => handleCategoryFilterChange(event.target.value)}>
+          <option value="all">all app categories</option>
+          {categorySummary.map((item) => (
+            <option key={item.key} value={item.key}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label>
+        <span>Sort by Quick Order</span>
+        <select value={quickOrderSort} onChange={(event) => setQuickOrderSort(event.target.value)}>
+          <option value="asc">ascending</option>
+          <option value="desc">descending</option>
+        </select>
+      </label>
+    </div>
+  );
 
   const applyUpdatedFlag = (featureId, updatedFlag) => {
     setRows((prev) =>
@@ -397,78 +478,28 @@ export default function FeatureControlPage() {
             )}
           </div>
 
-          <div className="fc-controls">
-            <label>
-              <span>Trust</span>
-              <select value={selectedTrustId} onChange={(event) => setSelectedTrustId(event.target.value)}>
-                {trustOptions.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name}</option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              <span>Tier</span>
-              <select value={selectedTier} onChange={(event) => setSelectedTier(event.target.value)}>
-                <option value="general">general</option>
-                <option value="vip">vip</option>
-              </select>
-            </label>
-
-            <label className="fc-search">
-              <span>Search</span>
-              <input
-                type="text"
-                placeholder="Search feature, display name, route..."
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-              />
-            </label>
-
-            <label>
-              <span>Status</span>
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                <option value="all">all</option>
-                <option value="enabled">enabled</option>
-                <option value="disabled">disabled</option>
-              </select>
-            </label>
-
-            <label>
-              <span>Category</span>
-              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-                <option value="all">all app categories</option>
-                {categorySummary.map((item) => (
-                  <option key={item.key} value={item.key}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              <span>Sort by Quick Order</span>
-              <select value={quickOrderSort} onChange={(event) => setQuickOrderSort(event.target.value)}>
-                <option value="asc">ascending</option>
-                <option value="desc">descending</option>
-              </select>
-            </label>
-          </div>
+          {!openedFromFeatures20 ? renderControls() : null}
 
           <div className="fc-category-summary" aria-label="Feature category summary">
             <button
               type="button"
               className={`fc-category-card ${activeCategoryView === 'all' ? 'active' : ''}`}
               onClick={() => openCategoryView('all')}
+              aria-pressed={activeCategoryView === 'all'}
+              title={activeCategoryView === 'all' ? 'Click to close category view' : 'Click to view all features'}
             >
               <div className="fc-category-card-left">
                 <span className="fc-category-card-title">All Categories</span>
                 <span className="fc-category-card-sub">
                   Showing all features
                 </span>
+                <span className="fc-category-card-hint">
+                  {activeCategoryView === 'all' ? 'Click again to close' : 'Click to open details'}
+                </span>
               </div>
               <div className="fc-category-card-right">
                 <strong>{rowsWithCounts.length}</strong>
+                <span className="fc-category-card-arrow" aria-hidden="true">→</span>
               </div>
             </button>
             {categorySummary.map((item) => (
@@ -477,15 +508,21 @@ export default function FeatureControlPage() {
                 type="button"
                 className={`fc-category-card category-${item.key} ${activeCategoryView === item.key ? 'active' : ''}`}
                 onClick={() => openCategoryView(item.key)}
+                aria-pressed={activeCategoryView === item.key}
+                title={activeCategoryView === item.key ? `Click to close ${item.label}` : `Click to view ${item.label}`}
               >
                 <div className="fc-category-card-left">
                   <span className="fc-category-card-title">{item.label}</span>
                   <span className="fc-category-card-sub">
                     Enabled {item.enabled} of {item.total}
                   </span>
+                  <span className="fc-category-card-hint">
+                    {activeCategoryView === item.key ? 'Click again to close' : 'Click to open details'}
+                  </span>
                 </div>
                 <div className="fc-category-card-right">
                   <strong>{item.enabled}/{item.total}</strong>
+                  <span className="fc-category-card-arrow" aria-hidden="true">→</span>
                 </div>
               </button>
             ))}
@@ -518,6 +555,11 @@ export default function FeatureControlPage() {
                 ×
               </button>
             </div>
+            {openedFromFeatures20 ? (
+              <div className="fc-category-controls-wrap">
+                {renderControls('fc-controls-inline')}
+              </div>
+            ) : null}
 
             <FeatureControlTable
               rows={filteredRows}
