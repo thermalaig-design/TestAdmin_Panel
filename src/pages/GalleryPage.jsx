@@ -297,7 +297,7 @@ export default function GalleryPage() {
 
   const compressImageToLimit = async (file, maxBytes) => {
     if ((file?.size || 0) <= maxBytes) {
-      return { file, sizeValue: formatSizeToKb(file.size) };
+      return { file, sizeValue: formatSizeToKb(file.size), wasCompressed: false };
     }
 
     const image = await loadImageFromFile(file);
@@ -307,21 +307,29 @@ export default function GalleryPage() {
     const context = canvas.getContext('2d');
     if (!context) return null;
 
-    for (let scaleStep = 0; scaleStep < 9; scaleStep += 1) {
-      const scale = Math.pow(0.82, scaleStep);
-      const targetWidth = Math.max(160, Math.round(baseWidth * scale));
-      const targetHeight = Math.max(160, Math.round(baseHeight * scale));
+    let bestBlob = null;
+    for (let scaleStep = 0; scaleStep < 16; scaleStep += 1) {
+      const scale = Math.pow(0.75, scaleStep);
+      const targetWidth = Math.max(64, Math.round(baseWidth * scale));
+      const targetHeight = Math.max(64, Math.round(baseHeight * scale));
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       context.clearRect(0, 0, targetWidth, targetHeight);
       context.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-      for (let quality = 0.82; quality >= 0.2; quality -= 0.08) {
+      for (let quality = 0.86; quality >= 0.06; quality -= 0.05) {
         const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
+        if (blob && (!bestBlob || blob.size < bestBlob.size)) {
+          bestBlob = blob;
+        }
         if (blob && blob.size <= maxBytes) {
-          return { file: blob, sizeValue: formatSizeToKb(blob.size) };
+          return { file: blob, sizeValue: formatSizeToKb(blob.size), wasCompressed: true };
         }
       }
+    }
+
+    if (bestBlob && bestBlob.size <= maxBytes) {
+      return { file: bestBlob, sizeValue: formatSizeToKb(bestBlob.size), wasCompressed: true };
     }
 
     return null;
@@ -352,6 +360,7 @@ export default function GalleryPage() {
     const uploaded = [];
     let failed = 0;
     let sizeSkipped = 0;
+    let compressedCount = 0;
     let firstUploadError = '';
 
     for (const file of imageFiles) {
@@ -360,6 +369,9 @@ export default function GalleryPage() {
         if (!processed?.file) {
           sizeSkipped += 1;
           continue;
+        }
+        if (processed.wasCompressed) {
+          compressedCount += 1;
         }
         const { data, error: createErr } = await createGalleryPhoto({
           file: processed.file,
@@ -389,8 +401,9 @@ export default function GalleryPage() {
       }
     }
 
-    if (failed > 0 || sizeSkipped > 0 || files.length !== imageFiles.length) {
+    if (failed > 0 || sizeSkipped > 0 || files.length !== imageFiles.length || compressedCount > 0) {
       const notes = [];
+      if (compressedCount > 0) notes.push(`${compressedCount} auto-compressed to 25KB`);
       if (failed > 0) notes.push(`${failed} failed`);
       if (sizeSkipped > 0) notes.push(`${sizeSkipped} could not be compressed to 25KB`);
       if (files.length !== imageFiles.length) notes.push(`${files.length - imageFiles.length} non-image skipped`);
@@ -821,7 +834,7 @@ export default function GalleryPage() {
                       </div>
                     </label>
                     <div className="gallery-upload-note">
-                      Uploads go to {folderNameById.get(selectedFolderId)}. Max 10 photos, 25KB each.
+                      Uploads go to {folderNameById.get(selectedFolderId)}. Max 10 photos, 25KB each. Larger images are auto-compressed.
                     </div>
                   </div>
                 </div>
