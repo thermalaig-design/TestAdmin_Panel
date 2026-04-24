@@ -12,11 +12,14 @@ const TrustDetails = lazy(() => import('./pages/TrustDetails'));
 const SponsorsPage = lazy(() => import('./pages/SponsorsPage'));
 const MembersPage = lazy(() => import('./pages/MembersPage'));
 const MemberProfilePage = lazy(() => import('./pages/MemberProfilePage'));
+const OtherMembershipPage = lazy(() => import('./pages/OtherMembershipPage'));
+const MyFamilyPage = lazy(() => import('./pages/MyFamilyPage'));
 const ExecutiveBodyPage = lazy(() => import('./pages/ExecutiveBodyPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const MarqueePage = lazy(() => import('./pages/MarqueePage'));
 const NoticeboardPage = lazy(() => import('./pages/NoticeboardPage'));
 const NoticeDetailPage = lazy(() => import('./pages/NoticeDetailPage'));
+const NotificationPage = lazy(() => import('./pages/NotificationPage'));
 const EventsPage = lazy(() => import('./pages/EventsPage'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const FacilitiesPage = lazy(() => import('./pages/FacilitiesPage'));
@@ -48,6 +51,10 @@ function App() {
           <Route path="/member"       element={<MembersPage />} />
           <Route path="/member/create_member" element={<MembersPage />} />
           <Route path="/member-profile" element={<MemberProfilePage />} />
+          <Route path="/my-family" element={<MyFamilyPage />} />
+          <Route path="/my-family/create_family_member" element={<MyFamilyPage />} />
+          <Route path="/other-membership" element={<OtherMembershipPage />} />
+          <Route path="/other-sponsorship" element={<OtherMembershipPage />} />
           <Route path="/executive-body" element={<ExecutiveBodyPage />} />
           <Route path="/gallery"      element={<GalleryPage />} />
           <Route path="/gallery/:folderId" element={<GalleryPage />} />
@@ -56,6 +63,7 @@ function App() {
           <Route path="/noticeboard/create_notice" element={<NoticeboardPage />} />
           <Route path="/noticeboard/edit_details" element={<NoticeboardPage />} />
           <Route path="/noticeboard/:noticeId" element={<NoticeDetailPage />} />
+          <Route path="/notification" element={<NotificationPage />} />
           <Route path="/events"       element={<EventsPage />} />
           <Route path="/events/create_event" element={<EventsPage />} />
           <Route path="/events/edit_details" element={<EventsPage />} />

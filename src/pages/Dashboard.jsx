@@ -154,6 +154,20 @@ const MODULE_CARDS = [
     ),
   },
   {
+    id: 'card-notifications',
+    label: 'Notifications',
+    description: 'Manage alerts and notifications',
+    route: '/notification',
+    gradient: 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="18.5" cy="5.5" r="2.2" fill="rgba(255,255,255,0.9)" />
+      </svg>
+    ),
+  },
+  {
     id: 'card-noticeboard',
     label: 'Noticeboard',
     description: 'View notices and open individual updates',
@@ -318,11 +332,84 @@ const MODULE_CARDS = [
 
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust']);
-const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
+const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee', 'card-notifications']);
 const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-contact-us', 'card-donations', 'card-members']);
+const MENU_MODULE_CARDS = [
+  {
+    id: 'menu-card-contact-us',
+    label: 'Contact Us',
+    description: 'Manage contact details',
+    route: '/contact-us',
+    gradient: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 3.18 2 2 0 0 1 4.11 1h2a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.62a2 2 0 0 1-.45 2.11L7.1 8.9a16 16 0 0 0 8 8l1.45-1.19a2 2 0 0 1 2.11-.45c.84.3 1.72.51 2.62.63A2 2 0 0 1 22 16.92Z" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'menu-card-share-app',
+    label: 'Share App',
+    description: 'Coming soon',
+    route: '/dashboard',
+    temporarilyDeactivated: true,
+    deactivationText: 'Coming Soon',
+    gradient: 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="6" cy="12" r="2.2" stroke="white" strokeWidth="1.8" />
+        <circle cx="18" cy="6" r="2.2" stroke="white" strokeWidth="1.8" />
+        <circle cx="18" cy="18" r="2.2" stroke="white" strokeWidth="1.8" />
+        <path d="M8 11l7.6-4.1M8 13l7.6 4.1" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'menu-card-profile',
+    label: 'Profile',
+    description: 'Open member profile',
+    route: '/member-profile',
+    gradient: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="8" r="3.3" stroke="white" strokeWidth="1.8" />
+        <path d="M5 19c0-3.2 2.9-5.8 7-5.8s7 2.6 7 5.8" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'menu-card-my-family',
+    label: 'My Family',
+    description: 'Manage family details',
+    route: '/my-family',
+    gradient: 'linear-gradient(135deg, #14B8A6 0%, #0EA5E9 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="9" r="2.6" stroke="white" strokeWidth="1.8" />
+        <circle cx="16.5" cy="9.5" r="2" stroke="white" strokeWidth="1.8" />
+        <path d="M4.5 18c0-2.6 2.3-4.6 5.2-4.6s5.2 2 5.2 4.6" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M14.4 18c.36-1.46 1.5-2.5 3.2-2.8" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'menu-card-other-membership',
+    label: 'Other Membership',
+    description: 'View other memberships',
+    route: '/other-membership',
+    gradient: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="4" y="5" width="16" height="14" rx="2.3" stroke="white" strokeWidth="1.8" />
+        <path d="M8 10h8M8 14h5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+];
 
 const NAV_SECTION_TITLES = {
   dashboard: 'Dashboard',
+  menu: 'Menu',
   'company-details': 'Company Details',
   'app-design': 'App Design',
   'home-page': 'Home Page',
@@ -594,6 +681,9 @@ export default function Dashboard() {
   const scopedModules = useMemo(() => {
     if (currentSidebarNavKey === 'dashboard') {
       return [];
+    }
+    if (currentSidebarNavKey === 'menu') {
+      return MENU_MODULE_CARDS;
     }
     if (currentSidebarNavKey === 'app-design') {
       return MODULE_CARDS.filter((card) => APP_DESIGN_CARD_IDS.has(card.id));

@@ -19,6 +19,7 @@ const DEFAULT_NEW_HOME_LAYOUT = ['trustList', 'sponsors', 'marquee', 'gallery', 
 const pretty = (value, fallback) => JSON.stringify(value ?? fallback, null, 2);
 const DEFAULT_ANIMATIONS = { cards: 'fadeUp', navbar: 'fadeSlideDown', gallery: 'zoomIn' };
 const GRADIENT_OPTIONS = ['none', 'linear', 'radial', 'conic'];
+const TRANSITION_FEEL_OPTIONS = ['ease', 'linear', 'ease-in', 'ease-out', 'ease-in-out'];
 const DEFAULT_THEME_SECTION_CONFIG = {
   footer: { bg_color_1: '#1f296f', bg_color_2: '#c81e1e', text_color: '#ffffff', gradient_type: 'linear' },
   navbar: { blur: 10, opacity: 1, bg_color_1: '#1f296f', bg_color_2: '#c81e1e', text_color: '#f7f7f7', gradient_type: 'linear' },
@@ -55,7 +56,7 @@ const THEME_SECTION_FIELDS = {
     { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#f0f1fb' },
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
     { key: 'gradient_angle', label: 'Gradient Angle', type: 'number', min: 0, max: 360, step: 1 },
-    { key: 'gradient_transition', label: 'Transition Feel', type: 'text' },
+    { key: 'gradient_transition', label: 'Transition Feel', type: 'select', options: TRANSITION_FEEL_OPTIONS },
   ],
   sidebar: [
     { key: 'blur', label: 'Blur Strength', type: 'number', min: 0, step: 1 },
@@ -747,6 +748,67 @@ export default function ThemePage() {
     );
   };
 
+  const combinedPreview = useMemo(() => {
+    const config = buildThemeConfigForm(themeConfigForm || {});
+    const sidebar = config.sidebar || {};
+    const navbar = config.navbar || {};
+    const marquee = config.marquee || {};
+    const pageBg = config.page_bg || {};
+    const quickActions = config.quick_actions || {};
+    const appButtons = config.app_buttons || {};
+    const advertisement = config.advertisement || {};
+    const footer = config.footer || {};
+
+    const sidebarBg = sectionPreviewBackground(sidebar, '#a4ccea');
+    const sidebarText = safeText(sidebar.text_color, '#ffffff') || '#ffffff';
+    const sidebarBtnBg = safeText(sidebar.button_color, '#e3e3ee') || '#e3e3ee';
+    const sidebarBtnText = safeText(sidebar.button_text_color, '#ffffff') || '#ffffff';
+
+    const navbarBg = sectionPreviewBackground(navbar, '#1f296f');
+    const navbarText = safeText(navbar.text_color, '#f7f7f7') || '#f7f7f7';
+
+    const marqueeBg = sectionPreviewBackground(marquee, '#1a1891');
+    const marqueeText = safeText(marquee.text_color, '#ffffff') || '#ffffff';
+
+    const bodyBg = sectionPreviewBackground(pageBg, '#f6f8fc');
+
+    const quickBg = sectionPreviewBackground(quickActions, '#ffffff');
+    const quickText = safeText(quickActions.text_color, '#111827') || '#111827';
+    const quickIconBg = safeText(quickActions.icon_bg_color, '#e0e7ff') || '#e0e7ff';
+
+    const buttonBg = sectionPreviewBackground(appButtons, '#4a42e8');
+    const buttonText = safeText(appButtons.text_color, '#ffffff') || '#ffffff';
+
+    const adBg = safeText(advertisement.bg_color, '#eef2ff') || '#eef2ff';
+    const adOpacity = Number.isFinite(Number(advertisement.bg_opacity)) ? Number(advertisement.bg_opacity) : 1;
+    const adText = safeText(advertisement.text_color, '#4a42e8') || '#4a42e8';
+
+    const footerBg = sectionPreviewBackground(footer, '#1f296f');
+    const footerText = safeText(footer.text_color, '#ffffff') || '#ffffff';
+
+    return {
+      sidebarBg,
+      sidebarText,
+      sidebarBtnBg,
+      sidebarBtnText,
+      navbarBg,
+      navbarText,
+      marqueeBg,
+      marqueeText,
+      bodyBg,
+      quickBg,
+      quickText,
+      quickIconBg,
+      buttonBg,
+      buttonText,
+      adBg,
+      adOpacity,
+      adText,
+      footerBg,
+      footerText,
+    };
+  }, [themeConfigForm]);
+
   const renderHomeLayoutField = () => (
     <div className="theme-field theme-span-2" key="home_layout_order">
       <span>Home Layout Order</span>
@@ -942,38 +1004,93 @@ export default function ThemePage() {
                   <div className="theme-form-head">
                     <div className="theme-form-title">{isViewMode ? 'View Theme' : selectedId ? 'Edit Theme' : 'Create Theme'}</div>
                   </div>
-                <div className="theme-grid">
-                  <label className="theme-field"><span>Name *</span><input value={form.name} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} /></label>
-                  <label className="theme-field"><span>Template Key</span><input value={form.template_key} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, template_key: e.target.value }))} /></label>
-                  <label className="theme-field theme-span-2"><span>Description</span><textarea rows="3" value={form.description} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></label>
-                  <div className="theme-field theme-span-2">
-                    <span>Colors</span>
-                  </div>
-                  <div className="theme-span-2 theme-config-groups">
-                    {THEME_SECTION_ORDER.map((section) => (
-                      <div className="theme-config-group" key={section.key}>
-                        <div className="theme-config-group-head-row">
-                          <div>
-                            <div className="theme-config-group-head">{section.label}</div>
-                            <div className="theme-config-group-help">{THEME_SECTION_HELP[section.key] || ''}</div>
-                          </div>
-                          {renderSectionPreview(section.key)}
+                  <div className="theme-form-layout">
+                    <div className="theme-form-main">
+                      <div className="theme-grid">
+                        <label className="theme-field"><span>Name *</span><input value={form.name} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} /></label>
+                        <label className="theme-field"><span>Template Key</span><input value={form.template_key} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, template_key: e.target.value }))} /></label>
+                        <label className="theme-field theme-span-2"><span>Description</span><textarea rows="3" value={form.description} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></label>
+                        <div className="theme-field theme-span-2">
+                          <span>Colors</span>
                         </div>
-                        <div className="theme-config-group-grid">
-                          {(THEME_SECTION_FIELDS[section.key] || []).map((field) => renderThemeField(section.key, field))}
+                        <div className="theme-span-2 theme-config-groups">
+                          {THEME_SECTION_ORDER.map((section) => (
+                            <div className="theme-config-group" key={section.key}>
+                              <div className="theme-config-group-head-row">
+                                <div>
+                                  <div className="theme-config-group-head">{section.label}</div>
+                                  <div className="theme-config-group-help">{THEME_SECTION_HELP[section.key] || ''}</div>
+                                </div>
+                                {renderSectionPreview(section.key)}
+                              </div>
+                              <div className="theme-config-group-grid">
+                                {(THEME_SECTION_FIELDS[section.key] || []).map((field) => renderThemeField(section.key, field))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {renderHomeLayoutField()}
+                        {renderAnimationsField()}
+                        <label className="theme-field theme-span-2"><span>Custom CSS</span><textarea rows="5" value={form.custom_css} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, custom_css: e.target.value }))} /></label>
+                      </div>
+                      <div className="theme-form-actions">
+                        <button className="theme-secondary-btn" type="button" onClick={closeThemeForm}>Close</button>
+                        {!isViewMode && <button className="theme-primary-btn" type="button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Theme'}</button>}
+                      </div>
+                    </div>
+                    <aside className="theme-live-preview-wrap">
+                      <div className="theme-live-preview-card">
+                        <div className="theme-live-preview-head">
+                          <strong>Live App Preview</strong>
+                          <small>{form.template_key || 'template'}</small>
+                        </div>
+                        <div className="theme-live-preview-shell">
+                          <div className="theme-live-preview-sidebar" style={{ background: combinedPreview.sidebarBg, color: combinedPreview.sidebarText }}>
+                            <span>Dashboard</span>
+                            <span>Home</span>
+                            <span>Quick Actions</span>
+                            <button type="button" style={{ background: combinedPreview.sidebarBtnBg, color: combinedPreview.sidebarBtnText }}>Switch Trust</button>
+                          </div>
+                          <div className="theme-live-preview-phone" style={{ background: combinedPreview.bodyBg }}>
+                            <div className="theme-live-preview-navbar" style={{ background: combinedPreview.navbarBg, color: combinedPreview.navbarText }}>
+                              <span>{form.name || 'App Name'}</span>
+                              <span>Menu</span>
+                            </div>
+                            <div className="theme-live-preview-marquee" style={{ background: combinedPreview.marqueeBg, color: combinedPreview.marqueeText }}>
+                              Announcement strip running here
+                            </div>
+                            <div className="theme-live-preview-body">
+                              <div
+                                className="theme-live-preview-ad"
+                                style={{ background: combinedPreview.adBg, color: combinedPreview.adText, opacity: combinedPreview.adOpacity }}
+                              >
+                                {form.description || 'Description preview area'}
+                              </div>
+                              <div className="theme-live-preview-quick-row">
+                                <div className="theme-live-preview-quick-card" style={{ background: combinedPreview.quickBg, color: combinedPreview.quickText }}>
+                                  <i style={{ background: combinedPreview.quickIconBg }} />
+                                  <span>Directory</span>
+                                </div>
+                                <div className="theme-live-preview-quick-card" style={{ background: combinedPreview.quickBg, color: combinedPreview.quickText }}>
+                                  <i style={{ background: combinedPreview.quickIconBg }} />
+                                  <span>Reports</span>
+                                </div>
+                              </div>
+                              <button type="button" className="theme-live-preview-action" style={{ background: combinedPreview.buttonBg, color: combinedPreview.buttonText }}>
+                                Main Action
+                              </button>
+                            </div>
+                            <div className="theme-live-preview-footer" style={{ background: combinedPreview.footerBg, color: combinedPreview.footerText }}>
+                              <span>Home</span>
+                              <span>Profile</span>
+                              <span>More</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    ))}
+                    </aside>
                   </div>
-                  {renderHomeLayoutField()}
-                  {renderAnimationsField()}
-                  <label className="theme-field theme-span-2"><span>Custom CSS</span><textarea rows="5" value={form.custom_css} disabled={isViewMode} onChange={(e) => setForm((p) => ({ ...p, custom_css: e.target.value }))} /></label>
                 </div>
-                <div className="theme-form-actions">
-                  <button className="theme-secondary-btn" type="button" onClick={closeThemeForm}>Close</button>
-                  {!isViewMode && <button className="theme-primary-btn" type="button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Theme'}</button>}
-                </div>
-              </div>
               </section>
             </>
           )}
