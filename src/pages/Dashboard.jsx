@@ -336,6 +336,22 @@ const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marque
 const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-donations', 'card-members']);
 const MENU_MODULE_CARDS = [
   {
+    id: 'menu-card-user-management',
+    label: 'User Management',
+    description: 'Create users and assign feature permissions',
+    route: '/user-management',
+    gradient: 'linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="3" stroke="white" strokeWidth="1.8" />
+        <path d="M4.2 18c0-2.8 2.25-5 5-5s5 2.2 5 5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <rect x="14.2" y="11" width="6.4" height="8" rx="1.3" stroke="white" strokeWidth="1.8" />
+        <line x1="17.4" y1="13" x2="17.4" y2="17" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="15.4" y1="15" x2="19.4" y2="15" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     id: 'menu-card-contact-us',
     label: 'Contact Us',
     description: 'Manage contact details',

@@ -13,6 +13,7 @@ import './MyFamilyPage.css';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const MEMBER_PICKER_PAGE_SIZE = 10;
 
 const EMPTY_FORM = {
   members_id: '',
@@ -85,6 +86,7 @@ export default function MyFamilyPage() {
   const [memberPanelSearch, setMemberPanelSearch] = useState('');
   const [memberTypeFilter, setMemberTypeFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [memberPage, setMemberPage] = useState(1);
 
   const memberNameMap = useMemo(
     () => new Map(memberOptions.map((item) => [String(item.member_id), item.name || 'Member'])),
@@ -142,6 +144,14 @@ export default function MyFamilyPage() {
       return searchable.some((value) => String(value || '').toLowerCase().includes(term));
     });
   }, [memberOptions, memberPanelSearch, memberTypeFilter, roleFilter, isCreateRoute]);
+  const memberPickerTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredMemberOptions.length / MEMBER_PICKER_PAGE_SIZE)),
+    [filteredMemberOptions.length]
+  );
+  const paginatedMemberOptions = useMemo(() => {
+    const start = (memberPage - 1) * MEMBER_PICKER_PAGE_SIZE;
+    return filteredMemberOptions.slice(start, start + MEMBER_PICKER_PAGE_SIZE);
+  }, [filteredMemberOptions, memberPage]);
 
   const selectedMemberLabel = useMemo(
     () => memberLabelMap.get(selectedMemberId) || '',
@@ -194,6 +204,24 @@ export default function MyFamilyPage() {
       state: { userName, trust, sidebarNavKey: currentSidebarNavKey },
     });
   };
+
+  useEffect(() => {
+    setMemberPage(1);
+  }, [memberPanelSearch, memberTypeFilter, roleFilter, isCreateRoute]);
+
+  useEffect(() => {
+    setMemberPage((prev) => Math.min(Math.max(prev, 1), memberPickerTotalPages));
+  }, [memberPickerTotalPages]);
+
+  useEffect(() => {
+    if (!selectedMemberId) return;
+    const selectedIndex = filteredMemberOptions.findIndex(
+      (member) => String(member.member_id || '') === selectedMemberId
+    );
+    if (selectedIndex < 0) return;
+    const selectedPage = Math.floor(selectedIndex / MEMBER_PICKER_PAGE_SIZE) + 1;
+    setMemberPage(selectedPage);
+  }, [filteredMemberOptions, selectedMemberId]);
 
   useEffect(() => {
     if (!trustId) {
@@ -421,7 +449,7 @@ export default function MyFamilyPage() {
                 {filteredMemberOptions.length === 0 && (
                   <div className="mf-picker-empty">No members found.</div>
                 )}
-                {filteredMemberOptions.map((member) => {
+                {paginatedMemberOptions.map((member) => {
                   const memberId = String(member.member_id || '');
                   const isSelected = memberId && memberId === selectedMemberId;
                   return (
@@ -442,6 +470,27 @@ export default function MyFamilyPage() {
                   );
                 })}
               </div>
+              {filteredMemberOptions.length > MEMBER_PICKER_PAGE_SIZE && (
+                <div className="mf-picker-pagination">
+                  <button
+                    type="button"
+                    className="mf-btn mf-btn-muted"
+                    onClick={() => setMemberPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={memberPage === 1}
+                  >
+                    Prev
+                  </button>
+                  <span>Page {memberPage} of {memberPickerTotalPages}</span>
+                  <button
+                    type="button"
+                    className="mf-btn mf-btn-muted"
+                    onClick={() => setMemberPage((prev) => Math.min(prev + 1, memberPickerTotalPages))}
+                    disabled={memberPage === memberPickerTotalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </aside>
 
             <div className={`mf-layout ${isCreateRoute ? 'create-only' : 'records-only'}`}>

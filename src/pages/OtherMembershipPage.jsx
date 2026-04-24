@@ -24,6 +24,7 @@ const EMPTY_FORM = {
 
 const sanitizeDigits = (value) => String(value ?? '').replace(/\D+/g, '');
 const toText = (value) => (value === null || value === undefined ? '' : String(value));
+const MEMBER_PICKER_PAGE_SIZE = 10;
 const formatMemberLabel = (member = {}) =>
   `${member.membership_number ? `${member.membership_number} - ` : ''}${member.name || 'Member'}`;
 const buildFormFromItem = (item = {}) => ({
@@ -79,6 +80,7 @@ export default function OtherMembershipPage() {
   const [memberPanelSearch, setMemberPanelSearch] = useState('');
   const [memberTypeFilter, setMemberTypeFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [memberPage, setMemberPage] = useState(1);
 
   const memberNameMap = useMemo(
     () => new Map(memberOptions.map((item) => [String(item.member_id), item.name || 'Member'])),
@@ -131,6 +133,14 @@ export default function OtherMembershipPage() {
       return searchable.some((value) => String(value || '').toLowerCase().includes(term));
     });
   }, [memberOptions, memberPanelSearch, memberTypeFilter, roleFilter, isCreateRoute]);
+  const memberPickerTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredMemberOptions.length / MEMBER_PICKER_PAGE_SIZE)),
+    [filteredMemberOptions.length]
+  );
+  const paginatedMemberOptions = useMemo(() => {
+    const start = (memberPage - 1) * MEMBER_PICKER_PAGE_SIZE;
+    return filteredMemberOptions.slice(start, start + MEMBER_PICKER_PAGE_SIZE);
+  }, [filteredMemberOptions, memberPage]);
   const selectedMemberLabel = useMemo(
     () => memberLabelMap.get(selectedMemberId) || '',
     [memberLabelMap, selectedMemberId]
@@ -195,6 +205,24 @@ export default function OtherMembershipPage() {
       state: { userName, trust, sidebarNavKey: currentSidebarNavKey },
     });
   };
+
+  useEffect(() => {
+    setMemberPage(1);
+  }, [memberPanelSearch, memberTypeFilter, roleFilter, isCreateRoute]);
+
+  useEffect(() => {
+    setMemberPage((prev) => Math.min(Math.max(prev, 1), memberPickerTotalPages));
+  }, [memberPickerTotalPages]);
+
+  useEffect(() => {
+    if (!selectedMemberId) return;
+    const selectedIndex = filteredMemberOptions.findIndex(
+      (member) => String(member.member_id || '') === selectedMemberId
+    );
+    if (selectedIndex < 0) return;
+    const selectedPage = Math.floor(selectedIndex / MEMBER_PICKER_PAGE_SIZE) + 1;
+    setMemberPage(selectedPage);
+  }, [filteredMemberOptions, selectedMemberId]);
 
   useEffect(() => {
     if (!trustId) {
@@ -389,7 +417,7 @@ export default function OtherMembershipPage() {
                 {filteredMemberOptions.length === 0 && (
                   <div className="om-picker-empty">No members found.</div>
                 )}
-                {filteredMemberOptions.map((member) => {
+                {paginatedMemberOptions.map((member) => {
                   const memberId = String(member.member_id || '');
                   const isSelected = memberId && memberId === selectedMemberId;
                   return (
@@ -410,6 +438,27 @@ export default function OtherMembershipPage() {
                   );
                 })}
               </div>
+              {filteredMemberOptions.length > MEMBER_PICKER_PAGE_SIZE && (
+                <div className="om-picker-pagination">
+                  <button
+                    type="button"
+                    className="om-btn om-btn-muted"
+                    onClick={() => setMemberPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={memberPage === 1}
+                  >
+                    Prev
+                  </button>
+                  <span>Page {memberPage} of {memberPickerTotalPages}</span>
+                  <button
+                    type="button"
+                    className="om-btn om-btn-muted"
+                    onClick={() => setMemberPage((prev) => Math.min(prev + 1, memberPickerTotalPages))}
+                    disabled={memberPage === memberPickerTotalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </aside>
 
             <div className={`om-layout ${isCreateRoute ? 'create-only' : 'records-only'}`}>

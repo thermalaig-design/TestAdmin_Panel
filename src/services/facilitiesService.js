@@ -4,7 +4,6 @@ import { cachedQuery, invalidateCache } from './requestCache';
 const TABLE_NAME = 'facilities';
 const FACILITIES_BUCKET = String(import.meta?.env?.VITE_FACILITIES_BUCKET || 'facilities').trim() || 'facilities';
 const LEGACY_FACILITIES_BUCKETS = new Set(['facilities']);
-const FACILITY_SIGNED_URL_TTL_SECONDS = 60 * 60;
 const MAX_FETCH = 50;
 
 function uniqueId() {
@@ -62,22 +61,22 @@ function normalizeFacilitiesBucket(bucket = '') {
   return bucket;
 }
 
-export async function resolveFacilitiesAttachmentUrl(rawUrl = '', expiresIn = FACILITY_SIGNED_URL_TTL_SECONDS) {
+export async function resolveFacilitiesAttachmentUrl(rawUrl = '') {
   const info = extractStorageObjectInfo(rawUrl);
   if (!info) return { data: { signedUrl: String(rawUrl || '').trim() }, error: null };
 
   const bucket = normalizeFacilitiesBucket(info.bucket);
   if (!bucket) return { data: { signedUrl: String(rawUrl || '').trim() }, error: null };
 
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(info.objectPath, expiresIn);
-  if (error || !data?.signedUrl) {
-    return { data: { signedUrl: String(rawUrl || '').trim() }, error };
+  const { data } = supabase.storage.from(bucket).getPublicUrl(info.objectPath);
+  if (!data?.publicUrl) {
+    return { data: { signedUrl: String(rawUrl || '').trim() }, error: null };
   }
 
-  return { data: { signedUrl: data.signedUrl }, error: null };
+  return { data: { signedUrl: data.publicUrl }, error: null };
 }
 
-async function refreshAttachmentsWithSignedUrls(attachments = []) {
+async function refreshAttachmentsWithPublicUrls(attachments = []) {
   if (!Array.isArray(attachments) || !attachments.length) return [];
 
   const resolved = await Promise.all(
@@ -126,7 +125,7 @@ export async function fetchFacilitiesByTrust(trustId) {
       const normalizedRows = await Promise.all(
         (data || []).map(async (row) => {
           const normalized = normalizeRow(row);
-          const refreshedAttachments = await refreshAttachmentsWithSignedUrls(normalized.attachments);
+          const refreshedAttachments = await refreshAttachmentsWithPublicUrls(normalized.attachments);
           return { ...normalized, attachments: refreshedAttachments };
         })
       );
@@ -163,22 +162,22 @@ export async function uploadFacilitiesAttachment(file, { trustId = null } = {}) 
     return { data: null, error: uploadError };
   }
 
-  const { data: signedData, error: signError } = await supabase
+  const { data: publicData } = supabase
     .storage
     .from(FACILITIES_BUCKET)
-    .createSignedUrl(path, FACILITY_SIGNED_URL_TTL_SECONDS);
+    .getPublicUrl(path);
 
-  if (signError || !signedData?.signedUrl) {
+  if (!publicData?.publicUrl) {
     return {
       data: null,
-      error: signError || { message: 'Uploaded image but failed to generate signed URL.' },
+      error: { message: 'Uploaded image but failed to generate public URL.' },
     };
   }
 
   return {
     data: {
       path,
-      publicUrl: signedData.signedUrl || null,
+      publicUrl: publicData.publicUrl || null,
     },
     error: null,
   };
@@ -187,7 +186,7 @@ export async function uploadFacilitiesAttachment(file, { trustId = null } = {}) 
 export async function createFacility(payload = {}) {
   if (!payload.trust_id) return { data: null, error: { message: 'No trust id provided.' } };
 
-  const normalizedAttachments = await refreshAttachmentsWithSignedUrls(
+  const normalizedAttachments = await refreshAttachmentsWithPublicUrls(
     Array.isArray(payload.attachments) ? payload.attachments : []
   );
 
@@ -211,7 +210,7 @@ export async function updateFacility(facilityId, updates = {}, trustId = null) {
 
   const normalizedAttachments =
     updates.attachments !== undefined
-      ? await refreshAttachmentsWithSignedUrls(Array.isArray(updates.attachments) ? updates.attachments : [])
+      ? await refreshAttachmentsWithPublicUrls(Array.isArray(updates.attachments) ? updates.attachments : [])
       : undefined;
 
   const payload = {

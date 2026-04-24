@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import PageHeader from '../components/PageHeader';
@@ -66,9 +66,11 @@ export default function ExecutiveBodyPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({ reg_id: '', role_type: 'committee', title: '', subtitle: '' });
+  const [createMemberSearch, setCreateMemberSearch] = useState('');
   const [createError, setCreateError] = useState('');
   const [createSaving, setCreateSaving] = useState(false);
   const normalizedTrustId = String(trustId || '');
+  const backdropMouseDownRef = useRef({ edit: false, create: false });
 
   useEffect(() => {
     if (!trustId) {
@@ -220,6 +222,23 @@ export default function ExecutiveBodyPage() {
     );
   }, [registeredMembers, roleMembers, normalizedTrustId]);
 
+  const filteredRegisteredMemberOptions = useMemo(() => {
+    const term = toText(createMemberSearch).toLowerCase();
+    if (!term) return registeredMemberOptions;
+    return registeredMemberOptions.filter((member) => {
+      const searchable = [
+        member?.name,
+        member?.membership_number,
+        member?.mobile,
+        member?.email,
+        member?.company_name,
+      ]
+        .map((value) => toText(value).toLowerCase())
+        .filter(Boolean);
+      return searchable.some((value) => value.includes(term));
+    });
+  }, [createMemberSearch, registeredMemberOptions]);
+
   const leftTotalPages = Math.max(1, Math.ceil(groupedRoleMembers.length / LEFT_PAGE_SIZE));
 
   useEffect(() => {
@@ -274,6 +293,7 @@ export default function ExecutiveBodyPage() {
       title: toText(selectedRoleMember?.title),
       subtitle: '',
     });
+    setCreateMemberSearch('');
     setCreateError('');
     setCreateOpen(true);
   };
@@ -282,6 +302,18 @@ export default function ExecutiveBodyPage() {
     setCreateOpen(false);
     setCreateError('');
     setCreateSaving(false);
+    setCreateMemberSearch('');
+  };
+
+  const handleBackdropMouseDown = (key) => (event) => {
+    backdropMouseDownRef.current[key] = event.target === event.currentTarget;
+  };
+
+  const handleBackdropClick = (key, closeHandler) => (event) => {
+    const startedOnBackdrop = !!backdropMouseDownRef.current[key];
+    const endedOnBackdrop = event.target === event.currentTarget;
+    backdropMouseDownRef.current[key] = false;
+    if (startedOnBackdrop && endedOnBackdrop) closeHandler();
   };
 
   const saveEditedRole = async () => {
@@ -496,7 +528,11 @@ export default function ExecutiveBodyPage() {
           )}
 
           {editRoleId && (
-            <div className="eb-modal-backdrop" onClick={closeEditRole}>
+            <div
+              className="eb-modal-backdrop"
+              onMouseDown={handleBackdropMouseDown('edit')}
+              onClick={handleBackdropClick('edit', closeEditRole)}
+            >
               <div className="eb-modal-card" onClick={(event) => event.stopPropagation()}>
                 <h4>Edit Member Role</h4>
                 <div className="eb-modal-grid">
@@ -539,18 +575,29 @@ export default function ExecutiveBodyPage() {
           )}
 
           {createOpen && (
-            <div className="eb-modal-backdrop" onClick={closeCreateRole}>
+            <div
+              className="eb-modal-backdrop"
+              onMouseDown={handleBackdropMouseDown('create')}
+              onClick={handleBackdropClick('create', closeCreateRole)}
+            >
               <div className="eb-modal-card" onClick={(event) => event.stopPropagation()}>
                 <h4>Create Executive Member</h4>
                 <div className="eb-modal-grid">
                   <label className="eb-field">
                     <span>Member</span>
+                    <input
+                      type="text"
+                      value={createMemberSearch}
+                      onChange={(event) => setCreateMemberSearch(event.target.value)}
+                      placeholder="Search member by name, membership no, mobile..."
+                    />
+                    <small>{filteredRegisteredMemberOptions.length} member(s) found</small>
                     <select
                       value={createForm.reg_id}
                       onChange={(event) => setCreateForm((prev) => ({ ...prev, reg_id: event.target.value }))}
                     >
                       <option value="">Select member</option>
-                      {registeredMemberOptions.map((member) => (
+                      {filteredRegisteredMemberOptions.map((member) => (
                         <option key={member.id} value={member.id}>
                           {toText(member?.name) || 'Member'} ({toText(member?.membership_number) || '-'})
                         </option>

@@ -177,8 +177,24 @@
   min-height: 0;
   overflow-y: auto;
   display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
   gap: 8px;
   padding-right: 2px;
+}
+
+.mf-picker-pagination {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mf-picker-pagination span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
 }
 
 .mf-picker-item {
