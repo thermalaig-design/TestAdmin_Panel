@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 
 const REGISTERED_TABLE_CANDIDATES = ['registered_members', 'reg_members'];
 const MEMBER_TABLE_CANDIDATES = ['members', 'Members'];
@@ -360,18 +361,20 @@ function buildProfilePhotoPath(memberId, file) {
 export async function uploadMemberProfilePhoto(memberId, file) {
   if (!memberId) return { data: null, error: { message: 'Member id is required for profile photo upload.' } };
   if (!file) return { data: null, error: { message: 'No profile photo file provided.' } };
-  if (!file.type || !file.type.startsWith('image/')) {
-    return { data: null, error: { message: 'Please select a valid image file for profile photo.' } };
+  const prepared = await prepareImageFileForUpload(file);
+  if (prepared.error || !prepared.file) {
+    return { data: null, error: { message: prepared.error?.message || getAllowedImageFormatsMessage() } };
   }
+  const uploadFile = prepared.file;
 
-  const path = buildProfilePhotoPath(memberId, file);
+  const path = buildProfilePhotoPath(memberId, uploadFile);
   const { error: uploadError } = await supabase
     .storage
     .from(PROFILE_PHOTO_BUCKET)
-    .upload(path, file, {
+    .upload(path, uploadFile, {
       cacheControl: '3600',
       upsert: false,
-      contentType: file.type || undefined,
+      contentType: uploadFile.type || undefined,
     });
 
   if (uploadError) return { data: null, error: uploadError };
@@ -385,6 +388,7 @@ export async function uploadMemberProfilePhoto(memberId, file) {
     data: {
       path,
       publicUrl: publicData?.publicUrl || null,
+      warning: prepared.warning || '',
     },
     error: null,
   };

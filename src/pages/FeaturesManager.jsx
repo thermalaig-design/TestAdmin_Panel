@@ -8,6 +8,7 @@ import {
   addFeatureFlag,
   deleteFeatureFlag,
 } from '../services/featuresService';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 import './FeaturesManager.css';
 
 // ── Inline icon renderer (same logic as Dashboard's FeatureIcon) ───────────────
@@ -414,16 +415,22 @@ export default function FeaturesManager({ trustId, trustName, onFeaturesChange }
     setSaveMsg('');
   };
 
-  const handleIconFileChange = (e) => {
+  const handleIconFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const prepared = await prepareImageFileForUpload(file);
+    if (prepared.error || !prepared.file) {
+      setSaveMsg(prepared.error?.message || getAllowedImageFormatsMessage());
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target.result;
       setIconPreview(base64);
       setEditForm(p => ({ ...p, icon_url: base64 }));
+      setSaveMsg(prepared.warning || '');
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(prepared.file);
   };
 
   const handleEditSave = async () => {
@@ -480,16 +487,22 @@ export default function FeaturesManager({ trustId, trustName, onFeaturesChange }
     setAddSaving(false);
   };
 
-  const handleAddIconFileChange = (e) => {
+  const handleAddIconFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const prepared = await prepareImageFileForUpload(file);
+    if (prepared.error || !prepared.file) {
+      setAddError(prepared.error?.message || getAllowedImageFormatsMessage());
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target.result;
       setAddIconPreview(base64);
       setAddForm(p => ({ ...p, icon_url: base64 }));
+      setAddError(prepared.warning || '');
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(prepared.file);
   };
 
   // ── Delete ─────────────────────────────────────────────────────────────────
@@ -704,7 +717,7 @@ export default function FeaturesManager({ trustId, trustName, onFeaturesChange }
                         <div className="fm-upload-placeholder">
                           <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="17 8 12 3 7 8" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="3" x2="12" y2="15" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round"/></svg>
                           <span>Click to upload image</span>
-                          <span className="fm-upload-hint">PNG, JPG, SVG, WebP</span>
+                          <span className="fm-upload-hint">JPG, JPEG, PNG (other image formats auto-convert to JPEG)</span>
                         </div>
                       </label>
                     )}
@@ -917,7 +930,7 @@ export default function FeaturesManager({ trustId, trustName, onFeaturesChange }
                         <div className="fm-upload-placeholder">
                           <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="17 8 12 3 7 8" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="3" x2="12" y2="15" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round"/></svg>
                           <span>Click to upload image</span>
-                          <span className="fm-upload-hint">PNG, JPG, SVG, WebP</span>
+                          <span className="fm-upload-hint">JPG, JPEG, PNG (other image formats auto-convert to JPEG)</span>
                         </div>
                       </label>
                     )}
@@ -1006,5 +1019,3 @@ export default function FeaturesManager({ trustId, trustName, onFeaturesChange }
     </div>
   );
 }
-
-

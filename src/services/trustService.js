@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 
 const TRUST_COLUMNS = 'id, name, icon_url, remark, created_at, terms_content, privacy_content, template_id, legal_name, superuser_id, gst_number, pan_number, website, email_id, remark1, remark2, remark3';
 const TRUST_ICON_BUCKET = 'trust-icons';
@@ -29,18 +30,20 @@ function buildTrustIconPath(ownerId, file) {
 
 export async function uploadTrustIcon(file, { ownerId = null } = {}) {
   if (!file) return { data: null, error: { message: 'No icon file provided.' } };
-  if (!file.type || !file.type.startsWith('image/')) {
-    return { data: null, error: { message: 'Please select a valid image file.' } };
+  const prepared = await prepareImageFileForUpload(file);
+  if (prepared.error || !prepared.file) {
+    return { data: null, error: { message: prepared.error?.message || getAllowedImageFormatsMessage() } };
   }
+  const uploadFile = prepared.file;
 
-  const path = buildTrustIconPath(ownerId, file);
+  const path = buildTrustIconPath(ownerId, uploadFile);
   const { error: uploadError } = await supabase
     .storage
     .from(TRUST_ICON_BUCKET)
-    .upload(path, file, {
+    .upload(path, uploadFile, {
       cacheControl: '3600',
       upsert: false,
-      contentType: file.type || undefined,
+      contentType: uploadFile.type || undefined,
     });
 
   if (uploadError) return { data: null, error: uploadError };
@@ -54,6 +57,7 @@ export async function uploadTrustIcon(file, { ownerId = null } = {}) {
     data: {
       path,
       publicUrl: publicData?.publicUrl || null,
+      warning: prepared.warning || '',
     },
     error: null,
   };

@@ -10,6 +10,7 @@ import {
   updateDonation,
 } from '../services/donationsService';
 import { parseAttachmentItem } from '../utils/attachmentUtils';
+import { isImageFileLike } from '../utils/imageUpload';
 import './NoticeboardPage.css';
 
 const DONATION_STATUS_OPTIONS = ['active', 'inactive'];
@@ -55,7 +56,7 @@ function formatMoney(value) {
 }
 
 function isImageFile(file) {
-  return String(file?.type || '').toLowerCase().startsWith('image/');
+  return isImageFileLike(file);
 }
 
 function isImageAttachmentValue(value = '') {
@@ -364,13 +365,13 @@ export default function DonationsPage() {
     const validFiles = files.filter(isImageFile);
     const skippedCount = Math.max(0, files.length - validFiles.length);
     if (!validFiles.length) {
-      setAttachmentWarning('Only image files are allowed for donation attachment.');
+      setAttachmentWarning('Image format should be JPG/JPEG/PNG.');
       return;
     }
 
     setProcessingAttachment(true);
     try {
-      const { data: uploadedUrls, error: uploadError } = await uploadDonationAttachments(validFiles, { trustId });
+      const { data: uploadedUrls, warnings: uploadWarnings = [], error: uploadError } = await uploadDonationAttachments(validFiles, { trustId });
       if (uploadError) {
         setFormError(uploadError.message || 'Unable to upload selected image(s).');
         return;
@@ -379,11 +380,10 @@ export default function DonationsPage() {
       const merged = [...existing, ...(uploadedUrls || [])].filter(Boolean);
       const unique = [...new Set(merged)];
       setForm((prev) => ({ ...prev, attachments: unique.join('\n') }));
-      setAttachmentWarning(
-        skippedCount > 0
-          ? `${uploadedUrls?.length || 0} image(s) uploaded. ${skippedCount} non-image file(s) skipped.`
-          : `${uploadedUrls?.length || 0} image(s) uploaded successfully.`
-      );
+      const uploadMessage = skippedCount > 0
+        ? `${uploadedUrls?.length || 0} image(s) uploaded. ${skippedCount} non-image file(s) skipped.`
+        : `${uploadedUrls?.length || 0} image(s) uploaded successfully.`;
+      setAttachmentWarning([uploadMessage, ...uploadWarnings].filter(Boolean).join(' ').trim());
     } catch (uploadError) {
       setFormError(uploadError?.message || 'Unable to upload selected image(s).');
     } finally {

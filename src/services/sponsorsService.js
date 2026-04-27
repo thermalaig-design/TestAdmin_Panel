@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
+import { normalizeImageDataUrlToJpeg } from '../utils/imageUpload';
 
 const SPONSORS_BUCKET = 'sponsors';
 
@@ -40,7 +41,12 @@ function buildSponsorPhotoPath(trustId, mime = 'image/jpeg') {
 }
 
 export async function uploadSponsorPhotoDataUrl(dataUrl, { trustId = null } = {}) {
-  const parsed = dataUrlToBuffer(dataUrl);
+  const normalized = await normalizeImageDataUrlToJpeg(dataUrl);
+  if (normalized.error) {
+    return { data: null, error: normalized.error };
+  }
+
+  const parsed = dataUrlToBuffer(normalized.dataUrl);
   if (!parsed?.buffer?.length) {
     return { data: null, error: { message: 'Invalid sponsor image data.' } };
   }
@@ -66,6 +72,7 @@ export async function uploadSponsorPhotoDataUrl(dataUrl, { trustId = null } = {}
     data: {
       path,
       publicUrl: publicData?.publicUrl || null,
+      warning: normalized.warning || '',
     },
     error: null,
   };

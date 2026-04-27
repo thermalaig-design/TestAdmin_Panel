@@ -10,6 +10,7 @@ import {
   uploadEventAttachment,
 } from '../services/eventsService';
 import { parseAttachmentItem } from '../utils/attachmentUtils';
+import { isImageFileLike } from '../utils/imageUpload';
 import './EventsPage.css';
 
 const EVENT_TYPES = ['general', 'vip'];
@@ -67,7 +68,7 @@ function isImageAttachment(item = {}) {
 }
 
 function isImageFile(file) {
-  return String(file?.type || '').toLowerCase().startsWith('image/');
+  return isImageFileLike(file);
 }
 
 function loadImageFromFile(file) {
@@ -542,7 +543,7 @@ export default function EventsPage() {
 
     files.forEach((file) => {
       if (!isImageFile(file)) {
-        warningMessages.push(`"${file.name}" skipped: only image files are allowed.`);
+        warningMessages.push(`"${file.name}" skipped: image should be JPG/JPEG/PNG.`);
         return;
       }
 
@@ -578,6 +579,7 @@ export default function EventsPage() {
           warningMessages.push(`"${file.name}" failed to upload.`);
           continue;
         }
+        if (uploadData?.warning) warningMessages.push(uploadData.warning);
 
         uploadedItems.push({
           name: file?.name || 'Attachment',

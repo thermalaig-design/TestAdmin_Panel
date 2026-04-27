@@ -11,6 +11,7 @@ import {
   uploadFacilitiesAttachment,
 } from '../services/facilitiesService';
 import { parseAttachmentItem } from '../utils/attachmentUtils';
+import { isImageFileLike } from '../utils/imageUpload';
 import './NoticeboardPage.css';
 
 const MAX_FACILITY_IMAGE_ATTACHMENTS = 3;
@@ -42,7 +43,7 @@ function formatDate(value) {
 }
 
 function isImageFile(file) {
-  return String(file?.type || '').toLowerCase().startsWith('image/');
+  return isImageFileLike(file);
 }
 
 function isImageAttachment(item = {}) {
@@ -466,7 +467,7 @@ export default function FacilitiesPage() {
 
     files.forEach((file) => {
       if (!isImageFile(file)) {
-        warningMessages.push(`"${file.name}" skipped: only image files are allowed.`);
+        warningMessages.push(`"${file.name}" skipped: image should be JPG/JPEG/PNG.`);
         return;
       }
 
@@ -503,6 +504,7 @@ export default function FacilitiesPage() {
           warningMessages.push(`"${file.name}" failed to upload${reason}.`);
           continue;
         }
+        if (uploadData?.warning) warningMessages.push(uploadData.warning);
 
         uploadedItems.push({
           name: file?.name || 'Attachment',
@@ -1100,5 +1102,3 @@ export default function FacilitiesPage() {
     </div>
   );
 }
-
-

@@ -17,6 +17,7 @@ import {
   updateRegisteredMember,
   updateRegisteredMembership,
 } from '../services/membersService';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 import './MemberProfilePage.css';
 
 const MEMBER_DETAILS_FIELDS = [
@@ -928,6 +929,7 @@ export default function MemberProfilePage() {
         setSaving(false);
         return;
       }
+      if (uploadData?.warning) setSaveError(uploadData.warning);
       uploadedProfilePhotoUrl = uploadData?.publicUrl || null;
     }
 
@@ -1010,13 +1012,14 @@ export default function MemberProfilePage() {
 
   const handleProfilePhotoFile = async (file) => {
     if (!file) return;
-    if (!file.type || !file.type.startsWith('image/')) {
-      setSaveError('Please select a valid image file for profile photo.');
+    const prepared = await prepareImageFileForUpload(file);
+    if (prepared.error || !prepared.file) {
+      setSaveError(prepared.error?.message || getAllowedImageFormatsMessage());
       return;
     }
 
     try {
-      const processed = await compressImageToLimit(file, PROFILE_PHOTO_MAX_BYTES);
+      const processed = await compressImageToLimit(prepared.file, PROFILE_PHOTO_MAX_BYTES);
       if (!processed?.file) {
         setSaveError('Image is too large and could not be compressed to 25KB.');
         return;
@@ -1027,7 +1030,7 @@ export default function MemberProfilePage() {
       setPendingProfilePhotoFile(processed.file);
       setPendingProfilePhotoPreviewUrl(previewUrl);
       setEditForm((prev) => ({ ...prev, profile_photo_url: previewUrl }));
-      setSaveError('');
+      setSaveError(prepared.warning || '');
     } catch {
       setSaveError('Unable to process selected image.');
     }

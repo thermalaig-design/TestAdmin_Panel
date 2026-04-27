@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './CreateTrustPage.css';
 import { createTrust } from '../services/trustService';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 
 export default function CreateTrustPage() {
   const navigate = useNavigate();
@@ -35,17 +36,18 @@ export default function CreateTrustPage() {
     }
   };
 
-  const handleIconFileChange = (e) => {
+  const handleIconFileChange = async (e) => {
     const file = e.target.files?.[0] || null;
     if (!file) return;
-    if (!file.type || !file.type.startsWith('image/')) {
-      setGeneralError('Please select a valid image file for trust icon.');
+    const prepared = await prepareImageFileForUpload(file);
+    if (prepared.error || !prepared.file) {
+      setGeneralError(prepared.error?.message || getAllowedImageFormatsMessage());
       e.target.value = '';
       return;
     }
-    setGeneralError('');
-    setIconFile(file);
-    setIconPreviewUrl(URL.createObjectURL(file));
+    setGeneralError(prepared.warning || '');
+    setIconFile(prepared.file);
+    setIconPreviewUrl(URL.createObjectURL(prepared.file));
   };
 
   const validateForm = () => {

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchTrustDetails, updateTrustDetails } from '../services/authService';
 import { uploadTrustIcon } from '../services/trustService';
 import Sidebar from '../components/Sidebar';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 import './TrusteesPage.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -313,18 +314,20 @@ export default function TrusteesPage() {
     setLogoFile(null);
   };
 
-  const handleLogoFile = (file) => {
+  const handleLogoFile = async (file) => {
     if (!file) return;
-    if (!file.type || !file.type.startsWith('image/')) {
-      setSaveError('Please select a valid image file.');
+    const prepared = await prepareImageFileForUpload(file);
+    if (prepared.error || !prepared.file) {
+      setSaveError(prepared.error?.message || getAllowedImageFormatsMessage());
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
       setDraft(prev => ({ ...prev, icon_url: reader.result }));
     };
-    reader.readAsDataURL(file);
-    setLogoFile(file);
+    reader.readAsDataURL(prepared.file);
+    setLogoFile(prepared.file);
+    setSaveError(prepared.warning || '');
   };
 
   const saveField = async (field) => {
@@ -351,6 +354,7 @@ export default function TrusteesPage() {
           setSavingField('');
           return;
         }
+        if (uploadData?.warning) setSaveError(uploadData.warning);
         updates.icon_url = uploadData?.publicUrl || '';
       } else {
         updates.icon_url = draft.icon_url || '';
@@ -1082,6 +1086,4 @@ export default function TrusteesPage() {
     </div>
   );
 }
-
-
 

@@ -10,14 +10,6 @@ import {
 } from '../services/socialMediaAccountsService';
 import './SocialMediaPage.css';
 
-const SOCIAL_MEDIA_CARDS = [
-  {
-    id: 'media-details',
-    title: 'Media Details',
-    description: 'Manage social media content, links, and platform-wise media information.',
-  },
-];
-
 function toTitleCase(value) {
   if (!value) return '';
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
@@ -91,7 +83,11 @@ export default function SocialMediaPage() {
   const selectedPhotoUrl = searchParams.get('photoUrl') || '';
   const selectedFolder = searchParams.get('folder') || '';
 
-  const [activeSection, setActiveSection] = useState(() => (isAccountsDetailsRoute ? 'accounts-details' : ''));
+  const [activeSection, setActiveSection] = useState(() => {
+    if (isAccountsDetailsRoute) return 'accounts-details';
+    if (isCreateRoute) return '';
+    return 'media-details';
+  });
   const [mediaRows, setMediaRows] = useState([]);
   const [mediaCount, setMediaCount] = useState(0);
   const [loadingCount, setLoadingCount] = useState(true);
@@ -342,8 +338,11 @@ export default function SocialMediaPage() {
       return;
     }
     const requestedSection = location.state?.socialMediaSection || '';
-    if (!requestedSection || requestedSection === 'accounts-details') return;
-    handleOpenSection(requestedSection);
+    if (requestedSection && requestedSection !== 'accounts-details') {
+      handleOpenSection(requestedSection);
+      return;
+    }
+    handleOpenSection('media-details');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCreateRoute, isAccountsDetailsRoute]);
 
@@ -464,38 +463,11 @@ export default function SocialMediaPage() {
             </div>
           ) : (
             <>
-              {!isAccountsDetailsRoute && (
-                <>
-                  <div className="sm-hero-card">
-                    <h3>Social Media</h3>
-                    <p>Select a section to manage social media module details.</p>
-                  </div>
-
-                  <div className={`sm-cards-grid ${SOCIAL_MEDIA_CARDS.length === 1 ? 'single' : ''}`}>
-                    {SOCIAL_MEDIA_CARDS.map((card) => (
-                      <div
-                        key={card.id}
-                        className={`sm-detail-card ${activeSection === card.id ? 'active' : ''}`}
-                      >
-                        <h4>{card.title}</h4>
-                        <p>{card.description}</p>
-                        {card.id === 'media-details' && (
-                          <div className="sm-card-subtitle">{mediaSubtitle}</div>
-                        )}
-                        <button type="button" onClick={() => handleOpenSection(card.id)}>
-                          Open {card.title}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
               {activeSection === 'media-details' && (
                 <div className="sm-section-card">
                   <div className="sm-section-head">
                     <h4>Media Details</h4>
-                    <span>{loadingMediaRows ? 'Loading...' : `${mediaRows.length} rows`}</span>
+                    <span>{loadingMediaRows ? 'Loading...' : mediaSubtitle}</span>
                   </div>
 
                   {loadingMediaRows ? (
@@ -529,7 +501,16 @@ export default function SocialMediaPage() {
 
                       {selectedMediaRow ? (
                         <div className="sm-media-details-card">
-                          <h5>{selectedMediaRow.title || 'Untitled'}</h5>
+                          <div className="sm-media-details-head">
+                            <h5>{selectedMediaRow.title || 'Untitled'}</h5>
+                            <button
+                              type="button"
+                              className="sm-media-close-btn"
+                              onClick={() => setSelectedMediaId('')}
+                            >
+                              Close
+                            </button>
+                          </div>
                           <div className="sm-media-preview-short">
                             {selectedMediaRow.previewUrl ? (
                               <img src={selectedMediaRow.previewUrl} alt={selectedMediaRow.title || 'Preview'} />

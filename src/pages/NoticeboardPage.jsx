@@ -11,6 +11,7 @@ import {
   uploadNoticeboardAttachment,
 } from '../services/noticeboardService';
 import { parseAttachmentItem } from '../utils/attachmentUtils';
+import { isImageFileLike } from '../utils/imageUpload';
 import './NoticeboardPage.css';
 
 const MAX_NOTICE_ATTACHMENTS = 10;
@@ -45,7 +46,7 @@ function formatDate(value) {
 }
 
 function isImageFile(file) {
-  return String(file?.type || '').toLowerCase().startsWith('image/');
+  return isImageFileLike(file);
 }
 
 function isPdfFile(file) {
@@ -591,7 +592,7 @@ export default function NoticeboardPage() {
     files.forEach((file) => {
       const allowedFile = isImageFile(file) || isPdfFile(file);
       if (!allowedFile) {
-        warningMessages.push(`"${file.name}" skipped: only image or PDF files are allowed.`);
+        warningMessages.push(`"${file.name}" skipped: image should be JPG/JPEG/PNG or PDF.`);
         return;
       }
 
@@ -636,6 +637,7 @@ export default function NoticeboardPage() {
           warningMessages.push(`"${file.name}" failed to upload.`);
           continue;
         }
+        if (uploadData?.warning) warningMessages.push(uploadData.warning);
 
         uploadedItems.push({
           name: file?.name || 'Attachment',

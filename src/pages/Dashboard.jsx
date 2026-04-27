@@ -379,7 +379,7 @@ const MODULE_CARDS = [
 
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust', 'card-social-media-account-details']);
-const DASHBOARD_CARD_IDS = new Set(['card-user-management', 'card-notifications', 'card-social-media']);
+const DASHBOARD_CARD_IDS = new Set(['card-user-management', 'card-notifications']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
 const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-donations', 'card-members']);
 const MENU_MODULE_CARDS = [

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FeatureIconRenderer } from '../../pages/Dashboard';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../../utils/imageUpload';
 
 function toDefaults(row) {
   return {
@@ -92,32 +93,34 @@ export default function FeatureEditModal({
     setFieldErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
-  const handleIconFileChange = (event) => {
+  const handleIconFileChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setUploadError('Please upload an image file only.');
+    const prepared = await prepareImageFileForUpload(file);
+    if (prepared.error || !prepared.file) {
+      setUploadError(prepared.error?.message || getAllowedImageFormatsMessage());
       return;
     }
+    const uploadFile = prepared.file;
 
-    if (file.size > 2 * 1024 * 1024) {
+    if (uploadFile.size > 2 * 1024 * 1024) {
       setUploadError('Icon image should be under 2MB.');
       return;
     }
 
     if (instantPreviewUrl) URL.revokeObjectURL(instantPreviewUrl);
-    setInstantPreviewUrl(URL.createObjectURL(file));
+    setInstantPreviewUrl(URL.createObjectURL(uploadFile));
 
     const reader = new FileReader();
     reader.onload = () => {
       handleChange('icon_url', String(reader.result || ''));
-      setUploadError('');
+      setUploadError(prepared.warning || '');
     };
     reader.onerror = () => {
       setUploadError('Unable to read selected image.');
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(uploadFile);
   };
 
   const handleSubmit = () => {

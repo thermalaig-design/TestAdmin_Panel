@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 
 const TABLE_NAME = 'noticeboard';
 const NOTICEBOARD_BUCKET = String(import.meta?.env?.VITE_NOTICEBOARD_BUCKET || 'noticeboard').trim() || 'noticeboard';
@@ -129,14 +130,25 @@ export async function uploadNoticeboardAttachment(file, { trustId = null } = {})
     return { data: null, error: { message: 'Please select a valid image or PDF file.' } };
   }
 
-  const path = buildNoticeboardAttachmentPath(trustId, file);
+  let uploadFile = file;
+  let warning = '';
+  if (isAllowedImage) {
+    const prepared = await prepareImageFileForUpload(file);
+    if (prepared.error || !prepared.file) {
+      return { data: null, error: { message: prepared.error?.message || getAllowedImageFormatsMessage() } };
+    }
+    uploadFile = prepared.file;
+    warning = prepared.warning || '';
+  }
+
+  const path = buildNoticeboardAttachmentPath(trustId, uploadFile);
   const { error: uploadError } = await supabase
     .storage
     .from(NOTICEBOARD_BUCKET)
-    .upload(path, file, {
+    .upload(path, uploadFile, {
       cacheControl: '3600',
       upsert: false,
-      contentType: file.type || undefined,
+      contentType: uploadFile.type || undefined,
     });
 
   if (uploadError) {
@@ -161,6 +173,7 @@ export async function uploadNoticeboardAttachment(file, { trustId = null } = {})
     data: {
       path,
       publicUrl: normalizeNoticeboardAttachmentUrl(publicData?.publicUrl || null),
+      warning,
     },
     error: null,
   };

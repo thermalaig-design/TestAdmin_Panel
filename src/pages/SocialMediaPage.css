@@ -361,6 +361,33 @@
   color: #1e1b4b;
 }
 
+.sm-media-details-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sm-media-details-head h5 {
+  margin: 0;
+}
+
+.sm-media-close-btn {
+  border: 1px solid rgba(79, 70, 229, 0.35);
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.sm-media-close-btn:hover {
+  background: #e0e7ff;
+}
+
 .sm-media-preview-short {
   width: 92px;
   height: 118px;

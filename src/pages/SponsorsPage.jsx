@@ -12,6 +12,7 @@ import {
 } from '../services/sponsorsService';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 import './SponsorsPage.css';
 
 const EMPTY_FORM = {
@@ -549,19 +550,20 @@ export default function SponsorsPage() {
 
   const handleFile = async (file) => {
     if (!file) return;
-    if (!file.type || !file.type.startsWith('image/')) {
-      setSaveError('Please select a valid image file.');
+    const prepared = await prepareImageFileForUpload(file);
+    if (prepared.error || !prepared.file) {
+      setSaveError(prepared.error?.message || getAllowedImageFormatsMessage());
       return;
     }
     try {
-      const processed = await compressImageToLimit(file, MAX_SPONSOR_IMAGE_SIZE_BYTES);
+      const processed = await compressImageToLimit(prepared.file, MAX_SPONSOR_IMAGE_SIZE_BYTES);
       if (!processed?.file) {
         setSaveError(`Image is too large and could not be compressed to ${Math.floor(MAX_SPONSOR_IMAGE_SIZE_BYTES / 1024)}KB.`);
         return;
       }
       const dataUrl = await blobToDataUrl(processed.file);
       setForm(prev => ({ ...prev, photo_url: dataUrl }));
-      setSaveError('');
+      setSaveError(prepared.warning || '');
     } catch {
       setSaveError('Unable to process selected image.');
     }
@@ -739,6 +741,7 @@ export default function SponsorsPage() {
         setSaveError(uploadError?.message || 'Unable to upload sponsor photo.');
         return;
       }
+      if (uploadData?.warning) setSaveError(uploadData.warning);
       resolvedPhotoUrl = uploadData.publicUrl;
     }
 

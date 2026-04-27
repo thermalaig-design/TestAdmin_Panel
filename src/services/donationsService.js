@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 
 const TABLE_NAME = 'Donations';
 const DONATIONS_BUCKET = String(import.meta?.env?.VITE_DONATIONS_BUCKET || 'donations').trim() || 'donations';
@@ -72,18 +73,20 @@ function toMoneyValue(rawAmount) {
 
 async function uploadSingleDonationAttachment(file, { trustId = null } = {}) {
   if (!file) return { data: null, error: { message: 'No attachment file provided.' } };
-  if (!file.type || !file.type.startsWith('image/')) {
-    return { data: null, error: { message: `Only image files are allowed: ${file?.name || 'unknown file'}` } };
+  const prepared = await prepareImageFileForUpload(file);
+  if (prepared.error || !prepared.file) {
+    return { data: null, error: { message: prepared.error?.message || getAllowedImageFormatsMessage() } };
   }
+  const uploadFile = prepared.file;
 
-  const path = buildDonationAttachmentPath(trustId, file);
+  const path = buildDonationAttachmentPath(trustId, uploadFile);
   const { error: uploadError } = await supabase
     .storage
     .from(DONATIONS_BUCKET)
-    .upload(path, file, {
+    .upload(path, uploadFile, {
       cacheControl: '3600',
       upsert: false,
-      contentType: file.type || undefined,
+      contentType: uploadFile.type || undefined,
     });
 
   if (uploadError) {
@@ -104,6 +107,7 @@ async function uploadSingleDonationAttachment(file, { trustId = null } = {}) {
     data: {
       path,
       publicUrl: String(publicData?.publicUrl || '').trim(),
+      warning: prepared.warning || '',
     },
     error: null,
   };
@@ -125,6 +129,7 @@ export async function uploadDonationAttachments(files = [], { trustId = null } =
 
   return {
     data: uploadResults.map((result) => String(result.data?.publicUrl || '').trim()).filter(Boolean),
+    warnings: uploadResults.map((result) => String(result.data?.warning || '').trim()).filter(Boolean),
     error: null,
   };
 }

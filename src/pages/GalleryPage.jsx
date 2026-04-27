@@ -13,6 +13,7 @@ import {
   deleteGalleryFolder,
   updateGalleryFolder,
 } from '../services/galleryService';
+import { getAllowedImageFormatsMessage, isImageFileLike } from '../utils/imageUpload';
 import './GalleryPage.css';
 
 export default function GalleryPage() {
@@ -373,9 +374,9 @@ export default function GalleryPage() {
       return;
     }
 
-    const imageFiles = files.filter((file) => file?.type && file.type.startsWith('image/'));
+    const imageFiles = files.filter((file) => isImageFileLike(file));
     if (!imageFiles.length) {
-      setError('Please select a valid image file.');
+      setError(getAllowedImageFormatsMessage());
       return;
     }
 

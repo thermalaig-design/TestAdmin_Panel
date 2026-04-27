@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
+import { getAllowedImageFormatsMessage, prepareImageFileForUpload } from '../utils/imageUpload';
 
 const TABLE_NAME = 'events';
 const EVENTS_BUCKET = String(import.meta?.env?.VITE_EVENTS_BUCKET || 'events').trim() || 'events';
@@ -130,18 +131,20 @@ export async function fetchEventById(trustId, eventId) {
 
 export async function uploadEventAttachment(file, { trustId = null } = {}) {
   if (!file) return { data: null, error: { message: 'No attachment file provided.' } };
-  if (!file.type || !file.type.startsWith('image/')) {
-    return { data: null, error: { message: 'Please select a valid image file.' } };
+  const prepared = await prepareImageFileForUpload(file);
+  if (prepared.error || !prepared.file) {
+    return { data: null, error: { message: prepared.error?.message || getAllowedImageFormatsMessage() } };
   }
+  const uploadFile = prepared.file;
 
-  const path = buildEventAttachmentPath(trustId, file);
+  const path = buildEventAttachmentPath(trustId, uploadFile);
   const { error: uploadError } = await supabase
     .storage
     .from(EVENTS_BUCKET)
-    .upload(path, file, {
+    .upload(path, uploadFile, {
       cacheControl: '3600',
       upsert: false,
-      contentType: file.type || undefined,
+      contentType: uploadFile.type || undefined,
     });
 
   if (uploadError) {
@@ -166,6 +169,7 @@ export async function uploadEventAttachment(file, { trustId = null } = {}) {
     data: {
       path,
       publicUrl: normalizeEventAttachmentUrl(publicData?.publicUrl || null),
+      warning: prepared.warning || '',
     },
     error: null,
   };
