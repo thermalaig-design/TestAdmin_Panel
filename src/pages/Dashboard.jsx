@@ -168,6 +168,53 @@ const MODULE_CARDS = [
     ),
   },
   {
+    id: 'card-user-management',
+    label: 'User Management',
+    description: 'Create users and assign feature permissions',
+    route: '/user-management',
+    gradient: 'linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="3" stroke="white" strokeWidth="1.8" />
+        <path d="M4.2 18c0-2.8 2.25-5 5-5s5 2.2 5 5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <rect x="14.2" y="11" width="6.4" height="8" rx="1.3" stroke="white" strokeWidth="1.8" />
+        <line x1="17.4" y1="13" x2="17.4" y2="17" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="15.4" y1="15" x2="19.4" y2="15" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'card-social-media',
+    label: 'Social Media',
+    description: 'Open social media module',
+    route: '/social-media',
+    gradient: 'linear-gradient(135deg, #0EA5E9 0%, #6366F1 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="3.5" y="5" width="17" height="14" rx="3" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.16)" />
+        <circle cx="8.5" cy="12" r="1.5" fill="white" />
+        <circle cx="12" cy="12" r="1.5" fill="white" />
+        <circle cx="15.5" cy="12" r="1.5" fill="white" />
+        <path d="M8.5 12h7" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'card-social-media-account-details',
+    label: 'Social Media Account Details',
+    description: 'Manage social media account details',
+    route: '/social-media/accounts-details',
+    gradient: 'linear-gradient(135deg, #0EA5E9 0%, #4F46E5 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="3.5" y="5" width="17" height="14" rx="3" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.16)" />
+        <path d="M7.5 11.5h9" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M7.5 15h6" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="16.5" cy="8.5" r="1.5" fill="white" />
+      </svg>
+    ),
+  },
+  {
     id: 'card-noticeboard',
     label: 'Noticeboard',
     description: 'View notices and open individual updates',
@@ -331,26 +378,11 @@ const MODULE_CARDS = [
 ];
 
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
-const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust']);
-const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee', 'card-notifications']);
+const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust', 'card-social-media-account-details']);
+const DASHBOARD_CARD_IDS = new Set(['card-user-management', 'card-notifications', 'card-social-media']);
+const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
 const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-donations', 'card-members']);
 const MENU_MODULE_CARDS = [
-  {
-    id: 'menu-card-user-management',
-    label: 'User Management',
-    description: 'Create users and assign feature permissions',
-    route: '/user-management',
-    gradient: 'linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)',
-    icon: (
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-        <circle cx="9" cy="8" r="3" stroke="white" strokeWidth="1.8" />
-        <path d="M4.2 18c0-2.8 2.25-5 5-5s5 2.2 5 5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-        <rect x="14.2" y="11" width="6.4" height="8" rx="1.3" stroke="white" strokeWidth="1.8" />
-        <line x1="17.4" y1="13" x2="17.4" y2="17" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="15.4" y1="15" x2="19.4" y2="15" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
   {
     id: 'menu-card-contact-us',
     label: 'Contact Us',
@@ -679,11 +711,10 @@ export default function Dashboard() {
   const userInitials = initials(userName);
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const pageTitle = NAV_SECTION_TITLES[currentSidebarNavKey] || 'Dashboard';
-  const hideModuleCards = currentSidebarNavKey === 'dashboard';
 
   const scopedModules = useMemo(() => {
     if (currentSidebarNavKey === 'dashboard') {
-      return [];
+      return MODULE_CARDS.filter((card) => DASHBOARD_CARD_IDS.has(card.id));
     }
     if (currentSidebarNavKey === 'menu') {
       return MENU_MODULE_CARDS;
@@ -702,6 +733,7 @@ export default function Dashboard() {
     }
     return MODULE_CARDS;
   }, [currentSidebarNavKey]);
+  const hideModuleCards = scopedModules.length === 0;
 
   const filteredModules = useMemo(() => {
     const query = String(searchTerm || '').trim().toLowerCase();
@@ -894,6 +926,9 @@ export default function Dashboard() {
                         sidebarNavKey: currentSidebarNavKey,
                         trusteesView: card.id === 'card-logo' ? 'logo' : 'default',
                         dashboardCardId: card.id,
+                        ...(card.id === 'card-social-media-account-details'
+                          ? { socialMediaSection: 'accounts-details' }
+                          : {}),
                       },
                     });
                   }}

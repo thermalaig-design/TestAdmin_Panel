@@ -588,6 +588,53 @@ async function fetchMemberRowsByIds(memberIds) {
   return { data: combinedRows, error: null, table: lastTable };
 }
 
+async function fetchRegisteredRowsByTrustId(trustId) {
+  if (!trustId) return { data: [], error: null };
+
+  const registeredTables = await resolveAvailableTables(REGISTERED_TABLE_CANDIDATES, 'registered');
+  const tableResults = await Promise.all(
+    registeredTables.map((registeredTable) =>
+      fetchAllRows(
+        supabase
+          .from(registeredTable)
+          .select('*')
+          .eq('trust_id', trustId)
+      )
+    )
+  );
+
+  const errored = tableResults.find((result) => result.error);
+  if (errored?.error) return { data: [], error: errored.error };
+  return { data: tableResults.flatMap((result) => result.data || []), error: null };
+}
+
+async function fetchRegisteredMembersByIds(registrationIds = [], currentTrustId = null) {
+  const uniqueRegistrationIds = [...new Set((registrationIds || []).filter(Boolean))];
+  if (!uniqueRegistrationIds.length) return { data: [], error: null };
+
+  const registeredTable = await resolveTable(REGISTERED_TABLE_CANDIDATES, 'registered');
+  const idChunks = chunkValues(uniqueRegistrationIds);
+  const chunkResults = await Promise.all(
+    idChunks.map((chunk) => supabase.from(registeredTable).select('*').in('id', chunk))
+  );
+  const errored = chunkResults.find((result) => result.error);
+  if (errored?.error) return { data: [], error: errored.error };
+
+  const registeredRows = chunkResults.flatMap((result) => result.data || []);
+  if (!registeredRows.length) return { data: [], error: null };
+
+  const memberIds = registeredRows.map(getRegisteredMemberId).filter(Boolean);
+  const { data: memberRows, error: memberError } = await fetchMemberRowsByIds(memberIds);
+  if (memberError) return { data: [], error: memberError };
+
+  const memberMap = new Map((memberRows || []).map((row) => [String(getMemberUniqueId(row)), row]));
+  const normalized = registeredRows.map((row) =>
+    normalizeRegisteredRow(row, memberMap.get(String(getRegisteredMemberId(row))) || {}, currentTrustId)
+  );
+
+  return { data: normalized, error: null };
+}
+
 async function fetchRegisteredRowById(id, currentTrustId) {
   const registeredTable = await resolveTable(REGISTERED_TABLE_CANDIDATES, 'registered');
   const { data: regRow, error } = await supabase.from(registeredTable).select('*').eq('id', id).single();
@@ -1031,18 +1078,18 @@ async function fetchMemberRoleRowsByRegistrationIds(registrationIds = []) {
   if (!uniqueRegistrationIds.length) return { data: [], error: null };
 
   const idChunks = chunkValues(uniqueRegistrationIds, MEMBER_ROLE_FETCH_CHUNK_SIZE);
-  const allRoleRows = [];
-
-  for (const chunk of idChunks) {
-    const { data, error } = await supabase
-      .from(MEMBER_ROLES_TABLE)
-      .select('*')
-      .in('reg_id', chunk)
-      .order('created_at', { ascending: false, nullsFirst: false });
-
-    if (error) return { data: [], error };
-    allRoleRows.push(...(data || []));
-  }
+  const chunkResults = await Promise.all(
+    idChunks.map((chunk) =>
+      supabase
+        .from(MEMBER_ROLES_TABLE)
+        .select('*')
+        .in('reg_id', chunk)
+        .order('created_at', { ascending: false, nullsFirst: false })
+    )
+  );
+  const errored = chunkResults.find((result) => result.error);
+  if (errored?.error) return { data: [], error: errored.error };
+  const allRoleRows = chunkResults.flatMap((result) => result.data || []);
 
   allRoleRows.sort((left, right) => {
     const leftCreatedAt = pickFirst(left, ['created_at']);
@@ -1063,17 +1110,24 @@ export async function fetchMemberRolesByTrust(trustId) {
   const normalizedTrustId = String(trustId);
 
   return cachedQuery(cacheKey, async () => {
-    const { data: registeredMembers, error: registeredError } = await fetchRegisteredMembersByTrust(trustId);
-    if (registeredError) return { data: [], error: registeredError };
+    const { data: registeredRows, error: registeredRowsError } = await fetchRegisteredRowsByTrustId(trustId);
+    if (registeredRowsError) return { data: [], error: registeredRowsError };
 
-    const registrationIds = (registeredMembers || []).map((item) => item?.id).filter(Boolean);
+    const registrationIds = (registeredRows || []).map((item) => item?.id).filter(Boolean);
     if (!registrationIds.length) return { data: [], error: null };
 
-    const { data: roleRows, error } = await fetchMemberRoleRowsByRegistrationIds(registrationIds);
+    const { data: roleRows, error: rolesError } = await fetchMemberRoleRowsByRegistrationIds(registrationIds);
+    if (rolesError) return { data: [], error: rolesError };
+    if (!(roleRows || []).length) return { data: [], error: null };
 
-    if (error) return { data: [], error };
+    const roleRegistrationIds = [...new Set((roleRows || []).map((item) => item?.reg_id).filter(Boolean))];
+    const { data: roleRegisteredMembers, error: roleRegisteredMembersError } = await fetchRegisteredMembersByIds(
+      roleRegistrationIds,
+      trustId
+    );
+    if (roleRegisteredMembersError) return { data: [], error: roleRegisteredMembersError };
 
-    const registeredMemberMap = new Map((registeredMembers || []).map((item) => [String(item.id), item]));
+    const registeredMemberMap = new Map((roleRegisteredMembers || []).map((item) => [String(item.id), item]));
     const normalized = (roleRows || [])
       .map((row) => normalizeMemberRoleRow(row, registeredMemberMap))
       .filter((item) => item.member && item.reg_id)

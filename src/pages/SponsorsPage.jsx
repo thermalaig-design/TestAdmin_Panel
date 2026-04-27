@@ -394,22 +394,18 @@ export default function SponsorsPage() {
     const load = async () => {
       setLoading(true);
       setError('');
-      const [{ data: sponsorsData, error: sponsorsErr }, { data: flashData, error: flashErr }] =
-        await Promise.all([
-          fetchSponsors(),
-          fetchSponsorFlashByTrust(trustId),
-        ]);
-
+      const { data: sponsorsData, error: sponsorsErr } = await fetchSponsors(trustId);
       if (sponsorsErr) setError(sponsorsErr.message || 'Unable to load sponsors.');
-      if (flashErr) setError(flashErr.message || 'Unable to load sponsor flash data.');
-
       setSponsors(sponsorsData || []);
+      setLoading(false);
+
+      const { data: flashData, error: flashErr } = await fetchSponsorFlashByTrust(trustId);
+      if (flashErr) setError(flashErr.message || 'Unable to load sponsor flash data.');
       const flashBySponsor = {};
       (flashData || []).forEach((row) => {
         flashBySponsor[row.sponsor_id] = row;
       });
       setFlashMap(flashBySponsor);
-      setLoading(false);
     };
     if (trustId) load();
   }, [trustId]);

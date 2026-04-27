@@ -37,7 +37,11 @@ export default function LoginPage() {
       let trusts = [];
       if (!isNewUser) {
         if (superuser.is_active === false) { triggerError('This account is inactive. Contact support.'); return; }
-        const { data: fetchedTrusts } = await fetchLinkedTrusts(superuser.id);
+        const { data: fetchedTrusts, error: trustsError } = await fetchLinkedTrusts(superuser.id);
+        if (trustsError) {
+          triggerError(`Trust load failed: ${trustsError.message || 'Unknown error'}`);
+          return;
+        }
         trusts = fetchedTrusts || [];
       }
       if (isNewUser) { await sendOtp(fullMobile); }

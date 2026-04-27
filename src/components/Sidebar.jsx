@@ -81,6 +81,20 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    id: 'nav-social-media',
+    label: 'Social Media',
+    route: '/social-media',
+    navKey: 'social-media',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <rect x="3.5" y="5" width="17" height="14" rx="3" stroke="currentColor" strokeWidth="1.8" />
+        <circle cx="8.5" cy="12" r="1.5" fill="currentColor" />
+        <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+        <circle cx="15.5" cy="12" r="1.5" fill="currentColor" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) {
@@ -268,7 +282,10 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
           {navItems.map((item) => {
             const isTrusteesCompanyView = item.id === 'nav-company-details' && location.pathname === '/trustees' && currentTrusteesView !== 'logo';
             const isTrusteesAppDesignView = item.id === 'nav-app-design' && location.pathname === '/trustees' && currentTrusteesView === 'logo';
+            const isCompanyDetailsAccountsView =
+              item.id === 'nav-company-details' && location.pathname === '/social-media/accounts-details';
             const isActive =
+              isCompanyDetailsAccountsView ||
               isTrusteesCompanyView ||
               isTrusteesAppDesignView ||
               (location.pathname === item.route && (

@@ -71,14 +71,18 @@ export async function uploadSponsorPhotoDataUrl(dataUrl, { trustId = null } = {}
   };
 }
 
-export async function fetchSponsors() {
-  return cachedQuery('sponsors:list', async () => {
-    const { data, error } = await supabase
+export async function fetchSponsors(trustId = null) {
+  const cacheKey = `sponsors:list:${trustId || 'all'}`;
+  return cachedQuery(cacheKey, async () => {
+    let query = supabase
       .from('sponsors')
       .select('*')
       .order('company_name', { ascending: true })
       .order('ref_no', { ascending: true });
 
+    if (trustId) query = query.eq('trust_id', trustId);
+
+    const { data, error } = await query;
     return { data, error };
   }, 20000);
 }

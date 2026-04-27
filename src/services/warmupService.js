@@ -17,7 +17,7 @@ export async function warmupTrustData(trustId) {
   warmedTrustId = trustId;
 
   await Promise.allSettled([
-    fetchSponsors(),
+    fetchSponsors(trustId),
     fetchSponsorFlashByTrust(trustId),
     fetchGalleryFolders(trustId),
     fetchEventsByTrust(trustId),

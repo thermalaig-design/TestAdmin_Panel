@@ -6,6 +6,7 @@ import {
   createDonation,
   deleteDonation,
   fetchDonationsByTrust,
+  uploadDonationAttachments,
   updateDonation,
 } from '../services/donationsService';
 import { parseAttachmentItem } from '../utils/attachmentUtils';
@@ -16,7 +17,6 @@ const DONATION_AMOUNT_TYPE_OPTIONS = ['fixed', 'variable', 'monthly'];
 const DONATION_TYPE_OPTIONS = ['general', 'vip'];
 const PARTIAL_MONEY_RE = /^\d*(?:\.\d{0,2})?$/;
 const MONEY_RE = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
-const MAX_DONATION_IMAGE_SIZE_BYTES = 25 * 1024;
 
 function formatDate(value) {
   if (!value) return '-';
@@ -58,63 +58,11 @@ function isImageFile(file) {
   return String(file?.type || '').toLowerCase().startsWith('image/');
 }
 
-function loadImageFromFile(file) {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(image);
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('Unable to process selected image.'));
-    };
-    image.src = objectUrl;
-  });
-}
-
-function canvasToBlob(canvas, type, quality) {
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), type, quality);
-  });
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('Unable to read selected image.'));
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function compressImageToLimit(file, maxBytes) {
-  if ((file?.size || 0) <= maxBytes) return { file };
-
-  const image = await loadImageFromFile(file);
-  const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
-  const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-
-  for (let scaleStep = 0; scaleStep < 10; scaleStep += 1) {
-    const scale = Math.pow(0.8, scaleStep);
-    const targetWidth = Math.max(120, Math.round(baseWidth * scale));
-    const targetHeight = Math.max(120, Math.round(baseHeight * scale));
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    context.clearRect(0, 0, targetWidth, targetHeight);
-    context.drawImage(image, 0, 0, targetWidth, targetHeight);
-
-    for (let quality = 0.82; quality >= 0.18; quality -= 0.07) {
-      const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
-      if (blob && blob.size <= maxBytes) return { file: blob };
-    }
-  }
-
-  return null;
+function isImageAttachmentValue(value = '') {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return false;
+  if (raw.startsWith('data:image/')) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)(?:$|\?|#)/i.test(raw);
 }
 
 export default function DonationsPage() {
@@ -335,7 +283,7 @@ export default function DonationsPage() {
       return;
     }
 
-    const attachmentValues = parseAttachments(form.attachments).slice(0, 1);
+    const attachmentValues = parseAttachments(form.attachments);
 
     setSaving(true);
     const payload = {
@@ -412,47 +360,41 @@ export default function DonationsPage() {
   const handleAttachmentFile = async (fileList) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
-
-    const file = files[0];
     setFormError('');
-
-    if (files.length > 1) {
-      setAttachmentWarning('Only one image is allowed. First selected image is used.');
-    } else {
-      setAttachmentWarning('');
-    }
-
-    if (!isImageFile(file)) {
+    const validFiles = files.filter(isImageFile);
+    const skippedCount = Math.max(0, files.length - validFiles.length);
+    if (!validFiles.length) {
       setAttachmentWarning('Only image files are allowed for donation attachment.');
       return;
     }
 
     setProcessingAttachment(true);
     try {
-      const processed = await compressImageToLimit(file, MAX_DONATION_IMAGE_SIZE_BYTES);
-      if (!processed?.file) {
-        setAttachmentWarning(`Image could not be compressed to ${Math.floor(MAX_DONATION_IMAGE_SIZE_BYTES / 1024)}KB.`);
+      const { data: uploadedUrls, error: uploadError } = await uploadDonationAttachments(validFiles, { trustId });
+      if (uploadError) {
+        setFormError(uploadError.message || 'Unable to upload selected image(s).');
         return;
       }
-
-      const outputBlob = processed.file;
-      if ((outputBlob.size || 0) > MAX_DONATION_IMAGE_SIZE_BYTES) {
-        setAttachmentWarning(`Image must be ${Math.floor(MAX_DONATION_IMAGE_SIZE_BYTES / 1024)}KB or smaller.`);
-        return;
-      }
-
-      const dataUrl = await blobToDataUrl(outputBlob);
-      setForm((prev) => ({ ...prev, attachments: dataUrl }));
+      const existing = parseAttachments(form.attachments);
+      const merged = [...existing, ...(uploadedUrls || [])].filter(Boolean);
+      const unique = [...new Set(merged)];
+      setForm((prev) => ({ ...prev, attachments: unique.join('\n') }));
+      setAttachmentWarning(
+        skippedCount > 0
+          ? `${uploadedUrls?.length || 0} image(s) uploaded. ${skippedCount} non-image file(s) skipped.`
+          : `${uploadedUrls?.length || 0} image(s) uploaded successfully.`
+      );
     } catch (uploadError) {
-      setFormError(uploadError?.message || 'Unable to process selected image.');
+      setFormError(uploadError?.message || 'Unable to upload selected image(s).');
     } finally {
       setProcessingAttachment(false);
     }
   };
 
-  const selectedAttachment = useMemo(() => {
-    const firstValue = parseAttachments(form.attachments)[0] || '';
-    return parseAttachmentItem(firstValue, 0);
+  const selectedAttachments = useMemo(() => {
+    return parseAttachments(form.attachments)
+      .map((item, index) => parseAttachmentItem(item, index))
+      .filter(Boolean);
   }, [form.attachments]);
 
   if (!trustId) return null;
@@ -567,9 +509,9 @@ export default function DonationsPage() {
                       />
                     </label>
                     <div className="nb-span-2">
-                      <span>Attachment (single image)</span>
+                      <span>Attachments (multiple images)</span>
                       <p className="nb-attachment-limit-note">
-                        Image upload only. Max size {Math.floor(MAX_DONATION_IMAGE_SIZE_BYTES / 1024)}KB. Larger images are auto-compressed.
+                        Images are uploaded to Supabase Storage bucket `donations` and saved as public URLs.
                       </p>
                       <label
                         className={`nb-attachment-dropzone ${attachmentDragOver ? 'drag' : ''}`}
@@ -588,28 +530,35 @@ export default function DonationsPage() {
                           ref={attachmentInputRef}
                           type="file"
                           accept="image/*"
+                          multiple
                           onChange={(event) => {
                             handleAttachmentFile(event.target.files);
                             event.target.value = '';
                           }}
                         />
                         <div className="nb-attachment-drop-inner">
-                          <span>{processingAttachment ? 'Processing image...' : 'Drag & drop image here'}</span>
-                          <span className="nb-attachment-drop-sub">or click to choose file</span>
+                          <span>{processingAttachment ? 'Uploading image(s)...' : 'Drag & drop images here'}</span>
+                          <span className="nb-attachment-drop-sub">or click to choose one or more files</span>
                         </div>
                       </label>
                       {attachmentWarning && <div className="nb-warning-inline">{attachmentWarning}</div>}
-                      {selectedAttachment?.value && (
+                      {selectedAttachments.length > 0 && (
                         <div className="nb-attachment-pill-list">
-                          <div className="nb-attachment-pill">
-                            <span className="nb-attachment-pill-name">{selectedAttachment.name || 'Attachment image'}</span>
-                            <button
-                              type="button"
-                              onClick={() => setForm((prev) => ({ ...prev, attachments: '' }))}
-                            >
-                              Remove
-                            </button>
-                          </div>
+                          {selectedAttachments.map((attachment, index) => (
+                            <div className="nb-attachment-pill" key={`${attachment.value}-${index}`}>
+                              <span className="nb-attachment-pill-name">{attachment.name || `Attachment ${index + 1}`}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const remaining = parseAttachments(form.attachments)
+                                    .filter((item, itemIndex) => itemIndex !== index);
+                                  setForm((prev) => ({ ...prev, attachments: remaining.join('\n') }));
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -849,7 +798,7 @@ export default function DonationsPage() {
                             {selectedDonation.attachments.map((item, index) => {
                               const parsed = parseAttachmentItem(item, index);
                               if (!parsed?.value) return null;
-                              const isImage = String(parsed.value).toLowerCase().startsWith('data:image/');
+                              const isImage = isImageAttachmentValue(parsed.value);
                               return (
                                 <li key={`${parsed.value}-${index}`}>
                                   {isImage ? (

@@ -295,14 +295,32 @@ export default function GalleryPage() {
 
   const formatSizeToKb = (bytes) => Number(((Number(bytes) || 0) / 1024).toFixed(2));
 
-  const compressImageToLimit = async (file, maxBytes) => {
-    if ((file?.size || 0) <= maxBytes) {
-      return { file, sizeValue: formatSizeToKb(file.size), wasCompressed: false };
+  const getCenterCropRect = (sourceWidth, sourceHeight, targetRatio) => {
+    const safeWidth = Math.max(1, Number(sourceWidth) || 1);
+    const safeHeight = Math.max(1, Number(sourceHeight) || 1);
+    const sourceRatio = safeWidth / safeHeight;
+
+    if (sourceRatio > targetRatio) {
+      const cropWidth = Math.round(safeHeight * targetRatio);
+      const sx = Math.floor((safeWidth - cropWidth) / 2);
+      return { sx, sy: 0, sw: cropWidth, sh: safeHeight };
     }
 
+    const cropHeight = Math.round(safeWidth / targetRatio);
+    const sy = Math.floor((safeHeight - cropHeight) / 2);
+    return { sx: 0, sy, sw: safeWidth, sh: cropHeight };
+  };
+
+  const compressImageToLimit = async (file, maxBytes) => {
     const image = await loadImageFromFile(file);
     const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
     const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
+    const ratio4By5 = 4 / 5;
+    const cropRect = getCenterCropRect(baseWidth, baseHeight, ratio4By5);
+    const sourceRatio = baseWidth / baseHeight;
+    const cropBaseWidth = cropRect.sw;
+    const cropBaseHeight = cropRect.sh;
+    const ratioAdjusted = Math.abs(sourceRatio - ratio4By5) > 0.01;
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (!context) return null;
@@ -310,12 +328,22 @@ export default function GalleryPage() {
     let bestBlob = null;
     for (let scaleStep = 0; scaleStep < 16; scaleStep += 1) {
       const scale = Math.pow(0.75, scaleStep);
-      const targetWidth = Math.max(64, Math.round(baseWidth * scale));
-      const targetHeight = Math.max(64, Math.round(baseHeight * scale));
+      const targetWidth = Math.max(64, Math.round(cropBaseWidth * scale));
+      const targetHeight = Math.max(80, Math.round(cropBaseHeight * scale));
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       context.clearRect(0, 0, targetWidth, targetHeight);
-      context.drawImage(image, 0, 0, targetWidth, targetHeight);
+      context.drawImage(
+        image,
+        cropRect.sx,
+        cropRect.sy,
+        cropRect.sw,
+        cropRect.sh,
+        0,
+        0,
+        targetWidth,
+        targetHeight
+      );
 
       for (let quality = 0.86; quality >= 0.06; quality -= 0.05) {
         const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
@@ -323,13 +351,15 @@ export default function GalleryPage() {
           bestBlob = blob;
         }
         if (blob && blob.size <= maxBytes) {
-          return { file: blob, sizeValue: formatSizeToKb(blob.size), wasCompressed: true };
+          const changed = ratioAdjusted || blob.size < (file?.size || Infinity) || file?.type !== 'image/jpeg';
+          return { file: blob, sizeValue: formatSizeToKb(blob.size), wasCompressed: changed };
         }
       }
     }
 
     if (bestBlob && bestBlob.size <= maxBytes) {
-      return { file: bestBlob, sizeValue: formatSizeToKb(bestBlob.size), wasCompressed: true };
+      const changed = ratioAdjusted || bestBlob.size < (file?.size || Infinity) || file?.type !== 'image/jpeg';
+      return { file: bestBlob, sizeValue: formatSizeToKb(bestBlob.size), wasCompressed: changed };
     }
 
     return null;
@@ -456,6 +486,25 @@ export default function GalleryPage() {
     setSelectedPhotoTotal((prev) => Math.max(0, prev - 1));
     setTotalPhotoCount((prev) => Math.max(0, prev - 1));
     setError('');
+  };
+
+  const handleOpenSocialMediaForm = (photo) => {
+    const photoId = photo?.id;
+    if (!photoId) {
+      setError('Unable to open social media form right now.');
+      return;
+    }
+
+    const params = new URLSearchParams({
+      platform: 'instagram,facebook',
+      photoId: String(photoId),
+      photoUrl: photo?.url || '',
+      folder: folderNameById.get(photo.folderId) || folderNameById.get(selectedFolderId) || '',
+    });
+
+    navigate(`/social-media/create?${params.toString()}`, {
+      state: { userName, trust, sidebarNavKey: currentSidebarNavKey },
+    });
   };
 
   const handleDeleteFolder = async (folder) => {
@@ -834,7 +883,7 @@ export default function GalleryPage() {
                       </div>
                     </label>
                     <div className="gallery-upload-note">
-                      Uploads go to {folderNameById.get(selectedFolderId)}. Max 10 photos, 25KB each. Larger images are auto-compressed.
+                      Uploads go to {folderNameById.get(selectedFolderId)}. Max 10 photos, 25KB each. Photos are auto-cropped to 4:5 and compressed.
                     </div>
                   </div>
                 </div>
@@ -870,8 +919,20 @@ export default function GalleryPage() {
                             <div key={photo.id} className="gallery-photo">
                               <img src={photo.url} alt="Gallery" loading="lazy" decoding="async" />
                               <div className="gallery-photo-overlay">
-                                <div className="gallery-photo-index">
-                                  {String(index + 1).padStart(2, '0')}
+                                <div className="gallery-photo-top">
+                                  <div className="gallery-photo-index">
+                                    {String(index + 1).padStart(2, '0')}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="gallery-photo-share gallery-photo-share-combo"
+                                    onClick={() => handleOpenSocialMediaForm(photo)}
+                                    title="Open social media form"
+                                    aria-label={`Open social media form for photo ${String(index + 1).padStart(2, '0')}`}
+                                  >
+                                    <span className="gallery-photo-share-icon instagram" aria-hidden="true">IG</span>
+                                    <span className="gallery-photo-share-icon facebook" aria-hidden="true">f</span>
+                                  </button>
                                 </div>
                                 {photo.folderId && (
                                   <div className="gallery-photo-tag">{folderNameById.get(photo.folderId)}</div>

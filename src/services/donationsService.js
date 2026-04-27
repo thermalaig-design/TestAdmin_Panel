@@ -2,12 +2,46 @@ import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
 const TABLE_NAME = 'Donations';
+const DONATIONS_BUCKET = String(import.meta?.env?.VITE_DONATIONS_BUCKET || 'donations').trim() || 'donations';
 const MAX_FETCH = 200;
 const MONEY_RE = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
 
 function normalizeAttachments(value) {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item || '').trim()).filter(Boolean);
+}
+
+function uniqueId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function extensionFromFile(file) {
+  const fromName = String(file?.name || '').split('.').pop()?.toLowerCase();
+  if (fromName && fromName.length <= 8) return fromName;
+  const mime = String(file?.type || '').toLowerCase();
+  if (mime.includes('png')) return 'png';
+  if (mime.includes('webp')) return 'webp';
+  if (mime.includes('gif')) return 'gif';
+  if (mime.includes('svg')) return 'svg';
+  return 'jpg';
+}
+
+function sanitizeFileName(fileName = '') {
+  const [base = 'image'] = String(fileName).split('.');
+  const safe = base.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
+  return safe || 'image';
+}
+
+function buildDonationAttachmentPath(trustId, file) {
+  const ext = extensionFromFile(file);
+  const safeTrustId = String(trustId || 'misc').replace(/[^a-zA-Z0-9_-]/g, '') || 'misc';
+  const timestamp = Date.now();
+  const unique = uniqueId();
+  const safeName = sanitizeFileName(file?.name);
+  return `donations/${safeTrustId}/${timestamp}_${safeName}_${unique}.${ext}`;
 }
 
 function normalizeRow(row = {}) {
@@ -34,6 +68,65 @@ function toMoneyValue(rawAmount) {
     return { value: null, error: { message: 'Amount must be a valid number (example: 345000.54).' } };
   }
   return { value: Number(normalized), error: null };
+}
+
+async function uploadSingleDonationAttachment(file, { trustId = null } = {}) {
+  if (!file) return { data: null, error: { message: 'No attachment file provided.' } };
+  if (!file.type || !file.type.startsWith('image/')) {
+    return { data: null, error: { message: `Only image files are allowed: ${file?.name || 'unknown file'}` } };
+  }
+
+  const path = buildDonationAttachmentPath(trustId, file);
+  const { error: uploadError } = await supabase
+    .storage
+    .from(DONATIONS_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+
+  if (uploadError) {
+    if (String(uploadError.message || '').toLowerCase().includes('bucket not found')) {
+      return {
+        data: null,
+        error: {
+          ...uploadError,
+          message: `Storage bucket "${DONATIONS_BUCKET}" not found. Create this bucket in Supabase Storage or set VITE_DONATIONS_BUCKET.`,
+        },
+      };
+    }
+    return { data: null, error: uploadError };
+  }
+
+  const { data: publicData } = supabase.storage.from(DONATIONS_BUCKET).getPublicUrl(path);
+  return {
+    data: {
+      path,
+      publicUrl: String(publicData?.publicUrl || '').trim(),
+    },
+    error: null,
+  };
+}
+
+export async function uploadDonationAttachments(files = [], { trustId = null } = {}) {
+  const selectedFiles = Array.from(files || []).filter(Boolean);
+  if (!selectedFiles.length) return { data: [], error: null };
+
+  const uploadResults = await Promise.all(
+    selectedFiles.map(async (file) => {
+      const { data, error } = await uploadSingleDonationAttachment(file, { trustId });
+      return { file, data, error };
+    })
+  );
+
+  const firstError = uploadResults.find((result) => result.error)?.error || null;
+  if (firstError) return { data: [], error: firstError };
+
+  return {
+    data: uploadResults.map((result) => String(result.data?.publicUrl || '').trim()).filter(Boolean),
+    error: null,
+  };
 }
 
 export async function fetchDonationsByTrust(trustId) {

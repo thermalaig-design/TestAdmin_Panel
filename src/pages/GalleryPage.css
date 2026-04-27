@@ -702,7 +702,8 @@
   overflow: hidden;
   background: #f3f4f6;
   border: 1px solid rgba(91, 102, 255, 0.1);
-  min-height: 220px;
+  aspect-ratio: 4 / 5;
+  min-height: 260px;
   box-shadow: 0 10px 24px rgba(86, 102, 177, 0.08);
   transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
@@ -714,7 +715,7 @@
 
 .gallery-photo img {
   width: 100%;
-  height: 220px;
+  height: 100%;
   object-fit: cover;
   display: block;
 }
@@ -727,6 +728,17 @@
   justify-content: space-between;
   padding: 12px;
   background: linear-gradient(180deg, rgba(10, 15, 30, 0.08), rgba(10, 15, 30, 0.45));
+}
+
+.gallery-photo-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gallery-photo-top > .gallery-photo-index {
+  margin-right: auto;
 }
 
 .gallery-photo-index {
@@ -743,6 +755,60 @@
   font-size: 11px;
   font-weight: 800;
   backdrop-filter: blur(8px);
+}
+
+.gallery-photo-share {
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: rgba(16, 24, 40, 0.52);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gallery-photo-share:hover {
+  background: rgba(59, 70, 196, 0.82);
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.gallery-photo-share-combo {
+  width: auto;
+  height: 34px;
+  padding: 0 6px;
+  gap: 6px;
+}
+
+.gallery-photo-share-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.gallery-photo-share-icon.instagram {
+  background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 8%, #fd5949 40%, #d6249f 65%, #285aeb 100%);
+}
+
+.gallery-photo-share-icon.facebook {
+  background: #1877f2;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: lowercase;
 }
 
 .gallery-photo-tag {

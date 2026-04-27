@@ -113,7 +113,7 @@ function mimeToExt(mime = '') {
 }
 
 function formatKb(bytes) {
-  return `${(Number(bytes || 0) / 1024).toFixed(2)} KB`;
+  return Number((Number(bytes || 0) / 1024).toFixed(2));
 }
 
 function buildStoragePath(row, ext) {
@@ -251,8 +251,11 @@ async function uploadToBucket(storagePath, buffer, mime) {
   return data?.publicUrl || null;
 }
 
-async function updateSponsorPhoto(rowId, publicUrl) {
-  const { error } = await supabase.from(TABLE).update({ photo_url: publicUrl }).eq('id', rowId);
+async function updateSponsorPhoto(rowId, publicUrl, sizeKb) {
+  const { error } = await supabase
+    .from(TABLE)
+    .update({ photo_url: publicUrl, size: sizeKb })
+    .eq('id', rowId);
   if (error) throw error;
 }
 
@@ -267,15 +270,14 @@ async function migrateRow(row) {
   const storagePath = buildStoragePath(row, ext);
   const publicUrl = await uploadToBucket(storagePath, optimized.buffer, optimized.mime || decoded.mime);
 
-  if (!DRY_RUN) {
-    await updateSponsorPhoto(row.id, publicUrl);
-  }
+  const sizeKb = formatKb(optimized.buffer.length);
+  if (!DRY_RUN) await updateSponsorPhoto(row.id, publicUrl, sizeKb);
 
   return {
     status: 'migrated',
     storagePath,
     publicUrl,
-    size: formatKb(optimized.buffer.length),
+    size: sizeKb,
     optimized: optimized.optimized === true,
   };
 }
@@ -298,7 +300,7 @@ async function runMigration() {
       const result = await migrateRow(row);
       if (result.status === 'migrated') {
         migrated += 1;
-        console.log(`MIGRATED ${row.id} -> ${result.storagePath} (${result.size})`);
+        console.log(`MIGRATED ${row.id} -> ${result.storagePath} (${result.size} KB)`);
       } else {
         skipped += 1;
         console.log(`SKIPPED ${row.id} -> ${result.reason}`);
