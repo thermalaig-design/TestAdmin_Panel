@@ -153,10 +153,14 @@ create table if not exists public.noticeboard (
   created_by uuid null,
   created_at timestamp with time zone null default now(),
   updated_at timestamp with time zone null default now(),
+  size numeric null,
   constraint noticeboard_pkey primary key (id),
   constraint noticeboard_created_by_fkey foreign key (created_by) references auth.users (id),
   constraint noticeboard_trust_id_fkey foreign key (trust_id) references public."Trust" (id) on delete cascade
 ) tablespace pg_default;
+
+alter table if exists public.noticeboard
+add column if not exists size numeric null;
 
 create index if not exists idx_noticeboard_trust on public.noticeboard using btree (trust_id) tablespace pg_default;
 create index if not exists idx_noticeboard_status on public.noticeboard using btree (status) tablespace pg_default;

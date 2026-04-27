@@ -10,7 +10,13 @@
     "preview": "vite preview",
     "migrate:gallery": "node scripts/migrate-gallery-base64-to-storage.mjs",
     "migrate:sponsors": "node scripts/migrate-sponsors-base64-to-storage.mjs",
-    "backfill:sponsors:size": "node scripts/backfill-sponsors-size-from-photo-url.mjs"
+    "backfill:sponsors:size": "node scripts/backfill-sponsors-size-from-photo-url.mjs",
+    "compress:sponsors:size": "node scripts/compress-sponsors-images-update-size.mjs",
+    "compress:noticeboard:size": "node scripts/compress-noticeboard-images-update-size.mjs",
+    "compress:donations:size": "node scripts/compress-donations-images-update-size.mjs",
+    "compress:events:size": "node scripts/compress-events-images-update-size.mjs",
+    "compress:facilities:size": "node scripts/compress-facilities-images-update-size.mjs",
+    "compress:member-profiles:size": "node scripts/compress-member-profiles-images-update-size.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",

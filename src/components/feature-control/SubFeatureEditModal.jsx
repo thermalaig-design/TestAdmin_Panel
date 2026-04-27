@@ -12,6 +12,13 @@ function toDefaults(row) {
   };
 }
 
+function normalizeRouteInput(value) {
+  const route = String(value ?? '').trim();
+  if (!route) return '';
+  if (/^https?:\/\//i.test(route)) return route;
+  return route.startsWith('/') ? route : `/${route}`;
+}
+
 function validate(values) {
   const errors = {};
 
@@ -34,7 +41,7 @@ function validate(values) {
     errors.icon_url = 'Icon should be URL/path/data image or emoji.';
   }
 
-  const route = String(values.route || '').trim();
+  const route = normalizeRouteInput(values.route);
   const isHttpRoute = /^https?:\/\//i.test(route);
   const isAppRoute = /^\/[A-Za-z0-9\-_/]*$/.test(route);
   if (route && !(isHttpRoute || isAppRoute)) {
@@ -115,7 +122,8 @@ export default function SubFeatureEditModal({
   };
 
   const handleSubmit = () => {
-    const errors = validate(form);
+    const normalizedRoute = normalizeRouteInput(form.route);
+    const errors = validate({ ...form, route: normalizedRoute });
     setFieldErrors(errors);
     if (Object.keys(errors).length) return;
 
@@ -124,7 +132,7 @@ export default function SubFeatureEditModal({
       display_name: String(form.display_name || '').trim(),
       tagline: String(form.tagline || '').trim(),
       icon_url: String(form.icon_url || '').trim(),
-      route: String(form.route || '').trim(),
+      route: normalizedRoute,
     });
   };
 
@@ -209,6 +217,7 @@ export default function SubFeatureEditModal({
                 placeholder="/vip-login"
                 value={form.route}
                 onChange={(event) => handleChange('route', event.target.value)}
+                onBlur={(event) => handleChange('route', normalizeRouteInput(event.target.value))}
               />
               {fieldErrors.route ? <small>{fieldErrors.route}</small> : null}
             </label>
