@@ -31,6 +31,7 @@ const SubFeatureControlPage = lazy(() => import('./pages/SubFeatureControlPage')
 const Features20Page = lazy(() => import('./pages/Features20Page'));
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage'));
 const SocialMediaPage = lazy(() => import('./pages/SocialMediaPage'));
+const SocialMediaApprovalPage = lazy(() => import('./pages/SocialMediaApprovalPage'));
 
 function App() {
   return (
@@ -88,6 +89,7 @@ function App() {
           <Route path="/social-media" element={<SocialMediaPage />} />
           <Route path="/social-media/accounts-details" element={<SocialMediaPage />} />
           <Route path="/social-media/create" element={<SocialMediaPage />} />
+          <Route path="/social-media/approvals" element={<SocialMediaApprovalPage />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

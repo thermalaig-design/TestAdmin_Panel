@@ -215,6 +215,19 @@ const MODULE_CARDS = [
     ),
   },
   {
+    id: 'card-social-media-approvals',
+    label: 'Social Media Approvals',
+    description: 'Approve or reject pending image posts',
+    route: '/social-media/approvals',
+    gradient: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <rect x="3.5" y="5" width="17" height="14" rx="3" stroke="white" strokeWidth="1.8" fill="rgba(255,255,255,0.16)" />
+        <path d="M7.8 12.2l2.2 2.2 5.7-5.7" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     id: 'card-noticeboard',
     label: 'Noticeboard',
     description: 'View notices and open individual updates',
@@ -378,7 +391,7 @@ const MODULE_CARDS = [
 ];
 
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
-const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust', 'card-social-media-account-details']);
+const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust', 'card-social-media-account-details', 'card-social-media-approvals']);
 const DASHBOARD_CARD_IDS = new Set(['card-user-management', 'card-notifications']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
 const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-donations', 'card-members']);

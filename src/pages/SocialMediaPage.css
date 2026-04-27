@@ -16,6 +16,21 @@
   padding: 24px 28px 34px;
 }
 
+.sm-queue-btn {
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+
+.sm-queue-btn:hover {
+  filter: brightness(1.05);
+}
+
 .sm-error {
   max-width: 900px;
   margin-bottom: 12px;

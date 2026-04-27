@@ -52,6 +52,21 @@ export async function createSocialMediaAccount(payload) {
   return { data: data ? normalizeRow(data) : null, error };
 }
 
+export async function upsertSocialMediaAccountByTrust(payload) {
+  if (!payload?.trust_id) {
+    return { data: null, error: { message: 'trust_id is required for upsert.' } };
+  }
+
+  const { data, error } = await supabase
+    .from(SOCIAL_MEDIA_ACCOUNTS_TABLE)
+    .upsert(payload, { onConflict: 'trust_id' })
+    .select('*')
+    .single();
+
+  if (!error) invalidateCache('social-media-accounts:');
+  return { data: data ? normalizeRow(data) : null, error };
+}
+
 export async function updateSocialMediaAccount(id, updates) {
   if (!id) return { data: null, error: { message: 'Social media account id is required.' } };
 

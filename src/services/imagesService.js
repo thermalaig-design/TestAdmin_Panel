@@ -41,6 +41,45 @@ export async function fetchImages({ limit = 30 } = {}) {
   }, 15000);
 }
 
+export async function fetchPendingImagesByTrust(trustId, { limit = 100 } = {}) {
+  if (!trustId) return { data: [], error: null };
+  const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(500, Number(limit))) : 100;
+  const cacheKey = `images:pending:${trustId}:${safeLimit}`;
+
+  return cachedQuery(cacheKey, async () => {
+    const { data: folders, error: foldersError } = await supabase
+      .from('gallery_folders')
+      .select('id')
+      .eq('trust_id', trustId);
+    if (foldersError) return { data: [], error: foldersError };
+
+    const folderIds = (folders || []).map((row) => row.id).filter(Boolean);
+    if (!folderIds.length) return { data: [], error: null };
+
+    const { data: photos, error: photosError } = await supabase
+      .from('gallery_photos')
+      .select('id')
+      .in('folder_id', folderIds);
+    if (photosError) return { data: [], error: photosError };
+
+    const photoIds = (photos || []).map((row) => row.id).filter(Boolean);
+    if (!photoIds.length) return { data: [], error: null };
+
+    const { data, error } = await supabase
+      .from(IMAGES_TABLE)
+      .select('id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent, Approved, created_by, created_at, updated_at, gallery_photo:gallery_photos(public_url, storage_path)')
+      .in('gallery_photo_id', photoIds)
+      .in('Approved', ['pending', 'Pending'])
+      .order('created_at', { ascending: false })
+      .limit(safeLimit);
+
+    return {
+      data: (data || []).map(normalizeImageRow),
+      error,
+    };
+  }, 10000);
+}
+
 export async function fetchImagesCount() {
   return cachedQuery('images:count', async () => {
     const { count, error } = await supabase
@@ -70,6 +109,21 @@ export async function updateImage(id, updates) {
     .update(updates)
     .eq('id', id)
     .select('id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent, Approved, created_by, created_at, updated_at')
+    .single();
+
+  if (!error) invalidateCache('images:');
+  return { data: data ? normalizeImageRow(data) : null, error };
+}
+
+export async function updateImageApproval(id, approvedValue) {
+  if (!id) return { data: null, error: { message: 'Image id is required.' } };
+  if (!approvedValue) return { data: null, error: { message: 'Approved value is required.' } };
+
+  const { data, error } = await supabase
+    .from(IMAGES_TABLE)
+    .update({ Approved: approvedValue })
+    .eq('id', id)
+    .select('id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent, Approved, created_by, created_at, updated_at, gallery_photo:gallery_photos(public_url, storage_path)')
     .single();
 
   if (!error) invalidateCache('images:');

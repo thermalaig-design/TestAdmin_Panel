@@ -4,9 +4,8 @@ import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
 import { createImage, fetchImages, fetchImagesCount } from '../services/imagesService';
 import {
-  createSocialMediaAccount,
   fetchSocialMediaAccountByTrust,
-  updateSocialMediaAccount,
+  upsertSocialMediaAccountByTrust,
 } from '../services/socialMediaAccountsService';
 import './SocialMediaPage.css';
 
@@ -238,7 +237,7 @@ export default function SocialMediaPage() {
       Hashtags: form.hashtags.trim() || null,
       Description: form.description.trim() || null,
       aspectRatio: form.aspectRatio.trim() || null,
-      Approved: 'Approved',
+      Approved: 'pending',
       created_by: superuserId || null,
     };
 
@@ -289,9 +288,7 @@ export default function SocialMediaPage() {
       payload.created_by = currentMemberId;
     }
 
-    const response = accountRecordId
-      ? await updateSocialMediaAccount(accountRecordId, payload)
-      : await createSocialMediaAccount(payload);
+    const response = await upsertSocialMediaAccountByTrust(payload);
 
     if (response.error) {
       setError(response.error.message || 'Unable to save account details.');
@@ -377,6 +374,21 @@ export default function SocialMediaPage() {
         <PageHeader
           title={pageTitle}
           subtitle={pageSubtitle}
+          right={
+            isAccountsDetailsRoute ? (
+              <button
+                type="button"
+                className="sm-queue-btn"
+                onClick={() =>
+                  navigate('/social-media/approvals', {
+                    state: { userName, trust, superuserId, sidebarNavKey: currentSidebarNavKey },
+                  })
+                }
+              >
+                Open Approval Queue
+              </button>
+            ) : null
+          }
           onBack={() =>
             navigate(isCreateRoute ? '/gallery' : '/dashboard', {
               state: { userName, trust, superuserId, sidebarNavKey: currentSidebarNavKey },
