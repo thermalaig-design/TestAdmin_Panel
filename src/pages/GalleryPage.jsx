@@ -41,6 +41,7 @@ export default function GalleryPage() {
   const [folderSearch, setFolderSearch] = useState('');
   const [folderSort, setFolderSort] = useState('name_asc');
   const [folderPage, setFolderPage] = useState(1);
+  const [previewPhoto, setPreviewPhoto] = useState(null);
   const deferredFolderSearch = useDeferredValue(folderSearch);
   const currentMemberId = location.state?.selectedMemberId || null;
   const FOLDER_PAGE_SIZE = 6;
@@ -296,32 +297,10 @@ export default function GalleryPage() {
 
   const formatSizeToKb = (bytes) => Number(((Number(bytes) || 0) / 1024).toFixed(2));
 
-  const getCenterCropRect = (sourceWidth, sourceHeight, targetRatio) => {
-    const safeWidth = Math.max(1, Number(sourceWidth) || 1);
-    const safeHeight = Math.max(1, Number(sourceHeight) || 1);
-    const sourceRatio = safeWidth / safeHeight;
-
-    if (sourceRatio > targetRatio) {
-      const cropWidth = Math.round(safeHeight * targetRatio);
-      const sx = Math.floor((safeWidth - cropWidth) / 2);
-      return { sx, sy: 0, sw: cropWidth, sh: safeHeight };
-    }
-
-    const cropHeight = Math.round(safeWidth / targetRatio);
-    const sy = Math.floor((safeHeight - cropHeight) / 2);
-    return { sx: 0, sy, sw: safeWidth, sh: cropHeight };
-  };
-
   const compressImageToLimit = async (file, maxBytes) => {
     const image = await loadImageFromFile(file);
     const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
     const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
-    const ratio4By5 = 4 / 5;
-    const cropRect = getCenterCropRect(baseWidth, baseHeight, ratio4By5);
-    const sourceRatio = baseWidth / baseHeight;
-    const cropBaseWidth = cropRect.sw;
-    const cropBaseHeight = cropRect.sh;
-    const ratioAdjusted = Math.abs(sourceRatio - ratio4By5) > 0.01;
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (!context) return null;
@@ -329,22 +308,12 @@ export default function GalleryPage() {
     let bestBlob = null;
     for (let scaleStep = 0; scaleStep < 16; scaleStep += 1) {
       const scale = Math.pow(0.75, scaleStep);
-      const targetWidth = Math.max(64, Math.round(cropBaseWidth * scale));
-      const targetHeight = Math.max(80, Math.round(cropBaseHeight * scale));
+      const targetWidth = Math.max(64, Math.round(baseWidth * scale));
+      const targetHeight = Math.max(64, Math.round(baseHeight * scale));
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       context.clearRect(0, 0, targetWidth, targetHeight);
-      context.drawImage(
-        image,
-        cropRect.sx,
-        cropRect.sy,
-        cropRect.sw,
-        cropRect.sh,
-        0,
-        0,
-        targetWidth,
-        targetHeight
-      );
+      context.drawImage(image, 0, 0, targetWidth, targetHeight);
 
       for (let quality = 0.86; quality >= 0.06; quality -= 0.05) {
         const blob = await canvasToBlob(canvas, 'image/jpeg', Number(quality.toFixed(2)));
@@ -352,14 +321,14 @@ export default function GalleryPage() {
           bestBlob = blob;
         }
         if (blob && blob.size <= maxBytes) {
-          const changed = ratioAdjusted || blob.size < (file?.size || Infinity) || file?.type !== 'image/jpeg';
+          const changed = blob.size < (file?.size || Infinity) || file?.type !== 'image/jpeg';
           return { file: blob, sizeValue: formatSizeToKb(blob.size), wasCompressed: changed };
         }
       }
     }
 
     if (bestBlob && bestBlob.size <= maxBytes) {
-      const changed = ratioAdjusted || bestBlob.size < (file?.size || Infinity) || file?.type !== 'image/jpeg';
+      const changed = bestBlob.size < (file?.size || Infinity) || file?.type !== 'image/jpeg';
       return { file: bestBlob, sizeValue: formatSizeToKb(bestBlob.size), wasCompressed: changed };
     }
 
@@ -487,6 +456,15 @@ export default function GalleryPage() {
     setSelectedPhotoTotal((prev) => Math.max(0, prev - 1));
     setTotalPhotoCount((prev) => Math.max(0, prev - 1));
     setError('');
+  };
+
+  const handleOpenPhotoPreview = (photo) => {
+    if (!photo?.url) return;
+    setPreviewPhoto(photo);
+  };
+
+  const handleClosePhotoPreview = () => {
+    setPreviewPhoto(null);
   };
 
   const handleOpenSocialMediaForm = (photo) => {
@@ -884,7 +862,7 @@ export default function GalleryPage() {
                       </div>
                     </label>
                     <div className="gallery-upload-note">
-                      Uploads go to {folderNameById.get(selectedFolderId)}. Max 10 photos, 25KB each. Photos are auto-cropped to 4:5 and compressed.
+                      Uploads go to {folderNameById.get(selectedFolderId)}. Max 10 photos, 25KB each. Original ratio is preserved and images are compressed.
                     </div>
                   </div>
                 </div>
@@ -917,7 +895,19 @@ export default function GalleryPage() {
                       <>
                         <div className="gallery-grid">
                           {selectedFolderPhotos.map((photo, index) => (
-                            <div key={photo.id} className="gallery-photo">
+                            <div
+                              key={photo.id}
+                              className="gallery-photo"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleOpenPhotoPreview(photo)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  handleOpenPhotoPreview(photo);
+                                }
+                              }}
+                            >
                               <img src={photo.url} alt="Gallery" loading="lazy" decoding="async" />
                               <div className="gallery-photo-overlay">
                                 <div className="gallery-photo-top">
@@ -927,7 +917,10 @@ export default function GalleryPage() {
                                   <button
                                     type="button"
                                     className="gallery-photo-share gallery-photo-share-combo"
-                                    onClick={() => handleOpenSocialMediaForm(photo)}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleOpenSocialMediaForm(photo);
+                                    }}
                                     title="Open social media form"
                                     aria-label={`Open social media form for photo ${String(index + 1).padStart(2, '0')}`}
                                   >
@@ -943,7 +936,10 @@ export default function GalleryPage() {
                                 <button
                                   type="button"
                                   className="gallery-photo-remove"
-                                  onClick={() => handleDeletePhoto(photo.id)}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDeletePhoto(photo.id);
+                                  }}
                                 >
                                   Delete photo
                                 </button>
@@ -971,6 +967,27 @@ export default function GalleryPage() {
             )}
           </div>
         </div>
+
+        {previewPhoto?.url && (
+          <div className="gallery-preview-backdrop" onClick={handleClosePhotoPreview}>
+            <div
+              className="gallery-preview-modal"
+              role="dialog"
+              aria-modal="true"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="gallery-preview-close"
+                onClick={handleClosePhotoPreview}
+                aria-label="Close preview"
+              >
+                Close
+              </button>
+              <img src={previewPhoto.url} alt="Gallery preview" />
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

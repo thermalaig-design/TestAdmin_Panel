@@ -248,13 +248,17 @@ export default function SocialMediaPage() {
       return;
     }
 
-    setSaveMessage('Image details saved successfully.');
     setSaving(false);
-    setForm({
-      ...form,
-      title: '',
-      hashtags: '',
-      description: '',
+    navigate('/social-media', {
+      replace: true,
+      state: {
+        userName,
+        trust,
+        superuserId,
+        sidebarNavKey: currentSidebarNavKey,
+        socialMediaSection: 'media-details',
+        flashMessage: 'Image details saved successfully.',
+      },
     });
   };
 
@@ -327,6 +331,14 @@ export default function SocialMediaPage() {
     : isAccountsDetailsRoute
       ? 'Manage social media account information'
       : 'Manage media and account information';
+
+  useEffect(() => {
+    const flashMessage = String(location.state?.flashMessage || '').trim();
+    if (!flashMessage) return;
+    setSaveMessage(flashMessage);
+    const timer = window.setTimeout(() => setSaveMessage(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [location.state?.flashMessage]);
 
   useEffect(() => {
     if (isCreateRoute) return;

@@ -94,6 +94,8 @@ function App() {
           <Route path="/social-media/approvals" element={<SocialMediaApprovalPage />} />
           <Route path="/share-app" element={<ShareAppPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />
+          <Route path="/achievements/create_achievement" element={<AchievementsPage />} />
+          <Route path="/achievements/edit_details" element={<AchievementsPage />} />
         </Routes>
       </Suspense>
     </BrowserRouter>
