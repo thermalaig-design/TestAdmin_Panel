@@ -40,6 +40,9 @@ const SORT_OPTIONS = [
 const PAGE_SIZE = 10;
 const MEMBERS_CACHE_TTL_MS = 3 * 60 * 1000;
 const CREATE_NEW_ROLE_VALUE = '__create_new_role__';
+const MEMBERS_BASE_PATH = '/members';
+const MEMBERS_CREATE_PATH = '/member/create_member';
+const MEMBERS_LANDING_PATH = '/member-profile';
 
 const initials = (value = '') =>
   value.split(' ').map((word) => word[0]).slice(0, 2).join('').toUpperCase() || 'M';
@@ -171,7 +174,7 @@ export default function MembersPage() {
   const { userName = 'Admin', trust = null } = location.state || {};
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
-  const isCreateRoute = location.pathname === '/member/create_member';
+  const isCreateRoute = location.pathname === MEMBERS_CREATE_PATH;
   const cachedMembers = readMembersCache(trustId);
 
   const [registeredMembers, setRegisteredMembers] = useState(() => cachedMembers?.registeredMembers || []);
@@ -305,6 +308,17 @@ export default function MembersPage() {
   );
 
   useEffect(() => {
+    if (isCreateRoute) {
+      setShowForm(true);
+      return;
+    }
+    setShowForm(false);
+    setShowPicker(false);
+    setShowRegisterForm(false);
+    setShowDetailModal(false);
+  }, [isCreateRoute]);
+
+  useEffect(() => {
     if (isCreateRoute) return;
     const params = new URLSearchParams(location.search);
     const existing = Number(params.get('page') || '1');
@@ -366,7 +380,7 @@ export default function MembersPage() {
     setShowRegisterForm(false);
     setShowDetailModal(false);
     setUseCustomMainRole(false);
-    navigate('/member/create_member', { state: { userName, trust } });
+    navigate(MEMBERS_CREATE_PATH, { state: { userName, trust } });
   };
 
   const openRegisterForm = (directoryMember) => {
@@ -491,7 +505,7 @@ export default function MembersPage() {
         setRegisteredMembers((prev) => [data, ...prev]);
         setDirectoryMembers((prev) => [toDirectoryMember(data), ...prev]);
         if (isCreateRoute) {
-          navigate('/member', { state: { userName, trust } });
+          navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust } });
         } else {
           setSelectedId(data.id);
           setShowForm(false);
@@ -539,7 +553,7 @@ export default function MembersPage() {
           subtitle="Manage registered members for the current trust"
           onBack={() => {
             if (isCreateRoute) {
-              navigate('/member', { state: { userName, trust } });
+              navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust } });
               return;
             }
             navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
@@ -812,7 +826,7 @@ export default function MembersPage() {
                     className="sp-secondary"
                     onClick={() => {
                       if (isCreateRoute) {
-                        navigate('/member', { state: { userName, trust } });
+                        navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust } });
                         return;
                       }
                       setShowForm(false);
