@@ -14,6 +14,9 @@
 
 .sm-content {
   padding: 24px 28px 34px;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .sm-queue-btn {
@@ -136,13 +139,13 @@
 }
 
 .sm-section-card {
-  max-width: 900px;
+  max-width: 100%;
   margin-top: 18px;
   border-radius: 20px;
   border: 1px solid rgba(99, 102, 241, 0.2);
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 12px 26px rgba(79, 70, 229, 0.1);
-  padding: 20px;
+  padding: 24px;
 }
 
 .sm-create-card {
@@ -311,17 +314,20 @@
 .sm-media-list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 16px;
 }
 
 .sm-media-layout {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.1fr);
-  gap: 14px;
+  gap: 18px;
 }
 
 .sm-media-item {
   width: 100%;
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
   text-align: left;
   border: 1px solid rgba(99, 102, 241, 0.16);
   border-radius: 14px;
@@ -345,7 +351,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .sm-media-meta span {
@@ -430,7 +436,8 @@
 }
 
 .sm-media-open-btn {
-  margin-top: 8px;
+  margin-top: auto;
+  align-self: flex-start;
   border: 0;
   border-radius: 8px;
   background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
@@ -466,6 +473,10 @@
   }
 
   .sm-media-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sm-media-list {
     grid-template-columns: 1fr;
   }
 }

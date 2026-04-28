@@ -41,8 +41,19 @@ function canvasToBlob(canvas, type, quality) {
   });
 }
 
+async function decodeImage(input) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(input);
+    } catch {
+      // Fallback to HTMLImageElement decode path below.
+    }
+  }
+  return loadImageFromFile(input);
+}
+
 async function convertImageFileToJpeg(file, quality = 0.92) {
-  const image = await loadImageFromFile(file);
+  const image = await decodeImage(file);
   const width = Math.max(1, image.naturalWidth || image.width || 1);
   const height = Math.max(1, image.naturalHeight || image.height || 1);
   const canvas = document.createElement('canvas');
@@ -52,6 +63,7 @@ async function convertImageFileToJpeg(file, quality = 0.92) {
   if (!context) throw new Error('Unable to process selected image.');
   context.drawImage(image, 0, 0, width, height);
   const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+  if (typeof image?.close === 'function') image.close();
   if (!blob) throw new Error('Unable to process selected image.');
   return new File([blob], withJpegName(file?.name), {
     type: 'image/jpeg',
@@ -115,11 +127,17 @@ export async function normalizeImageDataUrlToJpeg(dataUrl = '', { quality = 0.92
   if (!match) return { dataUrl: '', warning: '', error: { message: 'Invalid image data.' } };
 
   const mime = String(match[1] || '').toLowerCase();
-  if (mime === 'image/jpeg' || mime === 'image/png') {
-    return { dataUrl: String(dataUrl || ''), warning: '', error: null };
-  }
-
   try {
+    const toBlob = async (url) => {
+      const response = await fetch(String(url || ''));
+      if (!response.ok) throw new Error('Unable to process selected image.');
+      return response.blob();
+    };
+    if (mime === 'image/jpeg' || mime === 'image/png') {
+      const blob = await toBlob(dataUrl);
+      return { dataUrl: String(dataUrl || ''), blob, warning: '', error: null };
+    }
+
     const image = await new Promise((resolve, reject) => {
       const node = new Image();
       node.onload = () => resolve(node);
@@ -145,6 +163,7 @@ export async function normalizeImageDataUrlToJpeg(dataUrl = '', { quality = 0.92
     });
     return {
       dataUrl: normalizedDataUrl,
+      blob,
       warning: 'Image format converted to JPEG. Allowed formats: JPG, JPEG, PNG.',
       error: null,
     };

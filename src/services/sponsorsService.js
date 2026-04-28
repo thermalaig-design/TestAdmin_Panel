@@ -11,18 +11,15 @@ function uniqueId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function dataUrlToBuffer(dataUrl = '') {
+async function dataUrlToBlob(dataUrl = '') {
   const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/i.exec(String(dataUrl || ''));
   if (!match) return null;
-  const b64 = match[2];
-  const raw = atob(b64);
-  const bytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) {
-    bytes[i] = raw.charCodeAt(i);
-  }
+  const response = await fetch(String(dataUrl || ''));
+  if (!response.ok) return null;
+  const blob = await response.blob();
   return {
     mime: match[1].toLowerCase(),
-    buffer: bytes,
+    blob,
   };
 }
 
@@ -46,8 +43,10 @@ export async function uploadSponsorPhotoDataUrl(dataUrl, { trustId = null } = {}
     return { data: null, error: normalized.error };
   }
 
-  const parsed = dataUrlToBuffer(normalized.dataUrl);
-  if (!parsed?.buffer?.length) {
+  const parsed = normalized.blob
+    ? { mime: String(normalized.blob.type || 'image/jpeg').toLowerCase(), blob: normalized.blob }
+    : await dataUrlToBlob(normalized.dataUrl);
+  if (!parsed?.blob || !parsed.blob.size) {
     return { data: null, error: { message: 'Invalid sponsor image data.' } };
   }
 
@@ -55,7 +54,7 @@ export async function uploadSponsorPhotoDataUrl(dataUrl, { trustId = null } = {}
   const { error: uploadError } = await supabase
     .storage
     .from(SPONSORS_BUCKET)
-    .upload(path, parsed.buffer, {
+    .upload(path, parsed.blob, {
       cacheControl: '3600',
       upsert: false,
       contentType: parsed.mime,

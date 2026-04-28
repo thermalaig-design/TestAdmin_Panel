@@ -31,6 +31,18 @@ function normalizeTimeToHHMM(value: string | null) {
   return raw.slice(0, 5);
 }
 
+function isWithinOneMinuteWindow(targetHHMM: string, nowHHMM: string) {
+  const [tH, tM] = targetHHMM.split(':').map(Number);
+  const [nH, nM] = nowHHMM.split(':').map(Number);
+  if ([tH, tM, nH, nM].some((n) => Number.isNaN(n))) return false;
+
+  const targetMins = tH * 60 + tM;
+  const nowMins = nH * 60 + nM;
+  const diff = Math.abs(targetMins - nowMins);
+  const wrappedDiff = 1440 - diff;
+  return Math.min(diff, wrappedDiff) <= 1;
+}
+
 function composeCaption(description: string | null, hashtags: string | null) {
   const text = [String(description || '').trim(), String(hashtags || '').trim()]
     .filter(Boolean)
@@ -43,6 +55,7 @@ async function postToBlotato(apiKey: string, payload: unknown) {
   const response = await fetch(BLOTATO_POST_URL, {
     method: 'POST',
     headers: {
+      'X-API-Key': apiKey,
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
@@ -92,7 +105,8 @@ Deno.serve(async () => {
 
     const dueAccounts = (accounts || []).filter((row) => {
       const targetTime = normalizeTimeToHHMM(row['TimeForAutoInput']);
-      return targetTime && targetTime === nowHHMM;
+      if (!targetTime) return false;
+      return isWithinOneMinuteWindow(targetTime, nowHHMM);
     });
 
     summary.dueTrusts = dueAccounts.length;

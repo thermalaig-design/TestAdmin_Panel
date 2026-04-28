@@ -287,6 +287,34 @@ const MODULE_CARDS = [
     ),
   },
   {
+    id: 'card-share-app',
+    label: 'Share App',
+    description: 'Open share app module',
+    route: '/share-app',
+    gradient: 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="6" cy="12" r="2.2" stroke="white" strokeWidth="1.8" />
+        <circle cx="18" cy="6" r="2.2" stroke="white" strokeWidth="1.8" />
+        <circle cx="18" cy="18" r="2.2" stroke="white" strokeWidth="1.8" />
+        <path d="M8 11l7.6-4.1M8 13l7.6 4.1" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'card-achievements',
+    label: 'Achievements',
+    description: 'Open achievements module',
+    route: '/achievements',
+    gradient: 'linear-gradient(135deg, #7C3AED 0%, #2563EB 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="9" r="4.2" stroke="white" strokeWidth="1.8" />
+        <path d="M8.8 13.4L7 21l5-2.3L17 21l-1.8-7.6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     id: 'card-theme',
     label: 'Theme',
     description: 'Preview and manage visual themes',
@@ -392,7 +420,7 @@ const MODULE_CARDS = [
 
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust', 'card-social-media-account-details', 'card-social-media-approvals']);
-const DASHBOARD_CARD_IDS = new Set(['card-user-management', 'card-notifications']);
+const DASHBOARD_CARD_IDS = new Set(['card-user-management', 'card-notifications', 'card-share-app', 'card-achievements']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
 const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-donations', 'card-members']);
 const MENU_MODULE_CARDS = [
@@ -405,23 +433,6 @@ const MENU_MODULE_CARDS = [
     icon: (
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
         <path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 3.18 2 2 0 0 1 4.11 1h2a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.62a2 2 0 0 1-.45 2.11L7.1 8.9a16 16 0 0 0 8 8l1.45-1.19a2 2 0 0 1 2.11-.45c.84.3 1.72.51 2.62.63A2 2 0 0 1 22 16.92Z" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: 'menu-card-share-app',
-    label: 'Share App',
-    description: 'Coming soon',
-    route: '/dashboard',
-    temporarilyDeactivated: true,
-    deactivationText: 'Coming Soon',
-    gradient: 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
-    icon: (
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-        <circle cx="6" cy="12" r="2.2" stroke="white" strokeWidth="1.8" />
-        <circle cx="18" cy="6" r="2.2" stroke="white" strokeWidth="1.8" />
-        <circle cx="18" cy="18" r="2.2" stroke="white" strokeWidth="1.8" />
-        <path d="M8 11l7.6-4.1M8 13l7.6 4.1" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     ),
   },

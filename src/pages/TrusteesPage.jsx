@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchTrustDetails, updateTrustDetails } from '../services/authService';
 import { uploadTrustIcon } from '../services/trustService';
@@ -208,6 +208,7 @@ export default function TrusteesPage() {
   const [contentDraft,   setContentDraft]   = useState({ terms_content: '', privacy_content: '' });
   const [contentSaving,  setContentSaving]  = useState(false);
   const [contentError,   setContentError]   = useState('');
+  const logoPreviewObjectUrlRef = useRef('');
 
 
   // ── Fetch full trust details ─────────────────────────────────────────────
@@ -296,6 +297,10 @@ export default function TrusteesPage() {
   };
 
   const cancelEdit = () => {
+    if (logoPreviewObjectUrlRef.current) {
+      URL.revokeObjectURL(logoPreviewObjectUrlRef.current);
+      logoPreviewObjectUrlRef.current = '';
+    }
     setEditMode({
       name: false,
       legal: false,
@@ -321,14 +326,21 @@ export default function TrusteesPage() {
       setSaveError(prepared.error?.message || getAllowedImageFormatsMessage());
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setDraft(prev => ({ ...prev, icon_url: reader.result }));
-    };
-    reader.readAsDataURL(prepared.file);
+    if (logoPreviewObjectUrlRef.current) URL.revokeObjectURL(logoPreviewObjectUrlRef.current);
+    const previewUrl = URL.createObjectURL(prepared.file);
+    logoPreviewObjectUrlRef.current = previewUrl;
+    setDraft(prev => ({ ...prev, icon_url: previewUrl }));
     setLogoFile(prepared.file);
     setSaveError(prepared.warning || '');
   };
+
+  useEffect(() => {
+    return () => {
+      if (logoPreviewObjectUrlRef.current) {
+        URL.revokeObjectURL(logoPreviewObjectUrlRef.current);
+      }
+    };
+  }, []);
 
   const saveField = async (field) => {
     if (!trustId) return;
@@ -1086,4 +1098,3 @@ export default function TrusteesPage() {
     </div>
   );
 }
-
