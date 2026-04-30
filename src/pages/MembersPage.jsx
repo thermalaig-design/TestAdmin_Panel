@@ -196,6 +196,9 @@ export default function MembersPage() {
   const [editingRegistrationId, setEditingRegistrationId] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailId, setDetailId] = useState(null);
+  const [createFlowStep, setCreateFlowStep] = useState(isCreateRoute ? 'mobile-search' : 'form');
+  const [createMobileQuery, setCreateMobileQuery] = useState('');
+  const [selectedCreateMemberId, setSelectedCreateMemberId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [useCustomMainRole, setUseCustomMainRole] = useState(false);
   const [useCustomRegisterRole, setUseCustomRegisterRole] = useState(false);
@@ -286,6 +289,30 @@ export default function MembersPage() {
     () => [...filteredDirectoryMembers].sort((left, right) => compareMembers(left, right, 'name_asc')),
     [filteredDirectoryMembers]
   );
+  const createMobileMatches = useMemo(() => {
+    const digits = sanitizeDigits(createMobileQuery);
+    if (!digits) return [];
+    return sortedDirectoryMembers.filter((member) => {
+      const memberMobile = sanitizeDigits(member.mobile);
+      if (!memberMobile) return false;
+      return memberMobile === digits || memberMobile.endsWith(digits);
+    });
+  }, [createMobileQuery, sortedDirectoryMembers]);
+  const selectedCreateMember = useMemo(
+    () => createMobileMatches.find((member) => member.member_id === selectedCreateMemberId) || null,
+    [createMobileMatches, selectedCreateMemberId]
+  );
+  const createMobileDigits = sanitizeDigits(createMobileQuery);
+  const isCreateMobileSearchReady = createMobileDigits.length === 10;
+  const isEditingExistingMember = !!selectedMember?.id;
+  const isUsingExistingMemberInCreateFlow =
+    isCreateRoute && createFlowStep === 'form' && !!selectedCreateMember?.member_id;
+  const canEditMembersTable = isEditingExistingMember
+    ? selectedMember?.is_editable === true
+    : isUsingExistingMemberInCreateFlow
+      ? selectedCreateMember?.is_editable === true
+      : true;
+  const isMembersTableLocked = !canEditMembersTable;
 
   const hasRegisteredMembers = sortedRegisteredMembers.length > 0;
   const visibleMembers = hasRegisteredMembers ? sortedRegisteredMembers : sortedDirectoryMembers;
@@ -310,6 +337,11 @@ export default function MembersPage() {
   useEffect(() => {
     if (isCreateRoute) {
       setShowForm(true);
+      setCreateFlowStep('mobile-search');
+      setCreateMobileQuery('');
+      setSelectedCreateMemberId(null);
+      setSelectedId(null);
+      setForm(EMPTY_FORM);
       return;
     }
     setShowForm(false);
@@ -381,6 +413,38 @@ export default function MembersPage() {
     setShowDetailModal(false);
     setUseCustomMainRole(false);
     navigate(MEMBERS_CREATE_PATH, { state: { userName, trust } });
+  };
+
+  const openCreateFormFromMobileSearch = (mobileDigits = '') => {
+    setSelectedId(null);
+    setSelectedCreateMemberId(null);
+    setSaveError('');
+    setForm((prev) => ({
+      ...EMPTY_FORM,
+      mobile: sanitizeDigits(mobileDigits) || prev.mobile || '',
+    }));
+    setCreateFlowStep('form');
+  };
+
+  const handlePickMemberFromMobileSearch = (member) => {
+    setSelectedCreateMemberId(member.member_id || null);
+    setSelectedId(null);
+    setSaveError('');
+    setForm({
+      name: member.name || '',
+      company_name: member.company_name || '',
+      membership_number: '',
+      role: '',
+      joined_date: '',
+      mobile: sanitizeDigits(member.mobile),
+      email: member.email || '',
+      address_home: member.address_home || '',
+      address_office: member.address_office || '',
+      resident_landline: sanitizeDigits(member.resident_landline),
+      office_landline: sanitizeDigits(member.office_landline),
+      is_active: true,
+    });
+    setCreateFlowStep('form');
   };
 
   const openRegisterForm = (directoryMember) => {
@@ -465,12 +529,12 @@ export default function MembersPage() {
 
   const handleSave = async () => {
     setSaveError('');
-    if (!form.name.trim()) {
+    if (!form.name.trim() && canEditMembersTable) {
       setSaveError('Member name is required.');
       return;
     }
 
-    const payload = {
+    const fullPayload = {
       name: form.name.trim(),
       company_name: form.company_name.trim() || null,
       membership_number: form.membership_number.trim() || null,
@@ -484,10 +548,19 @@ export default function MembersPage() {
       office_landline: sanitizeDigits(form.office_landline) || null,
       is_active: !!form.is_active,
     };
+    const registrationPayload = {
+      membership_number: form.membership_number.trim() || null,
+      role: form.role.trim() || null,
+      joined_date: form.joined_date || null,
+      is_active: !!form.is_active,
+    };
 
     setSaving(true);
     if (selectedMember?.id) {
-      const { data, error: updateError } = await updateRegisteredMember(selectedMember.id, payload, trustId);
+      const action = canEditMembersTable
+        ? updateRegisteredMember(selectedMember.id, fullPayload, trustId)
+        : updateRegisteredMembership(selectedMember.id, registrationPayload, trustId);
+      const { data, error: updateError } = await action;
       if (updateError) {
         setSaveError(updateError.message || 'Unable to update member.');
       } else if (data) {
@@ -498,17 +571,33 @@ export default function MembersPage() {
         setShowForm(false);
       }
     } else {
-      const { data, error: createError } = await createMember(trustId, payload);
+      const createAction = isUsingExistingMemberInCreateFlow
+        ? registerExistingMember(trustId, selectedCreateMember.member_id, registrationPayload)
+        : createMember(trustId, fullPayload);
+      const { data, error: createError } = await createAction;
       if (createError) {
         setSaveError(createError.message || 'Unable to create member.');
       } else if (data) {
-        setRegisteredMembers((prev) => [data, ...prev]);
-        setDirectoryMembers((prev) => [toDirectoryMember(data), ...prev]);
-        if (isCreateRoute) {
-          navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust } });
+        const syncResult = isUsingExistingMemberInCreateFlow && canEditMembersTable
+          ? await updateRegisteredMember(data.id, fullPayload, trustId)
+          : { data, error: null };
+        if (syncResult.error) {
+          setSaveError(syncResult.error.message || 'Unable to update member details.');
         } else {
-          setSelectedId(data.id);
-          setShowForm(false);
+          const finalData = syncResult.data || data;
+          setRegisteredMembers((prev) => [finalData, ...prev.filter((item) => item.id !== finalData.id)]);
+          setDirectoryMembers((prev) => {
+            const exists = prev.some((item) => item.member_id === finalData.member_id);
+            return exists
+              ? prev.map((item) => (item.member_id === finalData.member_id ? { ...item, ...toDirectoryMember(finalData) } : item))
+              : [toDirectoryMember(finalData), ...prev];
+          });
+          if (isCreateRoute) {
+            navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust } });
+          } else {
+            setSelectedId(finalData.id);
+            setShowForm(false);
+          }
         }
       }
     }
@@ -706,23 +795,113 @@ export default function MembersPage() {
 
           {(isCreateRoute || showForm) && (
             <section className="sp-form">
+              {isCreateRoute && createFlowStep === 'mobile-search' && (
+                <div className="sp-form-card">
+                  <div className="sp-form-title">Search Member By Mobile</div>
+                  <div className="sp-form-section">
+                    <div className="sp-grid">
+                      <label className="sp-field sp-span-2">
+                        <span>Mobile Number</span>
+                        <input
+                          value={createMobileQuery}
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          placeholder="Enter mobile number"
+                          onChange={(e) => setCreateMobileQuery(sanitizeDigits(e.target.value))}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {createMobileDigits.length > 0 && !isCreateMobileSearchReady && (
+                    <div className="sp-modal-empty">Enter full 10-digit mobile number to search.</div>
+                  )}
+
+                  {isCreateMobileSearchReady && (
+                    <div className="sp-modal-list">
+                      {loadingDirectory ? (
+                        <div className="sp-modal-empty">Loading members...</div>
+                      ) : createMobileMatches.length > 0 ? (
+                        <div className="sp-modal-section my">
+                          <div className="sp-modal-section-title">
+                            Registered Members ({createMobileMatches.length})
+                          </div>
+                          {createMobileMatches.map((member) => (
+                            <div
+                              key={member.member_id}
+                              className={`sp-modal-item ${selectedCreateMemberId === member.member_id ? 'active' : ''}`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setSelectedCreateMemberId(member.member_id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setSelectedCreateMemberId(member.member_id);
+                                }
+                              }}
+                            >
+                              <div className="sp-modal-info">
+                                <div className="sp-modal-title">{member.name || 'Unnamed member'}</div>
+                                <div className="sp-modal-sub">{member.company_name || 'No company'}</div>
+                                <div className="sp-modal-sub">{member.mobile || member.email || ''}</div>
+                              </div>
+                              <div className="sp-modal-actions">
+                                <button
+                                  className="sp-icon-btn"
+                                  type="button"
+                                  onClick={() => handlePickMemberFromMobileSearch(member)}
+                                >
+                                  Use This Member
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="sp-modal-empty">
+                          No members found for this mobile number.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {isCreateMobileSearchReady && !loadingDirectory && (
+                    <div className="sp-form-actions">
+                      <button
+                        className="sp-primary"
+                        type="button"
+                        onClick={() => openCreateFormFromMobileSearch(createMobileQuery)}
+                      >
+                        Create New Member
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(!isCreateRoute || createFlowStep === 'form') && (
               <div className="sp-form-card">
                 <div className="sp-form-title">{selectedId ? 'Edit Member' : 'Create New Member'}</div>
+                {isMembersTableLocked && (
+                  <div className="sp-warning">
+                    Members Table is read-only for this member. You can still edit Registered Members Table.
+                  </div>
+                )}
 
                 <div className="sp-form-section">
                   <div className="sp-form-section-title">Members Table</div>
                   <div className="sp-grid">
                     <label className="sp-field">
                       <span>Member Name *</span>
-                      <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
+                      <input disabled={isMembersTableLocked} value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
                     </label>
                     <label className="sp-field">
                       <span>Company Name</span>
-                      <input value={form.company_name} onChange={(e) => setForm((prev) => ({ ...prev, company_name: e.target.value }))} />
+                      <input disabled={isMembersTableLocked} value={form.company_name} onChange={(e) => setForm((prev) => ({ ...prev, company_name: e.target.value }))} />
                     </label>
                     <label className="sp-field">
                       <span>Mobile</span>
                       <input
+                        disabled={isMembersTableLocked}
                         value={form.mobile}
                         inputMode="numeric"
                         pattern="[0-9]*"
@@ -731,11 +910,12 @@ export default function MembersPage() {
                     </label>
                     <label className="sp-field">
                       <span>Email</span>
-                      <input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
+                      <input disabled={isMembersTableLocked} value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
                     </label>
                     <label className="sp-field">
                       <span>Resident Landline</span>
                       <input
+                        disabled={isMembersTableLocked}
                         value={form.resident_landline}
                         inputMode="numeric"
                         pattern="[0-9]*"
@@ -745,6 +925,7 @@ export default function MembersPage() {
                     <label className="sp-field">
                       <span>Office Landline</span>
                       <input
+                        disabled={isMembersTableLocked}
                         value={form.office_landline}
                         inputMode="numeric"
                         pattern="[0-9]*"
@@ -753,11 +934,11 @@ export default function MembersPage() {
                     </label>
                     <label className="sp-field sp-span-2">
                       <span>Home Address</span>
-                      <input value={form.address_home} onChange={(e) => setForm((prev) => ({ ...prev, address_home: e.target.value }))} />
+                      <input disabled={isMembersTableLocked} value={form.address_home} onChange={(e) => setForm((prev) => ({ ...prev, address_home: e.target.value }))} />
                     </label>
                     <label className="sp-field sp-span-2">
                       <span>Office Address</span>
-                      <input value={form.address_office} onChange={(e) => setForm((prev) => ({ ...prev, address_office: e.target.value }))} />
+                      <input disabled={isMembersTableLocked} value={form.address_office} onChange={(e) => setForm((prev) => ({ ...prev, address_office: e.target.value }))} />
                     </label>
                   </div>
                   {numberWarning && <div className="sp-warning">{numberWarning}</div>}
@@ -822,6 +1003,15 @@ export default function MembersPage() {
                 {saveError && <div className="sp-error">{saveError}</div>}
 
                 <div className="sp-form-actions">
+                  {isCreateRoute && (
+                    <button
+                      className="sp-secondary"
+                      onClick={() => setCreateFlowStep('mobile-search')}
+                      type="button"
+                    >
+                      Back to Mobile Search
+                    </button>
+                  )}
                   <button
                     className="sp-secondary"
                     onClick={() => {
@@ -842,6 +1032,7 @@ export default function MembersPage() {
                   </button>
                 </div>
               </div>
+              )}
             </section>
           )}
         </div>

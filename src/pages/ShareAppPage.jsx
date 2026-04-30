@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
@@ -36,11 +36,8 @@ export default function ShareAppPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [lastSaved, setLastSaved] = useState({ playStoreLink: '', appStoreLink: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const playInputRef = useRef(null);
 
   const loadLinks = useCallback(async () => {
     if (!trust?.id) return;
@@ -58,11 +55,6 @@ export default function ShareAppPage() {
     setAppStoreLink(data?.appStoreLink || '');
     setCreatedAt(data?.createdAt || '');
     setUpdatedAt(data?.updatedAt || '');
-    setLastSaved({
-      playStoreLink: data?.playStoreLink || '',
-      appStoreLink: data?.appStoreLink || '',
-    });
-    setIsEditing(!data);
     setLoading(false);
   }, [trust?.id]);
 
@@ -97,34 +89,8 @@ export default function ShareAppPage() {
     setAppStoreLink(data?.appStoreLink || '');
     setCreatedAt(data?.createdAt || '');
     setUpdatedAt(data?.updatedAt || '');
-    setLastSaved({
-      playStoreLink: data?.playStoreLink || '',
-      appStoreLink: data?.appStoreLink || '',
-    });
-    setIsEditing(false);
     setSuccess('Share app links saved successfully.');
     setSaving(false);
-  };
-
-  const handleEdit = () => {
-    setError('');
-    setSuccess('');
-    setIsEditing(true);
-    window.setTimeout(() => {
-      playInputRef.current?.focus();
-      playInputRef.current?.setSelectionRange?.(
-        String(playInputRef.current?.value || '').length,
-        String(playInputRef.current?.value || '').length
-      );
-    }, 0);
-  };
-
-  const handleCancel = () => {
-    setPlayStoreLink(lastSaved.playStoreLink || '');
-    setAppStoreLink(lastSaved.appStoreLink || '');
-    setError('');
-    setSuccess('');
-    setIsEditing(false);
   };
 
   const handleDelete = async () => {
@@ -151,8 +117,6 @@ export default function ShareAppPage() {
     setAppStoreLink('');
     setCreatedAt('');
     setUpdatedAt('');
-    setLastSaved({ playStoreLink: '', appStoreLink: '' });
-    setIsEditing(true);
     setSuccess('Share app links deleted successfully.');
     setDeleting(false);
   };
@@ -211,13 +175,10 @@ export default function ShareAppPage() {
                   <div className="simple-input-wrap">
                     <div className="simple-prefix simple-prefix-play">Play</div>
                     <input
-                      ref={playInputRef}
                       type="url"
                       value={playStoreLink}
                       onChange={(e) => setPlayStoreLink(e.target.value)}
                       placeholder="https://play.google.com/store/apps/details?id=..."
-                      disabled={!isEditing}
-                      aria-disabled={!isEditing}
                     />
                   </div>
                 </label>
@@ -231,8 +192,6 @@ export default function ShareAppPage() {
                       value={appStoreLink}
                       onChange={(e) => setAppStoreLink(e.target.value)}
                       placeholder="https://apps.apple.com/..."
-                      disabled={!isEditing}
-                      aria-disabled={!isEditing}
                     />
                   </div>
                 </label>
@@ -245,35 +204,17 @@ export default function ShareAppPage() {
                 )}
 
                 <div className="simple-actions">
-                  {!isEditing ? (
-                    <>
-                      <button type="button" className="simple-btn-secondary" onClick={handleEdit}>
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="simple-btn-danger"
-                        onClick={handleDelete}
-                        disabled={deleting}
-                      >
-                        {deleting ? 'Deleting...' : 'Delete'}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="submit" disabled={saving}>
-                        {saving ? 'Saving...' : 'Save Links'}
-                      </button>
-                      <button
-                        type="button"
-                        className="simple-btn-muted"
-                        onClick={handleCancel}
-                        disabled={saving || deleting}
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  )}
+                  <button type="submit" disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Links'}
+                  </button>
+                  <button
+                    type="button"
+                    className="simple-btn-danger"
+                    onClick={handleDelete}
+                    disabled={deleting || saving}
+                  >
+                    {deleting ? 'Deleting...' : 'Delete'}
+                  </button>
                 </div>
               </form>
             )}

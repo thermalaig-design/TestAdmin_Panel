@@ -158,9 +158,18 @@ export default function TrusteesPage() {
 
   const { userName = 'Admin', trust: trustFromState = null } = location.state || {};
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
-  const trustId = trustFromState?.id || null;
-  const isLogoCardView =
-    location.state?.trusteesView === 'logo' || location.state?.dashboardCardId === 'card-logo';
+  const fallbackTrustId =
+    typeof window !== 'undefined' ? window.sessionStorage.getItem('admin:activeTrustId') : null;
+  const searchParams = new URLSearchParams(location.search || '');
+  const viewFromQuery = searchParams.get('view');
+  const trustId = location.state?.trustId || trustFromState?.id || fallbackTrustId || null;
+  const derivedTrusteesView = (
+    location.state?.trusteesView
+    || (viewFromQuery === 'logo' || viewFromQuery === 'default' ? viewFromQuery : '')
+    || (location.state?.dashboardCardId === 'card-logo' ? 'logo' : '')
+    || 'default'
+  );
+  const isLogoCardView = derivedTrusteesView === 'logo';
 
   // Redirect safety
   useEffect(() => {

@@ -700,6 +700,29 @@ export async function fetchAllMembersDirectory(currentTrustId) {
   }, 12000);
 }
 
+export async function fetchMembersDirectoryPage(
+  currentTrustId,
+  { from = 0, to = 19 } = {}
+) {
+  const pageKey = `members:directory:page:${currentTrustId || 'all'}:${from}:${to}`;
+  return cachedQuery(pageKey, async () => {
+    const memberTables = await resolveAvailableTables(MEMBER_TABLE_CANDIDATES, 'members');
+    const tableResults = await Promise.all(
+      memberTables.map(async (membersTable) => {
+        const { data, error } = await supabase
+          .from(membersTable)
+          .select('*')
+          .range(from, to);
+        return { data: data || [], error };
+      })
+    );
+    const errored = tableResults.find((result) => result.error);
+    if (errored?.error) return { data: [], error: errored.error };
+    const memberRows = tableResults.flatMap((result) => result.data || []);
+    return { data: memberRows.map((row) => normalizeMemberRow(row, currentTrustId)), error: null };
+  }, 10000);
+}
+
 export async function fetchRegisteredMembersDirectory(currentTrustId) {
   const cacheKey = `members:directory:registered:${currentTrustId || 'all'}`;
   return cachedQuery(cacheKey, async () => {

@@ -268,32 +268,6 @@
   margin-top: 2px;
 }
 
-.ct-icon-preview {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  padding: 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.ct-icon-preview img {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  object-fit: cover;
-  border: 1px solid #dbeafe;
-}
-
-.ct-icon-preview span {
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-  word-break: break-all;
-}
-
 /* ── BUTTONS ────────────────────────────────────────────────────────────────── */
 .ct-btn {
   padding: 12px 20px;

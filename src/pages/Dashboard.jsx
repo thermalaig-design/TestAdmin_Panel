@@ -786,6 +786,13 @@ export default function Dashboard() {
   }, [trustId]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (trustId) {
+      window.sessionStorage.setItem('admin:activeTrustId', String(trustId));
+    }
+  }, [trustId]);
+
+  useEffect(() => {
     if (!trustId) return undefined;
     let cancelled = false;
     let timeoutId = null;
@@ -942,13 +949,19 @@ export default function Dashboard() {
                   }}
                   onClick={() => {
                     if (card.temporarilyDeactivated) return;
-                    navigate(card.route, {
+                    const nextTrusteesView = card.id === 'card-logo' ? 'logo' : 'default';
+                    const targetRoute =
+                      card.route === '/trustees'
+                        ? `/trustees?view=${encodeURIComponent(nextTrusteesView)}`
+                        : card.route;
+                    navigate(targetRoute, {
                       state: {
                         userName,
                         trust: activeTrust,
+                        trustId,
                         superuserId,
                         sidebarNavKey: currentSidebarNavKey,
-                        trusteesView: card.id === 'card-logo' ? 'logo' : 'default',
+                        trusteesView: nextTrusteesView,
                         dashboardCardId: card.id,
                         ...(card.id === 'card-social-media-account-details'
                           ? { socialMediaSection: 'accounts-details' }

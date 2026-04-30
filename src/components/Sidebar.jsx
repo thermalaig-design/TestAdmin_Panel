@@ -103,7 +103,12 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
   const location = useLocation();
   const { userName = 'Admin', trust = null, superuserId = null } = location.state || {};
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
-  const currentTrusteesView = location.state?.trusteesView || '';
+  const trusteesSearchParams = new URLSearchParams(location.search || '');
+  const trusteesViewFromQuery = trusteesSearchParams.get('view');
+  const currentTrusteesView =
+    location.state?.trusteesView ||
+    (trusteesViewFromQuery === 'logo' || trusteesViewFromQuery === 'default' ? trusteesViewFromQuery : '') ||
+    '';
   const storedSuperuserId = typeof window !== 'undefined' ? window.sessionStorage.getItem(SUPERUSER_SESSION_KEY) : null;
   const resolvedSuperuserId = superuserId || trust?.superuser_id || storedSuperuserId || null;
   const [isMobile, setIsMobile] = useState(

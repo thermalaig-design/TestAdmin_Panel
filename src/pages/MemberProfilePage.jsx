@@ -5,8 +5,8 @@ import Sidebar from '../components/Sidebar';
 import {
   createFamilyMember,
   deleteFamilyMember,
-  fetchAllMembersDirectory,
   fetchFamilyMembersByMemberId,
+  fetchMembersDirectoryPage,
   fetchMemberProfileView,
   fetchOtherMembershipsByMemberId,
   fetchRegisteredMembersDirectory,
@@ -78,7 +78,8 @@ const PROFILE_SECTIONS = [
 ];
 const MEMBERS_CACHE_TTL_MS = 3 * 60 * 1000;
 const LIST_PAGE_SIZE = 10;
-const PICKER_PAGE_SIZE = 6;
+const PICKER_INITIAL_PAGE_SIZE = 20;
+const PICKER_NEXT_PAGE_SIZE = 10;
 const CREATE_NEW_ROLE_VALUE = '__create_new_role__';
 const FAMILY_GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const FAMILY_BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -459,6 +460,14 @@ function comparePickerMembers(left = {}, right = {}, sortBy = 'name_asc') {
   return byNameAsc;
 }
 
+function getPickerRange(page = 1) {
+  if (page <= 1) {
+    return { from: 0, to: PICKER_INITIAL_PAGE_SIZE - 1, pageSize: PICKER_INITIAL_PAGE_SIZE };
+  }
+  const from = PICKER_INITIAL_PAGE_SIZE + (page - 2) * PICKER_NEXT_PAGE_SIZE;
+  return { from, to: from + PICKER_NEXT_PAGE_SIZE - 1, pageSize: PICKER_NEXT_PAGE_SIZE };
+}
+
 export default function MemberProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -470,7 +479,7 @@ export default function MemberProfilePage() {
 
   const [members, setMembers] = useState([]);
   const [directoryMembers, setDirectoryMembers] = useState([]);
-  const [directoryTrustId, setDirectoryTrustId] = useState(null);
+  const [pickerHasMore, setPickerHasMore] = useState(false);
   const [loadingDirectory, setLoadingDirectory] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState(preselectedMemberId);
   const [memberSearch, setMemberSearch] = useState('');
@@ -579,30 +588,39 @@ export default function MemberProfilePage() {
     };
   }, [trustId]);
 
-  const ensureDirectoryMembersLoaded = async ({ forceRefresh = false } = {}) => {
+  useEffect(() => {
+    if (!location.state?.openPicker || !trustId) return;
+    setPickerSearch('');
+    setPickerFilter('all');
+    setPickerSortBy('name_asc');
+    setPickerPage(1);
+    setRegisterError('');
+    setShowPicker(true);
+  }, [location.state, trustId]);
+
+  const ensureDirectoryMembersLoaded = async (page = 1) => {
     if (!trustId) return;
     if (loadingDirectory) return;
-    if (!forceRefresh && directoryTrustId === trustId && directoryMembers.length > 0) return;
 
-    if (!forceRefresh) {
-      const cachedDirectory = readDirectoryCache(trustId);
-      if (cachedDirectory?.length) {
-        setDirectoryMembers(cachedDirectory);
-        setDirectoryTrustId(trustId);
-        return;
-      }
-    }
-
+    const { from, to, pageSize } = getPickerRange(page);
     setLoadingDirectory(true);
-    const { data, error: fetchError } = await fetchAllMembersDirectory(trustId);
+    const { data, error: fetchError } = await fetchMembersDirectoryPage(trustId, { from, to });
     if (!fetchError) {
       const next = data || [];
       setDirectoryMembers(next);
-      setDirectoryTrustId(trustId);
+      setPickerHasMore(next.length >= pageSize);
       writeDirectoryCache(trustId, next);
+    } else {
+      setDirectoryMembers([]);
+      setPickerHasMore(false);
     }
     setLoadingDirectory(false);
   };
+
+  useEffect(() => {
+    if (!showPicker) return;
+    ensureDirectoryMembersLoaded(pickerPage);
+  }, [showPicker, pickerPage, trustId]);
 
   const membersForRoleCount = useMemo(() => {
     if (activeGroup === 'my') {
@@ -717,18 +735,6 @@ export default function MemberProfilePage() {
     () => [...filteredDirectoryMembers].sort((left, right) => comparePickerMembers(left, right, pickerSortBy)),
     [filteredDirectoryMembers, pickerSortBy]
   );
-  const pickerTotalPages = useMemo(
-    () => Math.max(1, Math.ceil(sortedPickerMembers.length / PICKER_PAGE_SIZE)),
-    [sortedPickerMembers.length]
-  );
-  const safePickerPage = useMemo(
-    () => Math.min(pickerPage, pickerTotalPages),
-    [pickerPage, pickerTotalPages]
-  );
-  const paginatedPickerMembers = useMemo(() => {
-    const start = (safePickerPage - 1) * PICKER_PAGE_SIZE;
-    return sortedPickerMembers.slice(start, start + PICKER_PAGE_SIZE);
-  }, [safePickerPage, sortedPickerMembers]);
   const visibleOtherMemberships = useMemo(
     () =>
       (otherMemberships || []).filter(
@@ -1184,7 +1190,6 @@ export default function MemberProfilePage() {
     setPickerPage(1);
     setRegisterError('');
     setShowPicker(true);
-    ensureDirectoryMembersLoaded();
   };
 
   const openNewMemberForm = () => {
@@ -1988,7 +1993,7 @@ export default function MemberProfilePage() {
                     <div className="mp-modal-section-title">
                       {pickerFilter === 'my' ? 'My Members' : pickerFilter === 'others' ? 'Other Members' : 'Members'}
                     </div>
-                    {paginatedPickerMembers.map((member) => (
+                    {sortedPickerMembers.map((member) => (
                       <div
                         key={member.member_id}
                         className="mp-modal-item"
@@ -2038,16 +2043,16 @@ export default function MemberProfilePage() {
                       type="button"
                       className="mp-page-btn"
                       onClick={() => setPickerPage((prev) => Math.max(1, prev - 1))}
-                      disabled={safePickerPage <= 1}
+                      disabled={pickerPage <= 1 || loadingDirectory}
                     >
                       Prev
                     </button>
-                    <span className="mp-page-info">Page {safePickerPage} / {pickerTotalPages}</span>
+                    <span className="mp-page-info">Page {pickerPage}</span>
                     <button
                       type="button"
                       className="mp-page-btn"
-                      onClick={() => setPickerPage((prev) => Math.min(pickerTotalPages, prev + 1))}
-                      disabled={safePickerPage >= pickerTotalPages}
+                      onClick={() => setPickerPage((prev) => prev + 1)}
+                      disabled={!pickerHasMore || loadingDirectory}
                     >
                       Next
                     </button>

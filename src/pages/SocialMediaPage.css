@@ -243,6 +243,34 @@
   grid-column: 1 / -1;
 }
 
+.sm-post-time-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sm-post-time-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(99, 102, 241, 0.26);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e1b4b;
+}
+
+.sm-post-time-option input {
+  margin: 0;
+}
+
+.sm-post-time-input {
+  min-width: 230px;
+}
+
 .sm-form-actions {
   display: flex;
   justify-content: flex-end;
@@ -461,6 +489,32 @@
   font-size: 13px;
   color: #334155;
   line-height: 1.5;
+}
+
+.sm-media-view-post-wrap {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.sm-media-view-post-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(79, 70, 229, 0.32);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 8px 14px;
+  transition: transform 0.15s ease, filter 0.2s ease;
+}
+
+.sm-media-view-post-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 980px) {

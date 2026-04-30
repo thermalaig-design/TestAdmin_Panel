@@ -66,7 +66,60 @@ async function postToBlotato(apiKey: string, payload: unknown) {
   if (!response.ok) {
     throw new Error(`Blotato API error (${response.status}): ${responseText}`);
   }
-  return responseText;
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return { raw: responseText };
+  }
+}
+
+function firstNonEmptyString(values: unknown[]) {
+  for (const value of values) {
+    const normalized = String(value ?? '').trim();
+    if (normalized) return normalized;
+  }
+  return '';
+}
+
+function extractPostMeta(result: unknown) {
+  const source = (result && typeof result === 'object') ? (result as Record<string, unknown>) : {};
+  const post = (source.post && typeof source.post === 'object') ? (source.post as Record<string, unknown>) : {};
+  const data = (source.data && typeof source.data === 'object') ? (source.data as Record<string, unknown>) : {};
+
+  const submissionId = firstNonEmptyString([
+    source.submissionId,
+    source.submission_id,
+    source.id,
+    post.submissionId,
+    post.submission_id,
+    post.id,
+    data.submissionId,
+    data.submission_id,
+    data.id,
+  ]);
+
+  const publicUrl = firstNonEmptyString([
+    source.publicUrl,
+    source.public_url,
+    source.url,
+    source.postUrl,
+    source.post_url,
+    post.publicUrl,
+    post.public_url,
+    post.url,
+    post.postUrl,
+    post.post_url,
+    data.publicUrl,
+    data.public_url,
+    data.url,
+    data.postUrl,
+    data.post_url,
+  ]);
+
+  return {
+    submissionId: submissionId || null,
+    publicUrl: publicUrl || null,
+  };
 }
 
 async function fetchFolderIdsByTrust(trustId: string) {
@@ -217,17 +270,29 @@ Deno.serve(async () => {
           continue;
         }
 
+        let callResults: unknown[] = [];
         try {
-          await Promise.all(platformCalls);
+          callResults = await Promise.all(platformCalls);
         } catch (error) {
           summary.skippedImages += 1;
           summary.errors.push(`Trust ${trustId}, image ${image.id}: ${String(error)}`);
           continue;
         }
 
+        const extracted = callResults.map(extractPostMeta);
+        const resolvedSubmissionId =
+          extracted.find((entry) => entry.submissionId)?.submissionId || null;
+        const resolvedPublicUrl =
+          extracted.find((entry) => entry.publicUrl)?.publicUrl || null;
+
         const { error: updateError } = await supabase
           .from('Images')
-          .update({ Approved: 'posted' })
+          .update({
+            Approved: 'posted',
+            postStatus: 'posted',
+            blotatoSubmissionId: resolvedSubmissionId,
+            publicUrl: resolvedPublicUrl,
+          })
           .eq('id', image.id)
           .eq('Approved', 'approved');
 

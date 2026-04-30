@@ -29,7 +29,7 @@ select cron.schedule(
   '* * * * *',
   $$
   select net.http_post(
-    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/social-auto-poster',
+    url := 'https://lqdmefugrhluzlfabmuy.supabase.co/functions/v1/social-auto-poster',
     headers := '{"Content-Type":"application/json"}'::jsonb,
     body := '{}'::jsonb
   );

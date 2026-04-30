@@ -34,7 +34,6 @@ export default function SelectTrustPage() {
   const [entering,      setEntering]      = useState(false);
   const [trusts,        setTrusts]        = useState(trustsFromState);
   const [loadingTrusts, setLoadingTrusts] = useState(false);
-  const [trustFetchError, setTrustFetchError] = useState('');
 
   // New-user
   const [newName,     setNewName]     = useState('');
@@ -51,36 +50,11 @@ export default function SelectTrustPage() {
     let mounted = true;
     (async () => {
       setLoadingTrusts(true);
-      setTrustFetchError('');
-      try {
-        const { data, error } = await fetchLinkedTrusts(superuserId);
-        if (!mounted) return;
-        if (error) {
-          setTrusts([]);
-          setTrustFetchError(error.message || 'Unknown trust fetch error');
-        } else {
-          setTrusts(data || []);
-        }
-      } finally {
-        if (mounted) setLoadingTrusts(false);
-      }
+      const { data } = await fetchLinkedTrusts(superuserId);
+      if (mounted) { setTrusts(data || []); setLoadingTrusts(false); }
     })();
     return () => { mounted = false; };
   }, [superuserId, trustsFromState.length, isNewUser]);
-
-  const refetchTrusts = async () => {
-    if (!superuserId || isNewUser) return;
-    setLoadingTrusts(true);
-    setTrustFetchError('');
-    const { data, error } = await fetchLinkedTrusts(superuserId);
-    if (error) {
-      setTrusts([]);
-      setTrustFetchError(error.message || 'Unknown trust fetch error');
-    } else {
-      setTrusts(data || []);
-    }
-    setLoadingTrusts(false);
-  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -238,11 +212,6 @@ export default function SelectTrustPage() {
               Your account <strong>{userName}</strong> isn't linked to any trust yet.
               Contact your administrator or create a new app below.
             </p>
-            {trustFetchError && (
-              <p className="st-form-sub" style={{ textAlign: 'center', marginBottom: 12, color: '#dc2626' }}>
-                Trust fetch error: {trustFetchError}
-              </p>
-            )}
 
             <button 
               className="st-create-card"
@@ -257,12 +226,6 @@ export default function SelectTrustPage() {
                 <path d="M5 12h14M12 5l7 7-7 7" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-
-            {!!superuserId && (
-              <button className="st-back-btn" onClick={refetchTrusts} disabled={loadingTrusts}>
-                {loadingTrusts ? 'Retrying...' : 'Retry Trust Fetch'}
-              </button>
-            )}
 
             <button className="st-back-btn" onClick={() => navigate('/login')}>← Sign out</button>
           </div>

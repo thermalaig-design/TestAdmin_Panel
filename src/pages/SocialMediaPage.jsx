@@ -38,6 +38,8 @@ function getInitialForm() {
     hashtags: '',
     description: '',
     aspectRatio: '4:5',
+    postTimeMode: 'now',
+    postTimeValue: '',
   };
 }
 
@@ -52,7 +54,6 @@ function getInitialAccountForm() {
     threads: '',
     keywords: '',
     region: '',
-    timeForAutoInput: '',
     uploadPostApi: '',
   };
 }
@@ -117,9 +118,7 @@ export default function SocialMediaPage() {
       setLoadingCount(false);
     };
     loadCount();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -136,9 +135,7 @@ export default function SocialMediaPage() {
       setForm((prev) => ({ ...prev, aspectRatio: prev.aspectRatio || '4:5' }));
     };
     image.src = selectedPhotoUrl;
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [selectedPhotoUrl]);
 
   const loadMediaDetails = useCallback(async () => {
@@ -151,8 +148,7 @@ export default function SocialMediaPage() {
       setLoadingMediaRows(false);
       return;
     }
-    const rows = data || [];
-    setMediaRows(rows);
+    setMediaRows(data || []);
     setSelectedMediaId('');
     setLoadingMediaRows(false);
   }, []);
@@ -161,14 +157,12 @@ export default function SocialMediaPage() {
     if (!trust?.id) return;
     setLoadingAccount(true);
     setError('');
-
     const { data, error: fetchError } = await fetchSocialMediaAccountByTrust(trust.id);
     if (fetchError) {
       setError(fetchError.message || 'Unable to load account details.');
       setLoadingAccount(false);
       return;
     }
-
     if (!data) {
       setAccountRecordId('');
       setAccountCreatedAt('');
@@ -177,7 +171,6 @@ export default function SocialMediaPage() {
       setLoadingAccount(false);
       return;
     }
-
     setAccountRecordId(data.id || '');
     setAccountCreatedAt(data.createdAt || '');
     setAccountUpdatedAt(data.updatedAt || '');
@@ -191,7 +184,6 @@ export default function SocialMediaPage() {
       threads: data.threads ?? '',
       keywords: data.keywords || '',
       region: data.region || '',
-      timeForAutoInput: data.timeForAutoInput || '',
       uploadPostApi: data.uploadPostApi || '',
     });
     setLoadingAccount(false);
@@ -226,6 +218,11 @@ export default function SocialMediaPage() {
       setError('Selected photo is missing. Please open this page from gallery.');
       return;
     }
+    // ✅ Set Time mode mein time required hai
+    if (form.postTimeMode === 'set-time' && !form.postTimeValue) {
+      setError('Please select a scheduled date and time.');
+      return;
+    }
 
     setSaving(true);
     setError('');
@@ -237,7 +234,12 @@ export default function SocialMediaPage() {
       Hashtags: form.hashtags.trim() || null,
       Description: form.description.trim() || null,
       aspectRatio: form.aspectRatio.trim() || null,
-      Approved: 'pending',
+      postType: form.postTimeMode,         // ✅ now / set-time
+      Approved: 'approved',               // ✅ seedha approved
+      postTime:
+        form.postTimeMode === 'set-time'
+          ? new Date(form.postTimeValue).toISOString()
+          : new Date(Date.now() + 60 * 1000).toISOString(), // ✅ +1 min
       created_by: superuserId || null,
     };
 
@@ -257,7 +259,7 @@ export default function SocialMediaPage() {
         superuserId,
         sidebarNavKey: currentSidebarNavKey,
         socialMediaSection: 'media-details',
-        flashMessage: 'Image details saved successfully.',
+        flashMessage: 'Image scheduled successfully.',
       },
     });
   };
@@ -268,7 +270,6 @@ export default function SocialMediaPage() {
       setError('Trust not found. Please re-open from dashboard.');
       return;
     }
-
     setSavingAccount(true);
     setError('');
     setSaveMessage('');
@@ -284,7 +285,6 @@ export default function SocialMediaPage() {
       Threads: toNullableBigint(accountForm.threads),
       KeyWords: toNullableText(accountForm.keywords),
       region: toNullableText(accountForm.region),
-      TimeForAutoInput: toNullableText(accountForm.timeForAutoInput),
       'upload-Post-Api': toNullableText(accountForm.uploadPostApi),
     };
 
@@ -293,7 +293,6 @@ export default function SocialMediaPage() {
     }
 
     const response = await upsertSocialMediaAccountByTrust(payload);
-
     if (response.error) {
       setError(response.error.message || 'Unable to save account details.');
       setSavingAccount(false);
@@ -314,7 +313,6 @@ export default function SocialMediaPage() {
       threads: saved?.threads ?? '',
       keywords: saved?.keywords || '',
       region: saved?.region || '',
-      timeForAutoInput: saved?.timeForAutoInput || '',
       uploadPostApi: saved?.uploadPostApi || '',
     });
     setSaveMessage('Social media account details saved.');
@@ -325,6 +323,7 @@ export default function SocialMediaPage() {
     if (loadingCount) return 'Loading media count...';
     return `${mediaCount} media record${mediaCount === 1 ? '' : 's'} connected`;
   }, [mediaCount, loadingCount]);
+
   const pageTitle = isAccountsDetailsRoute ? 'Social Media Account Details' : 'Social Media';
   const pageSubtitle = isCreateRoute
     ? 'Create media details for selected photo'
@@ -458,7 +457,7 @@ export default function SocialMediaPage() {
                     </label>
 
                     <label className="sm-field">
-                      <span>aspectRatio</span>
+                      <span>Aspect Ratio</span>
                       <input
                         type="text"
                         value={form.aspectRatio}
@@ -466,6 +465,41 @@ export default function SocialMediaPage() {
                         placeholder="4:5 / 1:1 / 16:9"
                       />
                     </label>
+
+                    {/* ✅ Post Time Section */}
+                    <div className="sm-field sm-field-full">
+                      <span>Post Time</span>
+                      <div className="sm-post-time-row">
+                        <label className="sm-post-time-option">
+                          <input
+                            type="radio"
+                            name="postTimeMode"
+                            value="now"
+                            checked={form.postTimeMode === 'now'}
+                            onChange={(e) => handleFormChange('postTimeMode', e.target.value)}
+                          />
+                          <span>Now (+1 min)</span>
+                        </label>
+                        <label className="sm-post-time-option">
+                          <input
+                            type="radio"
+                            name="postTimeMode"
+                            value="set-time"
+                            checked={form.postTimeMode === 'set-time'}
+                            onChange={(e) => handleFormChange('postTimeMode', e.target.value)}
+                          />
+                          <span>Set Time</span>
+                        </label>
+                        {form.postTimeMode === 'set-time' && (
+                          <input
+                            type="datetime-local"
+                            value={form.postTimeValue}
+                            onChange={(e) => handleFormChange('postTimeValue', e.target.value)}
+                            className="sm-post-time-input"
+                          />
+                        )}
+                      </div>
+                    </div>
 
                     <div className="sm-form-actions sm-field-full">
                       <button type="submit" disabled={saving}>
@@ -497,7 +531,7 @@ export default function SocialMediaPage() {
                   {loadingMediaRows ? (
                     <div className="sm-empty">Loading media details...</div>
                   ) : mediaRows.length === 0 ? (
-                    <div className="sm-empty">No media rows found in `Images` table.</div>
+                    <div className="sm-empty">No media records found.</div>
                   ) : (
                     <div className="sm-media-layout">
                       <div className="sm-media-list">
@@ -511,6 +545,7 @@ export default function SocialMediaPage() {
                               <span>{row.hashtags || 'No hashtags'}</span>
                               <span>{row.approved || 'Pending'}</span>
                               <span>{row.aspectRatio || 'N/A'}</span>
+                              <span>Post: {formatDateTime(row.postTime)}</span>
                             </div>
                             <button
                               type="button"
@@ -543,22 +578,29 @@ export default function SocialMediaPage() {
                             )}
                           </div>
                           <div className="sm-media-details-grid">
-                            <div>
-                              <strong>Hashtags:</strong> {selectedMediaRow.hashtags || 'N/A'}
-                            </div>
-                            <div>
-                              <strong>Aspect Ratio:</strong> {selectedMediaRow.aspectRatio || 'N/A'}
-                            </div>
-                            <div>
-                              <strong>Approved:</strong> {selectedMediaRow.approved || 'N/A'}
-                            </div>
-                            <div>
-                              <strong>Created At:</strong> {formatDateTime(selectedMediaRow.createdAt)}
-                            </div>
-                            <div>
-                              <strong>Updated At:</strong> {formatDateTime(selectedMediaRow.updatedAt)}
-                            </div>
+                            <div><strong>Hashtags:</strong> {selectedMediaRow.hashtags || 'N/A'}</div>
+                            <div><strong>Aspect Ratio:</strong> {selectedMediaRow.aspectRatio || 'N/A'}</div>
+                            <div><strong>Status:</strong> {selectedMediaRow.approved || 'N/A'}</div>
+                            <div><strong>Post Type:</strong> {selectedMediaRow.postType || 'N/A'}</div>
+                            <div><strong>Post Status:</strong> {selectedMediaRow.postStatus || 'N/A'}</div>
+                            <div><strong>Post Time:</strong> {formatDateTime(selectedMediaRow.postTime)}</div>
+                            <div><strong>Created At:</strong> {formatDateTime(selectedMediaRow.createdAt)}</div>
+                            {selectedMediaRow.errorMessage && (
+                              <div><strong>Error:</strong> {selectedMediaRow.errorMessage}</div>
+                            )}
                           </div>
+                          {selectedMediaRow.publicUrl && (
+                            <div className="sm-media-view-post-wrap">
+                              <a
+                                href={selectedMediaRow.publicUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="sm-media-view-post-btn"
+                              >
+                                View Post
+                              </a>
+                            </div>
+                          )}
                           <div className="sm-media-details-desc">
                             <strong>Description:</strong> {selectedMediaRow.description || 'N/A'}
                           </div>
@@ -587,7 +629,6 @@ export default function SocialMediaPage() {
                           placeholder="Enter Blotato API key"
                         />
                       </label>
-
                       <label className="sm-field">
                         <span>Upload Post API</span>
                         <input
@@ -597,7 +638,6 @@ export default function SocialMediaPage() {
                           placeholder="Enter upload post API"
                         />
                       </label>
-
                       <label className="sm-field">
                         <span>Instagram</span>
                         <input
@@ -607,7 +647,6 @@ export default function SocialMediaPage() {
                           placeholder="Instagram account id"
                         />
                       </label>
-
                       <label className="sm-field">
                         <span>FB Account</span>
                         <input
@@ -617,7 +656,6 @@ export default function SocialMediaPage() {
                           placeholder="Facebook account id"
                         />
                       </label>
-
                       <label className="sm-field">
                         <span>FB Page</span>
                         <input
@@ -627,7 +665,6 @@ export default function SocialMediaPage() {
                           placeholder="Facebook page id"
                         />
                       </label>
-
                       <label className="sm-field">
                         <span>Youtube</span>
                         <input
@@ -637,7 +674,6 @@ export default function SocialMediaPage() {
                           placeholder="Youtube channel id"
                         />
                       </label>
-
                       <label className="sm-field">
                         <span>X</span>
                         <input
@@ -647,7 +683,6 @@ export default function SocialMediaPage() {
                           placeholder="X account id"
                         />
                       </label>
-
                       <label className="sm-field">
                         <span>Threads</span>
                         <input
@@ -657,7 +692,6 @@ export default function SocialMediaPage() {
                           placeholder="Threads account id"
                         />
                       </label>
-
                       <label className="sm-field">
                         <span>Region</span>
                         <input
@@ -667,16 +701,6 @@ export default function SocialMediaPage() {
                           placeholder="e.g. India"
                         />
                       </label>
-
-                      <label className="sm-field">
-                        <span>Time For Auto Input</span>
-                        <input
-                          type="time"
-                          value={accountForm.timeForAutoInput}
-                          onChange={(e) => handleAccountFormChange('timeForAutoInput', e.target.value)}
-                        />
-                      </label>
-
                       <label className="sm-field sm-field-full">
                         <span>KeyWords</span>
                         <textarea
@@ -686,14 +710,12 @@ export default function SocialMediaPage() {
                           rows={3}
                         />
                       </label>
-
                       {(accountCreatedAt || accountUpdatedAt) && (
                         <div className="sm-account-meta sm-field-full">
                           <span><strong>Created At:</strong> {formatDateTime(accountCreatedAt)}</span>
                           <span><strong>Updated At:</strong> {formatDateTime(accountUpdatedAt)}</span>
                         </div>
                       )}
-
                       <div className="sm-form-actions sm-field-full">
                         <button type="submit" disabled={savingAccount}>
                           {savingAccount ? 'Saving...' : 'Save Account Details'}

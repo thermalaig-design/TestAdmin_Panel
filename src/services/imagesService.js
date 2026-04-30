@@ -6,6 +6,9 @@ const IMAGES_TABLE = 'Images';
 function normalizeImageRow(row = {}) {
   const linkedPhoto = row.gallery_photo || null;
   const previewUrl = linkedPhoto?.public_url || linkedPhoto?.storage_path || null;
+  const approvedValue = String(row.Approved || '').trim().toLowerCase();
+  const rawPostStatus = String(row.postStatus || '').trim();
+  const normalizedPostStatus = approvedValue === 'posted' ? 'posted' : (rawPostStatus || null);
   return {
     id: row.id || '',
     galleryPhotoId: row.gallery_photo_id || null,
@@ -19,9 +22,28 @@ function normalizeImageRow(row = {}) {
     createdBy: row.created_by || null,
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || null,
+    postTime: row.postTime || null,
+    postType: row.postType || null,
+    postStatus: normalizedPostStatus,
+    blotatoSubmissionId: row.blotatoSubmissionId || null,
+    publicUrl: row.publicUrl || null,
+    errorMessage: row.errorMessage || null,
     raw: row,
   };
 }
+
+const IMAGES_SELECT = `
+  id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent,
+  Approved, created_by, created_at, updated_at, postTime, postType,
+  postStatus, blotatoSubmissionId, publicUrl, errorMessage,
+  gallery_photo:gallery_photos(public_url, storage_path)
+`.trim();
+
+const IMAGES_SELECT_NO_PHOTO = `
+  id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent,
+  Approved, created_by, created_at, updated_at, postTime, postType,
+  postStatus, blotatoSubmissionId, publicUrl, errorMessage
+`.trim();
 
 export async function fetchImages({ limit = 30 } = {}) {
   const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(100, Number(limit))) : 30;
@@ -30,7 +52,7 @@ export async function fetchImages({ limit = 30 } = {}) {
   return cachedQuery(cacheKey, async () => {
     const { data, error } = await supabase
       .from(IMAGES_TABLE)
-      .select('id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent, Approved, created_by, created_at, updated_at, gallery_photo:gallery_photos(public_url, storage_path)')
+      .select(IMAGES_SELECT)
       .order('created_at', { ascending: false })
       .limit(safeLimit);
 
@@ -67,7 +89,7 @@ export async function fetchPendingImagesByTrust(trustId, { limit = 100 } = {}) {
 
     const { data, error } = await supabase
       .from(IMAGES_TABLE)
-      .select('id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent, Approved, created_by, created_at, updated_at, gallery_photo:gallery_photos(public_url, storage_path)')
+      .select(IMAGES_SELECT)
       .in('gallery_photo_id', photoIds)
       .in('Approved', ['pending', 'Pending'])
       .order('created_at', { ascending: false })
@@ -94,7 +116,7 @@ export async function createImage(payload) {
   const { data, error } = await supabase
     .from(IMAGES_TABLE)
     .insert([payload])
-    .select('id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent, Approved, created_by, created_at, updated_at')
+    .select(IMAGES_SELECT_NO_PHOTO)
     .single();
 
   if (!error) invalidateCache('images:');
@@ -108,7 +130,7 @@ export async function updateImage(id, updates) {
     .from(IMAGES_TABLE)
     .update(updates)
     .eq('id', id)
-    .select('id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent, Approved, created_by, created_at, updated_at')
+    .select(IMAGES_SELECT_NO_PHOTO)
     .single();
 
   if (!error) invalidateCache('images:');
@@ -123,7 +145,7 @@ export async function updateImageApproval(id, approvedValue) {
     .from(IMAGES_TABLE)
     .update({ Approved: approvedValue })
     .eq('id', id)
-    .select('id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent, Approved, created_by, created_at, updated_at, gallery_photo:gallery_photos(public_url, storage_path)')
+    .select(IMAGES_SELECT)
     .single();
 
   if (!error) invalidateCache('images:');
