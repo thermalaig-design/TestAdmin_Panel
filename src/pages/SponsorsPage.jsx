@@ -395,7 +395,7 @@ export default function SponsorsPage() {
     const load = async () => {
       setLoading(true);
       setError('');
-      const { data: sponsorsData, error: sponsorsErr } = await fetchSponsors(trustId);
+      const { data: sponsorsData, error: sponsorsErr } = await fetchSponsors();
       if (sponsorsErr) setError(sponsorsErr.message || 'Unable to load sponsors.');
       setSponsors(sponsorsData || []);
       setLoading(false);

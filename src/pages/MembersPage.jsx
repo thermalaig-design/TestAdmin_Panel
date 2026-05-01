@@ -225,8 +225,11 @@ export default function MembersPage() {
 
       if (isCreateRoute) {
         setLoading(false);
-        const { data: directoryData, error: directoryError } = await fetchAllMembersDirectory(trustId);
+        const [{ data: directoryData, error: directoryError }, { data: registeredData, error: registeredError }] =
+          await Promise.all([fetchAllMembersDirectory(trustId), fetchRegisteredMembersByTrust(trustId)]);
         if (cancelled) return;
+        if (registeredError) setError(registeredError.message || 'Unable to load registered members.');
+        setRegisteredMembers(registeredData || []);
         if (directoryError) setError(directoryError.message || 'Unable to load members directory.');
         setDirectoryMembers(directoryData || []);
         setLoadingDirectory(false);
@@ -450,23 +453,29 @@ export default function MembersPage() {
   };
 
   const handlePickMemberFromMobileSearch = (member) => {
+    const existingRegistration = (registeredMembers || []).find(
+      (item) => String(item.member_id || '') === String(member.member_id || '')
+    );
     setSelectedCreateMemberId(member.member_id || null);
     setSelectedId(null);
     setSaveError('');
     setForm({
       name: member.name || '',
       company_name: member.company_name || '',
-      membership_number: '',
-      role: '',
-      joined_date: '',
+      membership_number: existingRegistration?.membership_number || '',
+      role: existingRegistration?.role || '',
+      joined_date: existingRegistration?.joined_date || '',
       mobile: sanitizeDigits(member.mobile),
       email: member.email || '',
       address_home: member.address_home || '',
       address_office: member.address_office || '',
       resident_landline: sanitizeDigits(member.resident_landline),
       office_landline: sanitizeDigits(member.office_landline),
-      is_active: true,
+      is_active: existingRegistration?.is_active !== false,
     });
+    setUseCustomMainRole(
+      !!existingRegistration?.role && !trustRoleOptions.includes(String(existingRegistration.role || '').trim())
+    );
     setCreateFlowStep('form');
   };
 

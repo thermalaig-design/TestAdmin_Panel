@@ -28,6 +28,7 @@ function normalizeImageRow(row = {}) {
     blotatoSubmissionId: row.blotatoSubmissionId || null,
     publicUrl: row.publicUrl || null,
     errorMessage: row.errorMessage || null,
+    platforms: row.platforms || null,
     raw: row,
   };
 }
@@ -35,14 +36,14 @@ function normalizeImageRow(row = {}) {
 const IMAGES_SELECT = `
   id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent,
   Approved, created_by, created_at, updated_at, postTime, postType,
-  postStatus, blotatoSubmissionId, publicUrl, errorMessage,
+  postStatus, blotatoSubmissionId, publicUrl, errorMessage, platforms,
   gallery_photo:gallery_photos(public_url, storage_path)
 `.trim();
 
 const IMAGES_SELECT_NO_PHOTO = `
   id, gallery_photo_id, Title, Hashtags, Description, aspectRatio, Intent,
   Approved, created_by, created_at, updated_at, postTime, postType,
-  postStatus, blotatoSubmissionId, publicUrl, errorMessage
+  postStatus, blotatoSubmissionId, publicUrl, errorMessage, platforms
 `.trim();
 
 export async function fetchImages({ limit = 30 } = {}) {

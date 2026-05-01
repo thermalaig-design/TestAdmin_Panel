@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
+import { supabase } from '../lib/supabase';
 import { createImage, fetchImages, fetchImagesCount } from '../services/imagesService';
 import {
   fetchSocialMediaAccountByTrust,
@@ -40,6 +41,7 @@ function getInitialForm() {
     aspectRatio: '4:5',
     postTimeMode: 'now',
     postTimeValue: '',
+    platforms: { instagram: true, facebook: true },
   };
 }
 
@@ -103,6 +105,7 @@ export default function SocialMediaPage() {
   const [loadingAccount, setLoadingAccount] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
   const [error, setError] = useState('');
+  const [generating, setGenerating] = useState(false); // ✅ AI generate state
 
   useEffect(() => {
     let cancelled = false;
@@ -203,8 +206,46 @@ export default function SocialMediaPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handlePlatformChange = (platform, checked) => {
+    setForm((prev) => ({
+      ...prev,
+      platforms: { ...prev.platforms, [platform]: checked },
+    }));
+  };
+
   const handleAccountFormChange = (field, value) => {
     setAccountForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // ✅ AI Generate Caption
+  const handleGenerateCaption = async () => {
+    if (!selectedPhotoUrl) {
+      setError('No photo selected.');
+      return;
+    }
+    setGenerating(true);
+    setError('');
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        'generate-image-caption',
+        {
+          body: { imageUrl: selectedPhotoUrl },
+        }
+      );
+      if (invokeError) throw invokeError;
+      if (data?.error) throw new Error(data.error);
+      setForm((prev) => ({
+        ...prev,
+        title: data.title || prev.title,
+        hashtags: data.hashtags || prev.hashtags,
+        description: data.description || prev.description,
+      }));
+    } catch (err) {
+      const message =
+        err?.message || 'Unauthorized request. Please login again and retry.';
+      setError('AI generation failed: ' + message);
+    }
+    setGenerating(false);
   };
 
   const handleCreateImage = async (event) => {
@@ -218,9 +259,12 @@ export default function SocialMediaPage() {
       setError('Selected photo is missing. Please open this page from gallery.');
       return;
     }
-    // ✅ Set Time mode mein time required hai
     if (form.postTimeMode === 'set-time' && !form.postTimeValue) {
       setError('Please select a scheduled date and time.');
+      return;
+    }
+    if (!form.platforms.instagram && !form.platforms.facebook) {
+      setError('Please select at least one platform.');
       return;
     }
 
@@ -234,12 +278,13 @@ export default function SocialMediaPage() {
       Hashtags: form.hashtags.trim() || null,
       Description: form.description.trim() || null,
       aspectRatio: form.aspectRatio.trim() || null,
-      postType: form.postTimeMode,         // ✅ now / set-time
-      Approved: 'approved',               // ✅ seedha approved
+      postType: form.postTimeMode,
+      Approved: 'approved',
       postTime:
         form.postTimeMode === 'set-time'
           ? new Date(form.postTimeValue).toISOString()
-          : new Date(Date.now() + 60 * 1000).toISOString(), // ✅ +1 min
+          : new Date(Date.now() + 60 * 1000).toISOString(),
+      platforms: JSON.stringify(form.platforms),
       created_by: superuserId || null,
     };
 
@@ -410,6 +455,21 @@ export default function SocialMediaPage() {
                   </div>
 
                   <form className="sm-form-grid" onSubmit={handleCreateImage}>
+
+                    {/* ✅ AI Generate Button */}
+                    {selectedPhotoUrl && (
+                      <div className="sm-field-full sm-ai-btn-wrap">
+                        <button
+                          type="button"
+                          className="sm-ai-generate-btn"
+                          onClick={handleGenerateCaption}
+                          disabled={generating}
+                        >
+                          {generating ? '✨ Generating...' : '✨ Generate with AI'}
+                        </button>
+                      </div>
+                    )}
+
                     <label className="sm-field">
                       <span>Title *</span>
                       <input
@@ -450,6 +510,29 @@ export default function SocialMediaPage() {
                         placeholder="4:5 / 1:1 / 16:9"
                       />
                     </label>
+
+                    {/* ✅ Platform Selection */}
+                    <div className="sm-field sm-field-full">
+                      <span>Post To</span>
+                      <div className="sm-post-time-row">
+                        <label className="sm-post-time-option">
+                          <input
+                            type="checkbox"
+                            checked={form.platforms.instagram}
+                            onChange={(e) => handlePlatformChange('instagram', e.target.checked)}
+                          />
+                          <span>Instagram</span>
+                        </label>
+                        <label className="sm-post-time-option">
+                          <input
+                            type="checkbox"
+                            checked={form.platforms.facebook}
+                            onChange={(e) => handlePlatformChange('facebook', e.target.checked)}
+                          />
+                          <span>Facebook</span>
+                        </label>
+                      </div>
+                    </div>
 
                     {/* ✅ Post Time Section */}
                     <div className="sm-field sm-field-full">
@@ -570,6 +653,16 @@ export default function SocialMediaPage() {
                             <div><strong>Post Status:</strong> {selectedMediaRow.postStatus || 'N/A'}</div>
                             <div><strong>Post Time:</strong> {formatDateTime(selectedMediaRow.postTime)}</div>
                             <div><strong>Created At:</strong> {formatDateTime(selectedMediaRow.createdAt)}</div>
+                            <div><strong>Platforms:</strong> {selectedMediaRow.platforms
+                              ? (() => {
+                                  try {
+                                    const p = JSON.parse(selectedMediaRow.platforms);
+                                    return [p.instagram && 'Instagram', p.facebook && 'Facebook']
+                                      .filter(Boolean).join(', ') || 'N/A';
+                                  } catch { return 'N/A'; }
+                                })()
+                              : 'N/A'}
+                            </div>
                             {selectedMediaRow.errorMessage && (
                               <div><strong>Error:</strong> {selectedMediaRow.errorMessage}</div>
                             )}

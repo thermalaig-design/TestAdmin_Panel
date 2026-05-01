@@ -568,3 +568,22 @@
     font-size: 22px;
   }
 }
+.sm-ai-btn-wrap {
+  margin-bottom: 8px;
+}
+
+.sm-ai-generate-btn {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  width: 100%;
+}
+
+.sm-ai-generate-btn:hover { opacity: 0.9; }
+.sm-ai-generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }

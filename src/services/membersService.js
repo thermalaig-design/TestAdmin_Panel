@@ -75,7 +75,7 @@ function getMemberUniqueId(row = {}) {
 }
 
 function getRegisteredMemberId(row = {}) {
-  return pickFirst(row, ['member_id', 'members_id']);
+  return pickFirst(row, ['member_id', 'members_id', 'Member ID', 'memberId']);
 }
 
 function getTrustId(row = {}) {
@@ -83,7 +83,7 @@ function getTrustId(row = {}) {
 }
 
 function getMembershipNumber(row = {}) {
-  return pickFirst(row, ['membership_number', 'Membership number']);
+  return pickFirst(row, ['membership_number', 'Membership number', 'Membership Number', 'membership no', 'membership_no']);
 }
 
 function chunkValues(values = [], size = MEMBER_FETCH_CHUNK_SIZE) {
@@ -150,9 +150,9 @@ function normalizeRegisteredRow(row = {}, memberRow = {}, currentTrustId = null)
     trust_id: registrationTrustId,
     member_id: getRegisteredMemberId(row) || normalizedMember.member_id,
     membership_number: getMembershipNumber(row) || '',
-    role: pickFirst(row, ['role']) || '',
-    joined_date: pickFirst(row, ['joined_date']) || '',
-    is_active: pickFirst(row, ['is_active']) !== false,
+    role: pickFirst(row, ['role', 'Role', 'role_name', 'designation']) || '',
+    joined_date: pickFirst(row, ['joined_date', 'Joined Date', 'joining_date']) || '',
+    is_active: pickFirst(row, ['is_active', 'Is Active', 'active']) !== false,
     is_editable: isEditable,
     member_type: isEditable ? 'my' : 'others',
   };
