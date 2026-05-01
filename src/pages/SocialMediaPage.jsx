@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
@@ -38,6 +38,7 @@ function getInitialForm() {
     title: '',
     hashtags: '',
     description: '',
+    prompt: '', // ✅ prompt field added
     aspectRatio: '4:5',
     postTimeMode: 'now',
     postTimeValue: '',
@@ -105,7 +106,9 @@ export default function SocialMediaPage() {
   const [loadingAccount, setLoadingAccount] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
   const [error, setError] = useState('');
-  const [generating, setGenerating] = useState(false); // ✅ AI generate state
+  const [generating, setGenerating] = useState(false);
+  const [generateStatus, setGenerateStatus] = useState('');
+  const aiCaptionCacheRef = useRef(new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -217,33 +220,61 @@ export default function SocialMediaPage() {
     setAccountForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  // ✅ AI Generate Caption
+  // ✅ AI Generate Caption — image + prompt dono bhejta hai
   const handleGenerateCaption = async () => {
     if (!selectedPhotoUrl) {
       setError('No photo selected.');
       return;
     }
     setGenerating(true);
+    setGenerateStatus('Analyzing image and preparing summary...');
     setError('');
     try {
+      const promptValue = form.prompt.trim();
+      const cacheKey = `${selectedPhotoUrl}__${promptValue.toLowerCase()}`;
+      const cached = aiCaptionCacheRef.current.get(cacheKey);
+      if (cached) {
+        setForm((prev) => ({
+          ...prev,
+          title: cached.title || prev.title,
+          hashtags: cached.hashtags || prev.hashtags,
+          description: cached.description || prev.description,
+        }));
+        setGenerateStatus('Summary ready (quick cache).');
+        window.setTimeout(() => setGenerateStatus(''), 1800);
+        setGenerating(false);
+        return;
+      }
+
       const { data, error: invokeError } = await supabase.functions.invoke(
         'generate-image-caption',
         {
-          body: { imageUrl: selectedPhotoUrl },
+          body: {
+            imageUrl: selectedPhotoUrl,
+            prompt: promptValue || null, // ✅ prompt bhi bhej rahe hain
+          },
         }
       );
       if (invokeError) throw invokeError;
       if (data?.error) throw new Error(data.error);
+      aiCaptionCacheRef.current.set(cacheKey, {
+        title: data.title || '',
+        hashtags: data.hashtags || '',
+        description: data.description || '',
+      });
       setForm((prev) => ({
         ...prev,
         title: data.title || prev.title,
         hashtags: data.hashtags || prev.hashtags,
         description: data.description || prev.description,
       }));
+      setGenerateStatus('Summary generated successfully.');
+      window.setTimeout(() => setGenerateStatus(''), 1800);
     } catch (err) {
       const message =
         err?.message || 'Unauthorized request. Please login again and retry.';
       setError('AI generation failed: ' + message);
+      setGenerateStatus('');
     }
     setGenerating(false);
   };
@@ -285,6 +316,7 @@ export default function SocialMediaPage() {
           ? new Date(form.postTimeValue).toISOString()
           : new Date(Date.now() + 60 * 1000).toISOString(),
       platforms: JSON.stringify(form.platforms),
+      prompt: form.prompt.trim() || null, // ✅ DB mein bhi save ho raha hai
       created_by: superuserId || null,
     };
 
@@ -454,7 +486,19 @@ export default function SocialMediaPage() {
                     <div><strong>Folder:</strong> {selectedFolder || 'N/A'}</div>
                   </div>
 
-                  <form className="sm-form-grid" onSubmit={handleCreateImage}>
+                  <form className={`sm-form-grid ${generating ? 'is-generating' : ''}`} onSubmit={handleCreateImage} aria-busy={generating ? 'true' : 'false'}>
+
+                    {/* ✅ Prompt Field */}
+                    <label className="sm-field sm-field-full">
+                      <span>AI Prompt (optional)</span>
+                      <textarea
+                        value={form.prompt}
+                        onChange={(e) => handleFormChange('prompt', e.target.value)}
+                        placeholder="e.g. Write in Hindi, focus on spiritual theme, keep it short..."
+                        rows={2}
+                        disabled={generating}
+                      />
+                    </label>
 
                     {/* ✅ AI Generate Button */}
                     {selectedPhotoUrl && (
@@ -465,8 +509,17 @@ export default function SocialMediaPage() {
                           onClick={handleGenerateCaption}
                           disabled={generating}
                         >
-                          {generating ? '✨ Generating...' : '✨ Generate with AI'}
+                          {generating ? 'Generating Summary...' : 'Generate with AI'}
                         </button>
+                        {generating && (
+                          <div className="sm-ai-loading-note" role="status" aria-live="polite">
+                            <span className="sm-spinner" aria-hidden="true" />
+                            <span>{generateStatus || 'Generating summary...'}</span>
+                          </div>
+                        )}
+                        {!generating && generateStatus && (
+                          <div className="sm-ai-done-note" role="status" aria-live="polite">{generateStatus}</div>
+                        )}
                       </div>
                     )}
 
@@ -478,6 +531,7 @@ export default function SocialMediaPage() {
                         onChange={(e) => handleFormChange('title', e.target.value)}
                         placeholder="Enter title"
                         required
+                        disabled={generating}
                       />
                     </label>
 
@@ -488,6 +542,7 @@ export default function SocialMediaPage() {
                         value={form.hashtags}
                         onChange={(e) => handleFormChange('hashtags', e.target.value)}
                         placeholder="#event #trust"
+                        disabled={generating}
                       />
                     </label>
 
@@ -498,6 +553,7 @@ export default function SocialMediaPage() {
                         onChange={(e) => handleFormChange('description', e.target.value)}
                         placeholder="Write description"
                         rows={4}
+                        disabled={generating}
                       />
                     </label>
 
@@ -508,10 +564,10 @@ export default function SocialMediaPage() {
                         value={form.aspectRatio}
                         onChange={(e) => handleFormChange('aspectRatio', e.target.value)}
                         placeholder="4:5 / 1:1 / 16:9"
+                        disabled={generating}
                       />
                     </label>
 
-                    {/* ✅ Platform Selection */}
                     <div className="sm-field sm-field-full">
                       <span>Post To</span>
                       <div className="sm-post-time-row">
@@ -520,6 +576,7 @@ export default function SocialMediaPage() {
                             type="checkbox"
                             checked={form.platforms.instagram}
                             onChange={(e) => handlePlatformChange('instagram', e.target.checked)}
+                            disabled={generating}
                           />
                           <span>Instagram</span>
                         </label>
@@ -528,13 +585,13 @@ export default function SocialMediaPage() {
                             type="checkbox"
                             checked={form.platforms.facebook}
                             onChange={(e) => handlePlatformChange('facebook', e.target.checked)}
+                            disabled={generating}
                           />
                           <span>Facebook</span>
                         </label>
                       </div>
                     </div>
 
-                    {/* ✅ Post Time Section */}
                     <div className="sm-field sm-field-full">
                       <span>Post Time</span>
                       <div className="sm-post-time-row">
@@ -545,6 +602,7 @@ export default function SocialMediaPage() {
                             value="now"
                             checked={form.postTimeMode === 'now'}
                             onChange={(e) => handleFormChange('postTimeMode', e.target.value)}
+                            disabled={generating}
                           />
                           <span>Now (+1 min)</span>
                         </label>
@@ -555,6 +613,7 @@ export default function SocialMediaPage() {
                             value="set-time"
                             checked={form.postTimeMode === 'set-time'}
                             onChange={(e) => handleFormChange('postTimeMode', e.target.value)}
+                            disabled={generating}
                           />
                           <span>Set Time</span>
                         </label>
@@ -564,13 +623,14 @@ export default function SocialMediaPage() {
                             value={form.postTimeValue}
                             onChange={(e) => handleFormChange('postTimeValue', e.target.value)}
                             className="sm-post-time-input"
+                            disabled={generating}
                           />
                         )}
                       </div>
                     </div>
 
                     <div className="sm-form-actions sm-field-full">
-                      <button type="submit" disabled={saving}>
+                      <button type="submit" disabled={saving || generating}>
                         {saving ? 'Sending...' : 'Send to Social Media'}
                       </button>
                     </div>
@@ -798,6 +858,15 @@ export default function SocialMediaPage() {
                         <button type="submit" disabled={savingAccount}>
                           {savingAccount ? 'Saving...' : 'Save Account Details'}
                         </button>
+                        {generating && (
+                          <div className="sm-ai-loading-note" role="status" aria-live="polite">
+                            <span className="sm-spinner" aria-hidden="true" />
+                            <span>{generateStatus || 'Generating summary...'}</span>
+                          </div>
+                        )}
+                        {!generating && generateStatus && (
+                          <div className="sm-ai-done-note" role="status" aria-live="polite">{generateStatus}</div>
+                        )}
                       </div>
                     </form>
                   )}
@@ -810,3 +879,4 @@ export default function SocialMediaPage() {
     </div>
   );
 }
+

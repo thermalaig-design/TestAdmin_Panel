@@ -204,6 +204,10 @@
   gap: 12px;
 }
 
+.sm-form-grid.is-generating {
+  opacity: 0.88;
+}
+
 .sm-field {
   display: grid;
   gap: 6px;
@@ -587,3 +591,33 @@
 
 .sm-ai-generate-btn:hover { opacity: 0.9; }
 .sm-ai-generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.sm-ai-loading-note {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #3730a3;
+  font-weight: 600;
+}
+
+.sm-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(79, 70, 229, 0.28);
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: sm-spin 0.8s linear infinite;
+}
+
+.sm-ai-done-note {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #166534;
+  font-weight: 600;
+}
+
+@keyframes sm-spin {
+  to { transform: rotate(360deg); }
+}

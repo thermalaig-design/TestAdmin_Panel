@@ -407,10 +407,39 @@ const MODULE_CARDS = [
 
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust', 'card-social-media-account-details']);
-const DASHBOARD_CARD_IDS = new Set(['card-user-management', 'card-notifications', 'card-share-app', 'card-achievements']);
+const DASHBOARD_CARD_IDS = new Set(['card-user-management']);
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
-const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-donations', 'card-members']);
+const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-donations', 'card-members', 'card-achievements']);
 const MENU_MODULE_CARDS = [
+  {
+    id: 'card-notifications',
+    label: 'Notifications',
+    description: 'Manage alerts and notifications',
+    route: '/notification',
+    gradient: 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="18.5" cy="5.5" r="2.2" fill="rgba(255,255,255,0.9)" />
+      </svg>
+    ),
+  },
+  {
+    id: 'card-share-app',
+    label: 'Share App',
+    description: 'Open share app module',
+    route: '/share-app',
+    gradient: 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+        <circle cx="6" cy="12" r="2.2" stroke="white" strokeWidth="1.8" />
+        <circle cx="18" cy="6" r="2.2" stroke="white" strokeWidth="1.8" />
+        <circle cx="18" cy="18" r="2.2" stroke="white" strokeWidth="1.8" />
+        <path d="M8 11l7.6-4.1M8 13l7.6 4.1" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
   {
     id: 'menu-card-contact-us',
     label: 'Contact Us',
