@@ -385,21 +385,6 @@ export default function SocialMediaPage() {
         <PageHeader
           title={pageTitle}
           subtitle={pageSubtitle}
-          right={
-            isAccountsDetailsRoute ? (
-              <button
-                type="button"
-                className="sm-queue-btn"
-                onClick={() =>
-                  navigate('/social-media/approvals', {
-                    state: { userName, trust, superuserId, sidebarNavKey: currentSidebarNavKey },
-                  })
-                }
-              >
-                Open Approval Queue
-              </button>
-            ) : null
-          }
           onBack={() =>
             navigate(isCreateRoute ? '/gallery' : '/dashboard', {
               state: { userName, trust, superuserId, sidebarNavKey: currentSidebarNavKey },

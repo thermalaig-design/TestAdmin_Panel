@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Sidebar from '../components/Sidebar';
@@ -175,7 +175,7 @@ export default function MembersPage() {
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
   const isCreateRoute = location.pathname === MEMBERS_CREATE_PATH;
-  const cachedMembers = readMembersCache(trustId);
+  const cachedMembers = isCreateRoute ? null : readMembersCache(trustId);
 
   const [registeredMembers, setRegisteredMembers] = useState(() => cachedMembers?.registeredMembers || []);
   const [directoryMembers, setDirectoryMembers] = useState(() => cachedMembers?.directoryMembers || []);
@@ -198,6 +198,7 @@ export default function MembersPage() {
   const [detailId, setDetailId] = useState(null);
   const [createFlowStep, setCreateFlowStep] = useState(isCreateRoute ? 'mobile-search' : 'form');
   const [createMobileQuery, setCreateMobileQuery] = useState('');
+  const deferredCreateMobileQuery = useDeferredValue(createMobileQuery);
   const [selectedCreateMemberId, setSelectedCreateMemberId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [useCustomMainRole, setUseCustomMainRole] = useState(false);
@@ -222,6 +223,16 @@ export default function MembersPage() {
       setError('');
       setLoadingDirectory(true);
 
+      if (isCreateRoute) {
+        setLoading(false);
+        const { data: directoryData, error: directoryError } = await fetchAllMembersDirectory(trustId);
+        if (cancelled) return;
+        if (directoryError) setError(directoryError.message || 'Unable to load members directory.');
+        setDirectoryMembers(directoryData || []);
+        setLoadingDirectory(false);
+        return;
+      }
+
       const directoryPromise = fetchAllMembersDirectory(trustId);
       const { data: registeredData, error: registeredError } = await fetchRegisteredMembersByTrust(trustId);
       if (cancelled) return;
@@ -244,7 +255,7 @@ export default function MembersPage() {
     return () => {
       cancelled = true;
     };
-  }, [trustId]);
+  }, [trustId, isCreateRoute]);
 
   useEffect(() => {
     if (!trustId) return;
@@ -271,39 +282,51 @@ export default function MembersPage() {
     [registeredMembers, detailId]
   );
 
-  const filteredRegisteredMembers = useMemo(
-    () => registeredMembers.filter((member) => !hiddenIds.has(member.id) && matchesMemberSearch(member, searchTerm)),
-    [registeredMembers, hiddenIds, searchTerm]
-  );
+  const filteredRegisteredMembers = useMemo(() => {
+    if (isCreateRoute) return [];
+    return registeredMembers.filter((member) => !hiddenIds.has(member.id) && matchesMemberSearch(member, searchTerm));
+  }, [isCreateRoute, registeredMembers, hiddenIds, searchTerm]);
 
-  const sortedRegisteredMembers = useMemo(
-    () => [...filteredRegisteredMembers].sort((left, right) => compareMembers(left, right, registeredSortBy)),
-    [filteredRegisteredMembers, registeredSortBy]
-  );
+  const sortedRegisteredMembers = useMemo(() => {
+    if (isCreateRoute) return [];
+    return [...filteredRegisteredMembers].sort((left, right) => compareMembers(left, right, registeredSortBy));
+  }, [isCreateRoute, filteredRegisteredMembers, registeredSortBy]);
 
   const filteredDirectoryMembers = useMemo(() => {
+    if (isCreateRoute) return directoryMembers;
     return directoryMembers.filter((member) => matchesMemberSearch(member, searchTerm));
-  }, [directoryMembers, searchTerm]);
+  }, [isCreateRoute, directoryMembers, searchTerm]);
 
-  const sortedDirectoryMembers = useMemo(
-    () => [...filteredDirectoryMembers].sort((left, right) => compareMembers(left, right, 'name_asc')),
-    [filteredDirectoryMembers]
-  );
+  const sortedDirectoryMembers = useMemo(() => {
+    if (isCreateRoute) return filteredDirectoryMembers;
+    return [...filteredDirectoryMembers].sort((left, right) => compareMembers(left, right, 'name_asc'));
+  }, [isCreateRoute, filteredDirectoryMembers]);
+  const directoryMobilePrefixIndex = useMemo(() => {
+    const index = new Map();
+    for (const member of sortedDirectoryMembers) {
+      const rawDigits = sanitizeDigits(member.mobile);
+      if (!rawDigits) continue;
+      const last10 = rawDigits.slice(-10);
+      if (last10.length !== 10) continue;
+      for (let length = 1; length <= 10; length += 1) {
+        const key = last10.slice(0, length);
+        if (!index.has(key)) index.set(key, []);
+        index.get(key).push(member);
+      }
+    }
+    return index;
+  }, [sortedDirectoryMembers]);
   const createMobileMatches = useMemo(() => {
-    const digits = sanitizeDigits(createMobileQuery);
+    const digits = sanitizeDigits(deferredCreateMobileQuery);
     if (!digits) return [];
-    return sortedDirectoryMembers.filter((member) => {
-      const memberMobile = sanitizeDigits(member.mobile);
-      if (!memberMobile) return false;
-      return memberMobile === digits || memberMobile.endsWith(digits);
-    });
-  }, [createMobileQuery, sortedDirectoryMembers]);
+    return directoryMobilePrefixIndex.get(digits) || [];
+  }, [deferredCreateMobileQuery, directoryMobilePrefixIndex]);
   const selectedCreateMember = useMemo(
     () => createMobileMatches.find((member) => member.member_id === selectedCreateMemberId) || null,
     [createMobileMatches, selectedCreateMemberId]
   );
   const createMobileDigits = sanitizeDigits(createMobileQuery);
-  const isCreateMobileSearchReady = createMobileDigits.length === 10;
+  const isCreateMobileSearchReady = createMobileDigits.length > 0;
   const isEditingExistingMember = !!selectedMember?.id;
   const isUsingExistingMemberInCreateFlow =
     isCreateRoute && createFlowStep === 'form' && !!selectedCreateMember?.member_id;
@@ -593,7 +616,7 @@ export default function MembersPage() {
               : [toDirectoryMember(finalData), ...prev];
           });
           if (isCreateRoute) {
-            navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust } });
+            navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust, openPicker: true } });
           } else {
             setSelectedId(finalData.id);
             setShowForm(false);
@@ -642,7 +665,7 @@ export default function MembersPage() {
           subtitle="Manage registered members for the current trust"
           onBack={() => {
             if (isCreateRoute) {
-              navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust } });
+              navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust, openPicker: true } });
               return;
             }
             navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } });
@@ -807,15 +830,11 @@ export default function MembersPage() {
                           inputMode="numeric"
                           pattern="[0-9]*"
                           placeholder="Enter mobile number"
-                          onChange={(e) => setCreateMobileQuery(sanitizeDigits(e.target.value))}
+                          onChange={(e) => setCreateMobileQuery(sanitizeDigits(e.target.value).slice(0, 10))}
                         />
                       </label>
                     </div>
                   </div>
-
-                  {createMobileDigits.length > 0 && !isCreateMobileSearchReady && (
-                    <div className="sp-modal-empty">Enter full 10-digit mobile number to search.</div>
-                  )}
 
                   {isCreateMobileSearchReady && (
                     <div className="sp-modal-list">
@@ -866,13 +885,13 @@ export default function MembersPage() {
                   )}
                   {isCreateMobileSearchReady && !loadingDirectory && (
                     <div className="sp-form-actions">
-                      <button
-                        className="sp-primary"
-                        type="button"
-                        onClick={() => openCreateFormFromMobileSearch(createMobileQuery)}
-                      >
-                        Create New Member
-                      </button>
+                        <button
+                          className="sp-primary"
+                          type="button"
+                          onClick={() => openCreateFormFromMobileSearch(createMobileQuery)}
+                        >
+                          Create New Member
+                        </button>
                     </div>
                   )}
                 </div>
@@ -1016,7 +1035,7 @@ export default function MembersPage() {
                     className="sp-secondary"
                     onClick={() => {
                       if (isCreateRoute) {
-                        navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust } });
+                        navigate(MEMBERS_LANDING_PATH, { replace: true, state: { userName, trust, openPicker: true } });
                         return;
                       }
                       setShowForm(false);

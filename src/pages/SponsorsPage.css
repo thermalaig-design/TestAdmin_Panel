@@ -364,6 +364,12 @@
   gap: 8px;
   text-align: left;
   cursor: pointer;
+  overflow: hidden;
+}
+
+.sp-left-item-body {
+  min-width: 0;
+  width: 100%;
 }
 
 .sp-left-item.active {
@@ -401,6 +407,8 @@
 }
 
 .sp-left-item-sub {
+  display: block;
+  max-width: 100%;
   font-size: 11px;
   color: #6b7280;
   white-space: nowrap;
@@ -590,6 +598,7 @@
   transition: transform 0.2s ease, border-color 0.2s ease;
   min-height: 108px;
   width: 100%;
+  overflow: hidden;
 }
 
 .sp-card.my {
@@ -612,6 +621,7 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .sp-card-badge {
@@ -637,6 +647,8 @@
 
 .sp-card-body {
   grid-column: 2 / -1;
+  min-width: 0;
+  width: 100%;
 }
 
 .sp-card-avatar {
@@ -663,11 +675,19 @@
   font-weight: 800;
   font-size: 18px;
   color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sp-card-sub {
+  display: block;
+  max-width: 100%;
   font-size: 14px;
   color: #6B7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sp-card-tag {
@@ -1545,5 +1565,31 @@
 
   .sp-role-tabs {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 981px) {
+  .sp-left-panel {
+    position: static;
+    min-height: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .sp-members-scroll-area {
+    flex: none;
+    min-height: auto;
+  }
+
+  .sp-left-list {
+    overflow: visible;
+    max-height: none;
+    padding-right: 0;
+  }
+
+  .sp-left-pagination {
+    position: static;
+    margin-top: 8px;
   }
 }

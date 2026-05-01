@@ -598,6 +598,11 @@ export default function MemberProfilePage() {
     setShowPicker(true);
   }, [location.state, trustId]);
 
+  useEffect(() => {
+    if (!showPicker) return;
+    import('./MembersPage');
+  }, [showPicker]);
+
   const ensureDirectoryMembersLoaded = async (page = 1) => {
     if (!trustId) return;
     if (loadingDirectory) return;
@@ -1193,8 +1198,6 @@ export default function MemberProfilePage() {
   };
 
   const openNewMemberForm = () => {
-    setShowPicker(false);
-    setShowRegisterForm(false);
     navigate('/member/create_member', { state: { userName, trust } });
   };
 
