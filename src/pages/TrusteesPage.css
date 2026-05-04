@@ -6,6 +6,21 @@
   min-height: 100vh;
   background: #F5F7FF;
   font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+.tp-root .dash-topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 18px;
+  padding: 16px 40px !important;
+  box-sizing: border-box;
+}
+
+.tp-root .dash-content {
+  padding: 28px 40px !important;
+  box-sizing: border-box;
 }
 
 /* ============================================================
@@ -50,6 +65,8 @@
   min-width: 0;
   flex-wrap: nowrap;
   width: auto !important;
+  flex: 0 1 auto;
+  max-width: 62%;
 }
 
 .tp-topbar-titles {
@@ -58,6 +75,98 @@
   justify-content: center;
   min-width: 0;
   white-space: nowrap;
+}
+
+.tp-page-title {
+  margin: 0;
+  font-family: 'Poppins', sans-serif;
+  font-size: clamp(22px, 2.2vw, 26px);
+  font-weight: 800;
+  color: #1E1F3B;
+  letter-spacing: -0.3px;
+  line-height: 1.15;
+}
+
+.tp-page-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #9CA3AF;
+}
+
+.tp-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.tp-search-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: clamp(260px, 32vw, 460px);
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(99, 102, 241, 0.16);
+  background: #F8FAFF;
+  color: #9CA3AF;
+}
+
+.tp-search-box.focused {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.tp-search-input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  min-width: 0;
+  font-size: 14px;
+  color: #1E1F3B;
+}
+
+.tp-search-input::placeholder {
+  color: #9CA3AF;
+}
+
+.tp-avatar-wrap {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tp-avatar-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  color: #fff;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tp-avatar-online {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #10B981;
+  border: 2px solid #fff;
 }
 
 /* ============================================================
@@ -76,6 +185,7 @@
   box-shadow: 0 16px 48px rgba(99, 102, 241, 0.35);
   overflow: hidden;
   animation: cardPop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  margin-bottom: 22px;
 }
 
 /* Decorative orbs */
@@ -296,14 +406,14 @@
 .tp-info-grid {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
   animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
 }
 
 .tp-info-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tp-info-group-head {
@@ -311,7 +421,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 2px;
+  padding: 2px 2px 0;
 }
 
 .tp-info-group-head h3 {
@@ -332,7 +442,7 @@
 .tp-info-group-cards {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .tp-info-card {
@@ -851,28 +961,112 @@
 }
 
 @media (max-width: 900px) {
+  .tp-root .dash-topbar {
+    flex-wrap: wrap;
+    padding: 14px 20px !important;
+    gap: 12px;
+  }
+  .tp-root .dash-content {
+    padding: 18px 20px !important;
+  }
+  .tp-topbar-left {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .tp-topbar-right {
+    width: 100%;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+  .tp-search-box {
+    width: min(100%, 460px);
+  }
   .tp-hero-card { flex-wrap: wrap; padding: 28px; min-height: 130px; }
   .tp-hero-stats { flex: 1 1 100%; justify-content: center; }
 }
 
 @media (max-width: 768px) {
+  .tp-root .dash-topbar {
+    padding-left: 72px !important;
+    padding-right: 14px !important;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .tp-root,
+  .dash-main,
+  .dash-content {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .tp-topbar-right {
+    width: 100%;
+    min-width: 0;
+    gap: 10px;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+
+  .tp-topbar-right .tp-search-box {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .tp-topbar-right .tp-search-input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .tp-topbar-left {
+    width: 100%;
+    max-width: 100%;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+
+  .tp-topbar-titles {
+    min-width: 0;
+    white-space: normal;
+  }
+
   .tp-hero-card { flex-direction: column; align-items: flex-start; padding: 24px; min-height: 0; }
   .tp-hero-name { font-size: 18px; }
+  .tp-page-title { font-size: 22px; }
+  .tp-page-subtitle { font-size: 12px; }
   .tp-info-group-head { flex-direction: column; align-items: flex-start; gap: 4px; }
-  .topbar-left {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
   .tp-back-btn {
     margin-right: 0;
+    padding: 12px 16px;
+    font-size: 15px;
   }
   .tp-info-card {
     flex-wrap: wrap;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .tp-info-actions {
     width: 100%;
     margin-left: 0;
     justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .tp-info-body,
+  .tp-info-value,
+  .tp-edit-input,
+  .tp-edit-textarea {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
   }
   .tp-section-header {
     flex-wrap: wrap;
@@ -885,6 +1079,42 @@
 }
 
 @media (max-width: 480px) {
+  .tp-root .dash-topbar,
+  .tp-root .dash-content {
+    padding-left: 64px;
+    padding-right: 10px;
+    box-sizing: border-box;
+  }
+
+  .tp-topbar-left {
+    gap: 8px;
+  }
+
+  .tp-back-btn {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .tp-topbar-right {
+    gap: 8px;
+  }
+
+  .tp-page-title { font-size: 20px; }
+  .tp-avatar-wrap,
+  .tp-avatar-btn {
+    width: 42px;
+    height: 42px;
+  }
+
+  .tp-avatar-btn {
+    font-size: 26px;
+  }
+
+  .tp-avatar-online {
+    width: 11px;
+    height: 11px;
+  }
+
   .tp-hero-left { flex-direction: column; align-items: flex-start; }
   .tp-logo-wrap { width: 64px; height: 64px; }
   .tp-hero-name { font-size: 17px; }
@@ -899,6 +1129,7 @@
   .tp-edit-actions {
     width: 100%;
     justify-content: flex-end;
+    flex-wrap: wrap;
   }
   .tp-section-header {
     padding: 10px;

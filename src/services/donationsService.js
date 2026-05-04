@@ -6,6 +6,8 @@ const TABLE_NAME = 'Donations';
 const DONATIONS_BUCKET = String(import.meta?.env?.VITE_DONATIONS_BUCKET || 'donations').trim() || 'donations';
 const MAX_FETCH = 200;
 const MONEY_RE = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
+const MAX_IMAGE_BYTES = 25 * 1024;
+const TARGET_MIN_IMAGE_BYTES = 20 * 1024;
 
 function normalizeAttachments(value) {
   if (!Array.isArray(value)) return [];
@@ -71,13 +73,125 @@ function toMoneyValue(rawAmount) {
   return { value: Number(normalized), error: null };
 }
 
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+async function decodeImageFile(file) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      // Fallback below.
+    }
+  }
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Unable to process selected image.'));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function compressImageToJpegRange(file, { minBytes = TARGET_MIN_IMAGE_BYTES, maxBytes = MAX_IMAGE_BYTES } = {}) {
+  if (!file) return { file: null, warning: '', error: { message: 'No image file provided.' } };
+  if (Number(file.size || 0) <= maxBytes) return { file, warning: '', error: null };
+
+  try {
+    const image = await decodeImageFile(file);
+    const width = Math.max(1, image.naturalWidth || image.width || 1);
+    const height = Math.max(1, image.naturalHeight || image.height || 1);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Unable to process selected image.');
+    context.drawImage(image, 0, 0, width, height);
+
+    let bestBlob = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    const targetMid = (minBytes + maxBytes) / 2;
+    let low = 0.01;
+    let high = 0.95;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 10;
+
+    while (attempts < MAX_ATTEMPTS && high - low > 0.005) {
+      const quality = Number((((low + high) / 2)).toFixed(3));
+      const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+      attempts += 1;
+      if (!blob) continue;
+
+      if (blob.size <= maxBytes && blob.size >= minBytes) {
+        bestBlob = blob;
+        break;
+      }
+
+      if (blob.size <= maxBytes) {
+        const distance = Math.abs(blob.size - targetMid);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestBlob = blob;
+        }
+        low = quality;
+      } else {
+        high = quality;
+      }
+    }
+
+    if (!bestBlob) {
+      const finalBlob = await canvasToBlob(canvas, 'image/jpeg', 0.01);
+      if (finalBlob && finalBlob.size <= maxBytes) {
+        bestBlob = finalBlob;
+      }
+    }
+
+    if (typeof image?.close === 'function') image.close();
+    if (!bestBlob || bestBlob.size > maxBytes) {
+      return {
+        file: null,
+        warning: '',
+        error: { message: `Image could not reach ${Math.floor(maxBytes / 1024)}KB using quality-only compression.` },
+      };
+    }
+
+    const compressedFile = new File([bestBlob], `${sanitizeFileName(file?.name)}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
+    return {
+      file: compressedFile,
+      warning: `"${file?.name || 'image'}" auto-compressed to ${Math.max(1, Math.round(bestBlob.size / 1024))}KB (target 20-25KB).`,
+      error: null,
+    };
+  } catch (error) {
+    return { file: null, warning: '', error: { message: error?.message || 'Unable to process selected image.' } };
+  }
+}
+
 async function uploadSingleDonationAttachment(file, { trustId = null } = {}) {
   if (!file) return { data: null, error: { message: 'No attachment file provided.' } };
   const prepared = await prepareImageFileForUpload(file);
   if (prepared.error || !prepared.file) {
     return { data: null, error: { message: prepared.error?.message || getAllowedImageFormatsMessage() } };
   }
-  const uploadFile = prepared.file;
+  const compressed = await compressImageToJpegRange(prepared.file, {
+    minBytes: TARGET_MIN_IMAGE_BYTES,
+    maxBytes: MAX_IMAGE_BYTES,
+  });
+  if (compressed.error || !compressed.file) {
+    return { data: null, error: { message: compressed.error?.message || 'Unable to process selected image.' } };
+  }
+  const uploadFile = compressed.file;
 
   const path = buildDonationAttachmentPath(trustId, uploadFile);
   const { error: uploadError } = await supabase
@@ -107,7 +221,7 @@ async function uploadSingleDonationAttachment(file, { trustId = null } = {}) {
     data: {
       path,
       publicUrl: String(publicData?.publicUrl || '').trim(),
-      warning: prepared.warning || '',
+      warning: [prepared.warning, compressed.warning].filter(Boolean).join(' ').trim(),
     },
     error: null,
   };

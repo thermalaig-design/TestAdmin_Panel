@@ -14,7 +14,7 @@ import './MarqueePage.css';
 const EMPTY_FORM = {
   message: '',
   is_active: true,
-  priority: 0,
+  priority: 1,
 };
 const FILTER_OPTIONS = [
   { key: 'all', label: 'All' },
@@ -106,10 +106,11 @@ export default function MarqueePage() {
 
   const openEdit = (item) => {
     setEditingId(item.id);
+    const parsedPriority = Number(item.priority);
     setForm({
       message: item.message || '',
       is_active: item.is_active !== false,
-      priority: Number.isFinite(Number(item.priority)) ? Number(item.priority) : 0,
+      priority: Number.isFinite(parsedPriority) ? Math.max(1, Math.floor(parsedPriority)) : 1,
     });
     setSaveError('');
     setShowForm(true);
@@ -125,7 +126,7 @@ export default function MarqueePage() {
     const payload = {
       message,
       is_active: !!form.is_active,
-      priority: Number.isFinite(Number(form.priority)) ? Number(form.priority) : 0,
+      priority: Number.isFinite(Number(form.priority)) ? Math.max(1, Math.floor(Number(form.priority))) : 1,
     };
 
     setSaving(true);
@@ -261,7 +262,7 @@ export default function MarqueePage() {
                   <span className={`marquee-status ${item.is_active ? 'active' : 'inactive'}`}>
                     {item.is_active ? 'Active' : 'Inactive'}
                   </span>
-                  <span className="marquee-priority">Priority: {item.priority}</span>
+                  <span className="marquee-priority">Priority: {Number.isFinite(Number(item.priority)) ? Math.max(1, Math.floor(Number(item.priority))) : 1}</span>
                 </div>
                 <p className="marquee-message">{item.message}</p>
                 <div className="marquee-meta">
@@ -334,8 +335,16 @@ export default function MarqueePage() {
                   <span>Priority</span>
                   <input
                     type="number"
+                    min={1}
+                    step={1}
                     value={form.priority}
-                    onChange={(event) => setForm((prev) => ({ ...prev, priority: Number(event.target.value) }))}
+                    onChange={(event) => {
+                      const raw = Number(event.target.value);
+                      setForm((prev) => ({
+                        ...prev,
+                        priority: Number.isFinite(raw) ? Math.max(1, Math.floor(raw)) : 1,
+                      }));
+                    }}
                   />
                 </label>
 

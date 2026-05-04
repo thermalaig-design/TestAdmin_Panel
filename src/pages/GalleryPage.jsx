@@ -478,6 +478,7 @@ export default function GalleryPage() {
       platform: 'instagram,facebook',
       photoId: String(photoId),
       photoUrl: photo?.url || '',
+      folderId: String(photo?.folderId || selectedFolderId || ''),
       folder: folderNameById.get(photo.folderId) || folderNameById.get(selectedFolderId) || '',
     });
 

@@ -20,6 +20,7 @@ const DEFAULT_NEW_HOME_LAYOUT = ['trustList', 'sponsors', 'marquee', 'gallery', 
 const pretty = (value, fallback) => JSON.stringify(value ?? fallback, null, 2);
 const DEFAULT_ANIMATIONS = { cards: 'fadeUp', navbar: 'fadeSlideDown', gallery: 'zoomIn' };
 const GRADIENT_OPTIONS = ['none', 'linear', 'radial', 'conic'];
+const GRADIENT_TRANSITION_OPTIONS = ['ease', 'linear', 'ease-in', 'ease-out', 'ease-in-out'];
 const DEFAULT_THEME_SECTION_CONFIG = {
   footer: { bg_color_1: '#1f296f', bg_color_2: '#c81e1e', text_color: '#ffffff', gradient_type: 'linear' },
   navbar: { blur: 10, opacity: 1, bg_color_1: '#1f296f', bg_color_2: '#c81e1e', text_color: '#f7f7f7', gradient_type: 'linear' },
@@ -27,8 +28,20 @@ const DEFAULT_THEME_SECTION_CONFIG = {
   page_bg: { bg_color_1: '#f6f8fc', bg_color_2: '#eef2ff', gradient_type: 'linear', gradient_angle: 180, gradient_transition: 'ease' },
   sidebar: { blur: 12, opacity: 0.98, bg_color_1: '#a4ccea', bg_color_2: '#ebebf4', text_color: '#ffffff', button_color: '#e3e3ee', gradient_type: 'linear', button_text_color: '#ffffff' },
   app_buttons: { bg_color_1: '#4a42e8', bg_color_2: null, text_color: '#ffffff', gradient_type: 'none' },
-  advertisement: { bg_color: '#eef2ff', bg_opacity: 1, text_color: '#4a42e8' },
-  quick_actions: { bg_color_1: '#ffffff', bg_color_2: null, text_color: '#111827', gradient_type: 'none', icon_bg_color: '#e0e7ff' },
+  advertisement: {
+    bg_color: '#6B0F2A',
+    bg_opacity: 0,
+    title_color: '#FFFFFF',
+    card_bg_color: '#6B0F2A',
+    badge_bg_color: '#FFFFFF',
+    subtitle_color: '#FFD6E0',
+    badge_dot_color: '#FF4D6D',
+    badge_text_color: '#6B0F2A',
+    card_border_color: '#FF6B8A',
+    card_shadow_color: '#3D0015',
+    description_color: '#F9A8C0',
+  },
+  quick_actions: { bg_color_1: '#ffffff', bg_color_2: '#aa0957', text_color: '#111827', gradient_type: 'none', icon_bg_color: '#f5d6ea' },
 };
 const THEME_SECTION_FIELDS = {
   footer: [
@@ -56,7 +69,7 @@ const THEME_SECTION_FIELDS = {
     { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#f0f1fb' },
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
     { key: 'gradient_angle', label: 'Gradient Angle', type: 'number', min: 0, max: 360, step: 1 },
-    { key: 'gradient_transition', label: 'Transition Feel', type: 'text' },
+    { key: 'gradient_transition', label: 'Transition Feel', type: 'select', options: GRADIENT_TRANSITION_OPTIONS },
   ],
   sidebar: [
     { key: 'blur', label: 'Blur Strength', type: 'number', min: 0, step: 1 },
@@ -76,15 +89,23 @@ const THEME_SECTION_FIELDS = {
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
   ],
   advertisement: [
-    { key: 'bg_color', label: 'Background Color', type: 'color', fallback: '#FDECEA' },
-    { key: 'bg_opacity', label: 'Background Transparency', type: 'number', min: 0, max: 1, step: 0.01 },
-    { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#C0241A' },
+    { key: 'bg_color', label: 'Section Background', type: 'color', fallback: '#6B0F2A' },
+    { key: 'bg_opacity', label: 'Section Transparency', type: 'number', min: 0, max: 1, step: 0.01 },
+    { key: 'title_color', label: 'Title Color', type: 'color', fallback: '#FFFFFF' },
+    { key: 'card_bg_color', label: 'Card Background', type: 'color', fallback: '#6B0F2A' },
+    { key: 'badge_bg_color', label: 'Badge Background', type: 'color', fallback: '#FFFFFF' },
+    { key: 'subtitle_color', label: 'Subtitle Color', type: 'color', fallback: '#FFD6E0' },
+    { key: 'badge_dot_color', label: 'Badge Dot Color', type: 'color', fallback: '#FF4D6D' },
+    { key: 'badge_text_color', label: 'Badge Text Color', type: 'color', fallback: '#6B0F2A' },
+    { key: 'card_border_color', label: 'Card Border Color', type: 'color', fallback: '#FF6B8A' },
+    { key: 'card_shadow_color', label: 'Card Shadow Color', type: 'color', fallback: '#3D0015' },
+    { key: 'description_color', label: 'Description Color', type: 'color', fallback: '#F9A8C0' },
   ],
   quick_actions: [
     { key: 'bg_color_1', label: 'Main Background Color', type: 'color', fallback: '#ffffff' },
-    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#ffffff', allowNull: true },
+    { key: 'bg_color_2', label: 'Second Background Color', type: 'color', fallback: '#aa0957', allowNull: true },
     { key: 'text_color', label: 'Text Color', type: 'color', fallback: '#111827' },
-    { key: 'icon_bg_color', label: 'Icon Background Color', type: 'color', fallback: '#e0e7ff' },
+    { key: 'icon_bg_color', label: 'Icon Background Color', type: 'color', fallback: '#f5d6ea' },
     { key: 'gradient_type', label: 'Background Style', type: 'select', options: GRADIENT_OPTIONS },
   ],
 };
@@ -105,7 +126,7 @@ const THEME_SECTION_HELP = {
   page_bg: 'Overall page background appearance.',
   sidebar: 'Color theme for the left menu panel.',
   app_buttons: 'Common style for buttons and icons.',
-  advertisement: 'Background and text for ad/notice boxes.',
+  advertisement: 'Colors for sponsors section cards, badges, and text.',
   quick_actions: 'Appearance of quick action cards.',
 };
 const ANIMATION_OPTIONS = {
@@ -268,9 +289,9 @@ const buildLegacyColorFields = (themeConfig) => {
 
   return {
     primary_color: safeText(config?.app_buttons?.bg_color_1, '#4a42e8') || '#4a42e8',
-    secondary_color: safeText(config?.sidebar?.bg_color_1, '#a4ccea') || '#a4ccea',
-    accent_color: safeText(config?.advertisement?.text_color, '#4a42e8') || '#4a42e8',
-    accent_bg: safeText(config?.advertisement?.bg_color, '#eef2ff') || '#eef2ff',
+    secondary_color: safeText(config?.quick_actions?.bg_color_1, '#fff') || '#fff',
+    accent_color: safeText(config?.advertisement?.title_color, '#FFFFFF') || '#FFFFFF',
+    accent_bg: safeText(config?.advertisement?.bg_color, '#6B0F2A') || '#6B0F2A',
     navbar_bg: safeText(config?.navbar?.bg_color_1, '#1f296f') || '#1f296f',
     page_bg: fallbackPageBg,
   };

@@ -78,6 +78,8 @@ export default function FeatureControlPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [quickOrderSort, setQuickOrderSort] = useState('asc');
   const [activeCategoryView, setActiveCategoryView] = useState(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const [togglingMap, setTogglingMap] = useState({});
   const [activeEditRow, setActiveEditRow] = useState(null);
@@ -89,6 +91,10 @@ export default function FeatureControlPage() {
   const selectedTrust = useMemo(
     () => trustOptions.find((item) => String(item.id) === String(selectedTrustId)) || null,
     [trustOptions, selectedTrustId]
+  );
+  const filterStorageKey = useMemo(
+    () => `fc:filters:${selectedTrustId || 'default'}:${selectedTier || 'general'}`,
+    [selectedTier, selectedTrustId]
   );
 
   const loadTrusts = useCallback(async () => {
@@ -161,6 +167,48 @@ export default function FeatureControlPage() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
+  useEffect(() => {
+    // On refresh/load: keep page state clean by closing category modal.
+    setActiveCategoryView(null);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(filterStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.searchTerm === 'string') setSearchTerm(parsed.searchTerm);
+      if (typeof parsed.statusFilter === 'string') setStatusFilter(parsed.statusFilter);
+      if (typeof parsed.categoryFilter === 'string') setCategoryFilter(parsed.categoryFilter);
+      if (typeof parsed.quickOrderSort === 'string') setQuickOrderSort(parsed.quickOrderSort);
+    } catch {
+      // ignore invalid persisted value
+    }
+  }, [filterStorageKey]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        filterStorageKey,
+        JSON.stringify({
+          searchTerm,
+          statusFilter,
+          categoryFilter,
+          quickOrderSort,
+        }),
+      );
+    } catch {
+      // ignore storage failure
+    }
+  }, [filterStorageKey, searchTerm, statusFilter, categoryFilter, quickOrderSort]);
+
+  useEffect(() => {
+    const checkViewport = () => setIsMobileViewport(window.innerWidth <= 680);
+    checkViewport();
+    window.addEventListener('resize', checkViewport);
+    return () => window.removeEventListener('resize', checkViewport);
   }, []);
 
   useEffect(() => {
@@ -298,11 +346,13 @@ export default function FeatureControlPage() {
 
     setCategoryFilter(next);
     setActiveCategoryView(next);
+    if (window.innerWidth <= 680) setMobileFiltersOpen(false);
   };
 
   const closeCategoryView = () => {
     setActiveCategoryView(null);
     setCategoryFilter('all');
+    setMobileFiltersOpen(false);
   };
 
   const handleCategoryFilterChange = (nextValue) => {
@@ -557,7 +607,20 @@ export default function FeatureControlPage() {
             </div>
             {openedFromFeatures20 ? (
               <div className="fc-category-controls-wrap">
-                {renderControls('fc-controls-inline')}
+                {isMobileViewport ? (
+                  <>
+                    <button
+                      type="button"
+                      className="fc-mobile-filters-toggle"
+                      onClick={() => setMobileFiltersOpen((prev) => !prev)}
+                    >
+                      {mobileFiltersOpen ? 'Hide Filters' : 'Show Filters'}
+                    </button>
+                    {mobileFiltersOpen ? renderControls('fc-controls-inline') : null}
+                  </>
+                ) : (
+                  renderControls('fc-controls-inline')
+                )}
               </div>
             ) : null}
 

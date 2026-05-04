@@ -18,7 +18,11 @@ const EMPTY_FORM = {
   is_read: false,
 };
 
-const TYPE_OPTIONS = ['general', 'alert', 'update'];
+const TYPE_OPTIONS = ['general', 'vip'];
+const TYPE_LABELS = {
+  general: 'general',
+  vip: 'VIP',
+};
 const AUDIENCE_OPTIONS = ['all', 'members', 'donors', 'admins'];
 
 function formatDate(value) {
@@ -38,7 +42,7 @@ export default function NotificationPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userName = 'Admin', trust = null } = location.state || {};
-  const currentSidebarNavKey = location.state?.sidebarNavKey || 'home-page';
+  const currentSidebarNavKey = location.state?.sidebarNavKey || 'menu';
   const trustId = trust?.id || null;
 
   const [list, setList] = useState([]);
@@ -52,9 +56,14 @@ export default function NotificationPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
+  const normalizeType = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    return TYPE_OPTIONS.includes(normalized) ? normalized : 'general';
+  };
+
   useEffect(() => {
     if (!trustId) {
-      navigate('/dashboard', { replace: true, state: { userName, trust, sidebarNavKey: 'home-page' } });
+      navigate('/dashboard', { replace: true, state: { userName, trust, sidebarNavKey: 'menu' } });
       return;
     }
 
@@ -104,7 +113,7 @@ export default function NotificationPage() {
     setForm({
       title: item.title || '',
       message: item.message || '',
-      type: item.type || 'general',
+      type: normalizeType(item.type),
       target_audience: item.target_audience || 'all',
       is_read: item.is_read === true,
     });
@@ -134,7 +143,7 @@ export default function NotificationPage() {
     const payload = {
       title,
       message,
-      type: String(form.type || 'general').trim() || 'general',
+      type: normalizeType(form.type),
       target_audience: String(form.target_audience || 'all').trim() || 'all',
       is_read: form.is_read === true,
     };
@@ -194,7 +203,7 @@ export default function NotificationPage() {
         <PageHeader
           title="Notification"
           subtitle="Manage records from notifications table"
-          onBack={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: 'home-page' } })}
+          onBack={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: 'menu' } })}
           right={(
             <button className="np-create-btn" type="button" onClick={openCreate}>
               Create Notification
@@ -257,7 +266,7 @@ export default function NotificationPage() {
                   </div>
                   <p className="np-message">{item.message || '-'}</p>
                   <div className="np-meta">
-                    <span>Type: {item.type || 'general'}</span>
+                    <span>Type: {TYPE_LABELS[normalizeType(item.type)] || 'general'}</span>
                     <span>Audience: {item.target_audience || 'all'}</span>
                     <span>Created: {formatDate(item.created_at)}</span>
                     <span>Updated: {formatDate(item.updated_at)}</span>
@@ -304,7 +313,7 @@ export default function NotificationPage() {
                       onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value }))}
                     >
                       {TYPE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>{option}</option>
+                        <option key={option} value={option}>{TYPE_LABELS[option] || option}</option>
                       ))}
                     </select>
                   </label>

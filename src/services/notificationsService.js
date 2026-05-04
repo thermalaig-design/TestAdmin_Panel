@@ -2,6 +2,12 @@ import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
 const NOTIFICATIONS_TABLE = 'notifications';
+const ALLOWED_TYPES = ['general', 'vip'];
+
+function normalizeType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return ALLOWED_TYPES.includes(normalized) ? normalized : 'general';
+}
 
 function pickFirst(row = {}, keys = []) {
   for (const key of keys) {
@@ -17,7 +23,7 @@ function normalizeNotificationRow(row = {}) {
     trust_id: pickFirst(row, ['trust_id']),
     title: pickFirst(row, ['title']) || '',
     message: pickFirst(row, ['message']) || '',
-    type: pickFirst(row, ['type']) || 'general',
+    type: normalizeType(pickFirst(row, ['type']) || 'general'),
     target_audience: pickFirst(row, ['target_audience']) || 'all',
     is_read: pickFirst(row, ['is_read']) === true,
     sent_by: pickFirst(row, ['sent_by']),
@@ -49,7 +55,7 @@ export async function createNotification(payload = {}) {
     trust_id: payload.trust_id,
     title: String(payload.title || '').trim(),
     message: String(payload.message || '').trim(),
-    type: String(payload.type || 'general').trim() || 'general',
+    type: normalizeType(payload.type),
     target_audience: String(payload.target_audience || 'all').trim() || 'all',
     is_read: payload.is_read === true,
     sent_by: payload.sent_by || null,
@@ -71,7 +77,7 @@ export async function updateNotification(notificationId, updates = {}, trustId =
   const payload = {
     ...(updates.title !== undefined ? { title: String(updates.title || '').trim() } : {}),
     ...(updates.message !== undefined ? { message: String(updates.message || '').trim() } : {}),
-    ...(updates.type !== undefined ? { type: String(updates.type || 'general').trim() || 'general' } : {}),
+    ...(updates.type !== undefined ? { type: normalizeType(updates.type) } : {}),
     ...(updates.target_audience !== undefined
       ? { target_audience: String(updates.target_audience || 'all').trim() || 'all' }
       : {}),

@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import {
   createOtherMembership,
   deleteOtherMembership,
+  fetchOtherMembershipById,
   fetchOtherMembershipsByTrustId,
   fetchRegisteredMembersByTrust,
   updateOtherMembership,
@@ -62,6 +63,10 @@ export default function OtherMembershipPage() {
     () => new URLSearchParams(location.search).get('memberId') || '',
     [location.search]
   );
+  const routeEditId = useMemo(
+    () => new URLSearchParams(location.search).get('editId') || '',
+    [location.search]
+  );
   const initialEditItem = location.state?.otherMembershipEditItem || null;
 
   const [memberOptions, setMemberOptions] = useState([]);
@@ -70,7 +75,8 @@ export default function OtherMembershipPage() {
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState(() => initialEditItem?.id || null);
+  const [editingId, setEditingId] = useState(() => initialEditItem?.id || routeEditId || null);
+  const [routeEditHydrated, setRouteEditHydrated] = useState(false);
   const [form, setForm] = useState(() => {
     if (initialEditItem?.id) return buildFormFromItem(initialEditItem);
     if (isCreateRoute && routeMemberId) return { ...EMPTY_FORM, member_id: String(routeMemberId) };
@@ -80,6 +86,7 @@ export default function OtherMembershipPage() {
   const [memberPanelSearch, setMemberPanelSearch] = useState('');
   const [memberTypeFilter, setMemberTypeFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState('name_asc');
   const [memberPage, setMemberPage] = useState(1);
 
   const memberNameMap = useMemo(
@@ -115,7 +122,7 @@ export default function OtherMembershipPage() {
   }, [memberOptions]);
   const filteredMemberOptions = useMemo(() => {
     const term = memberPanelSearch.trim().toLowerCase();
-    return memberOptions.filter((member) => {
+    const filtered = memberOptions.filter((member) => {
       if (isCreateRoute && member.member_type !== 'my') return false;
       if (memberTypeFilter === 'my' && member.member_type !== 'my') return false;
       if (memberTypeFilter === 'others' && member.member_type === 'my') return false;
@@ -132,7 +139,14 @@ export default function OtherMembershipPage() {
       ];
       return searchable.some((value) => String(value || '').toLowerCase().includes(term));
     });
-  }, [memberOptions, memberPanelSearch, memberTypeFilter, roleFilter, isCreateRoute]);
+    return [...filtered].sort((left, right) => {
+      const order = String(left.name || '').localeCompare(String(right.name || ''), undefined, {
+        sensitivity: 'base',
+        numeric: true,
+      });
+      return sortOrder === 'name_desc' ? -order : order;
+    });
+  }, [memberOptions, memberPanelSearch, memberTypeFilter, roleFilter, isCreateRoute, sortOrder]);
   const memberPickerTotalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredMemberOptions.length / MEMBER_PICKER_PAGE_SIZE)),
     [filteredMemberOptions.length]
@@ -262,6 +276,41 @@ export default function OtherMembershipPage() {
     load();
   }, [navigate, trustId, userName, trust]);
 
+  useEffect(() => {
+    if (!isCreateRoute || !routeEditId || routeEditHydrated) return;
+    if (initialEditItem?.id) {
+      setRouteEditHydrated(true);
+      return;
+    }
+    const match = list.find((item) => String(item.id || '') === String(routeEditId));
+    if (match) {
+      setEditingId(match.id);
+      setForm(buildFormFromItem(match));
+      const memberId = toText(match.member_id);
+      setMemberSearch(memberLabelMap.get(memberId) || toText(match.__member_name || match.member_name));
+      setFormError('');
+      setRouteEditHydrated(true);
+      return;
+    }
+
+    let cancelled = false;
+    const hydrateFromApi = async () => {
+      const { data, error: fetchError } = await fetchOtherMembershipById(routeEditId);
+      if (cancelled || fetchError || !data) return;
+      setEditingId(data.id);
+      setForm(buildFormFromItem(data));
+      const memberId = toText(data.member_id);
+      setMemberSearch(memberLabelMap.get(memberId) || toText(data.member_name));
+      setFormError('');
+      setRouteEditHydrated(true);
+    };
+
+    hydrateFromApi();
+    return () => {
+      cancelled = true;
+    };
+  }, [isCreateRoute, routeEditId, routeEditHydrated, initialEditItem?.id, list, memberLabelMap]);
+
   const handleSave = async () => {
     if (!trustId) return;
     if (!form.member_id) {
@@ -330,9 +379,12 @@ export default function OtherMembershipPage() {
 
   const handleEdit = (item) => {
     if (!isCreateRoute) {
-      navigate(`/other-membership/create_other_membership?memberId=${encodeURIComponent(String(item.member_id || ''))}`, {
+      navigate(
+        `/other-membership/create_other_membership?memberId=${encodeURIComponent(String(item.member_id || ''))}&editId=${encodeURIComponent(String(item.id || ''))}`,
+        {
         state: { userName, trust, sidebarNavKey: currentSidebarNavKey, otherMembershipEditItem: item },
-      });
+        }
+      );
       return;
     }
 
@@ -407,6 +459,13 @@ export default function OtherMembershipPage() {
                   ))}
                 </select>
               </div>
+              <div className="om-picker-role-row">
+                <span>Sort</span>
+                <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+                  <option value="name_asc">Name (A-Z)</option>
+                  <option value="name_desc">Name (Z-A)</option>
+                </select>
+              </div>
               <input
                 className="om-picker-search"
                 placeholder="Search member..."
@@ -466,9 +525,14 @@ export default function OtherMembershipPage() {
                 <div className="om-card">
                   <div className="om-card-head">
                     <h3>{headingText}</h3>
-                    <button type="button" className="om-btn om-btn-muted" onClick={navigateToRecords}>
-                      Other Membership Records
-                    </button>
+                    <div className="om-card-head-actions">
+                      <button type="button" className="om-btn om-btn-muted" onClick={navigateToRecords}>
+                        Other Membership Records
+                      </button>
+                      <button type="button" className="om-close-btn" onClick={navigateToRecords} aria-label="Close form">
+                        x
+                      </button>
+                    </div>
                   </div>
                   <div className="om-form-grid">
                     <label className="om-span-2">

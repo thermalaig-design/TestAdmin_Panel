@@ -73,6 +73,29 @@
   margin: 0;
 }
 
+.om-card-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.om-close-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  background: #fff;
+  color: #64748b;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.om-close-btn:hover {
+  color: #334155;
+  border-color: rgba(100, 116, 139, 0.58);
+}
+
 .om-card p {
   margin: 0;
   font-size: 14px;

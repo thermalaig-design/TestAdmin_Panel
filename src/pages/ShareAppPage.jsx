@@ -131,7 +131,7 @@ export default function ShareAppPage() {
               userName,
               trust,
               superuserId,
-              sidebarNavKey: 'dashboard',
+              sidebarNavKey: 'menu',
             },
           })
         }
@@ -148,7 +148,7 @@ export default function ShareAppPage() {
                 userName,
                 trust,
                 superuserId,
-                sidebarNavKey: 'dashboard',
+                sidebarNavKey: 'menu',
               },
             })
           }

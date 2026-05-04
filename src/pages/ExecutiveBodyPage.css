@@ -7,6 +7,8 @@
 
 .eb-main {
   min-width: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .eb-main .ph-header {
@@ -17,6 +19,8 @@
   padding: 22px 32px 30px;
   display: grid;
   gap: 16px;
+  height: calc(100vh - 112px);
+  overflow: hidden;
 }
 
 .eb-top-filters {
@@ -111,6 +115,7 @@
   grid-template-columns: 330px 1fr;
   gap: 16px;
   min-width: 0;
+  min-height: 0;
 }
 
 .eb-left,
@@ -119,10 +124,16 @@
   border: 1px solid rgba(99, 102, 241, 0.14);
   border-radius: 16px;
   padding: 14px;
+  min-height: 0;
 }
 
 .eb-left {
-  max-height: calc(100vh - 260px);
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.eb-right {
+  max-height: 100%;
   overflow-y: auto;
 }
 

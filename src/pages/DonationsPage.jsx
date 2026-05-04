@@ -93,6 +93,7 @@ export default function DonationsPage() {
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
   const [attachmentWarning, setAttachmentWarning] = useState('');
   const [processingAttachment, setProcessingAttachment] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
   const attachmentInputRef = useRef(null);
   const deferredSearch = useDeferredValue(search);
   const PAGE_SIZE = 10;
@@ -169,6 +170,15 @@ export default function DonationsPage() {
     document.addEventListener('click', closeMenu);
     return () => document.removeEventListener('click', closeMenu);
   }, []);
+
+  useEffect(() => {
+    if (!previewImage) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setPreviewImage(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [previewImage]);
 
   const filteredDonations = useMemo(() => {
     const term = deferredSearch.trim().toLowerCase();
@@ -362,16 +372,16 @@ export default function DonationsPage() {
     const files = Array.from(fileList || []);
     if (!files.length) return;
     setFormError('');
-    const validFiles = files.filter(isImageFile);
-    const skippedCount = Math.max(0, files.length - validFiles.length);
-    if (!validFiles.length) {
+    const imageFiles = files.filter(isImageFile);
+    if (!imageFiles.length) {
       setAttachmentWarning('Image format should be JPG/JPEG/PNG.');
       return;
     }
+    const skippedCount = Math.max(0, files.length - imageFiles.length);
 
     setProcessingAttachment(true);
     try {
-      const { data: uploadedUrls, warnings: uploadWarnings = [], error: uploadError } = await uploadDonationAttachments(validFiles, { trustId });
+      const { data: uploadedUrls, error: uploadError } = await uploadDonationAttachments(imageFiles, { trustId });
       if (uploadError) {
         setFormError(uploadError.message || 'Unable to upload selected image(s).');
         return;
@@ -381,9 +391,9 @@ export default function DonationsPage() {
       const unique = [...new Set(merged)];
       setForm((prev) => ({ ...prev, attachments: unique.join('\n') }));
       const uploadMessage = skippedCount > 0
-        ? `${uploadedUrls?.length || 0} image(s) uploaded. ${skippedCount} non-image file(s) skipped.`
+        ? `${uploadedUrls?.length || 0} image(s) uploaded. ${skippedCount} file(s) skipped.`
         : `${uploadedUrls?.length || 0} image(s) uploaded successfully.`;
-      setAttachmentWarning([uploadMessage, ...uploadWarnings].filter(Boolean).join(' ').trim());
+      setAttachmentWarning(uploadMessage);
     } catch (uploadError) {
       setFormError(uploadError?.message || 'Unable to upload selected image(s).');
     } finally {
@@ -511,7 +521,7 @@ export default function DonationsPage() {
                     <div className="nb-span-2">
                       <span>Attachments (multiple images)</span>
                       <p className="nb-attachment-limit-note">
-                        Images are uploaded to Supabase Storage bucket `donations` and saved as public URLs.
+                        Max size you can upload is 25 KB, and format should be JPG or JPEG and PNG.
                       </p>
                       <label
                         className={`nb-attachment-dropzone ${attachmentDragOver ? 'drag' : ''}`}
@@ -803,18 +813,26 @@ export default function DonationsPage() {
                                 <li key={`${parsed.value}-${index}`}>
                                   {isImage ? (
                                     <div className="nb-attachment-preview">
-                                      <img
-                                        src={parsed.value}
-                                        alt={parsed.name || 'Donation attachment'}
-                                        className="nb-attachment-preview-thumb"
-                                      />
-                                      <a href={parsed.value} target="_blank" rel="noreferrer" className="nb-attachment-link">
-                                        {parsed.name || 'View image'}
-                                      </a>
+                                      <button
+                                        type="button"
+                                        className="nb-attachment-preview-btn"
+                                        onClick={() =>
+                                          setPreviewImage({
+                                            src: parsed.value,
+                                            alt: parsed.name || 'Donation attachment preview',
+                                          })
+                                        }
+                                      >
+                                        <img
+                                          src={parsed.value}
+                                          alt={parsed.name || 'Donation attachment'}
+                                          className="nb-attachment-preview-thumb"
+                                        />
+                                      </button>
                                     </div>
                                   ) : (
                                     <a href={parsed.value} target="_blank" rel="noreferrer" className="nb-attachment-link">
-                                      {parsed.name || parsed.value}
+                                      View attachment
                                     </a>
                                   )}
                                 </li>
@@ -833,6 +851,31 @@ export default function DonationsPage() {
           )}
         </section>
       </main>
+      {previewImage && (
+        <div className="nb-preview-backdrop" onClick={() => setPreviewImage(null)}>
+          <div
+            className="nb-image-lightbox"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Image preview"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="nb-preview-close"
+              onClick={() => setPreviewImage(null)}
+              aria-label="Close preview"
+            >
+              x
+            </button>
+            <img
+              src={previewImage.src}
+              alt={previewImage.alt || 'Donation attachment preview'}
+              className="nb-image-lightbox-img"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

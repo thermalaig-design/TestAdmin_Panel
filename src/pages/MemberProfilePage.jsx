@@ -95,6 +95,7 @@ const PROFILE_NUMERIC_FIELD_KEYS = new Set([
   'emergency_contact_number',
   'spouse_contact',
 ]);
+const STRICT_TEN_DIGIT_PROFILE_KEYS = new Set(['whatsapp', 'emergency_contact_number']);
 const PROFILE_PHOTO_MAX_BYTES = 25 * 1024;
 const FALLBACK_REGION_CODES = [
   'IN', 'US', 'GB', 'CA', 'AU', 'AE', 'DE', 'FR', 'IT', 'ES', 'JP', 'SG', 'MY', 'TH', 'NZ', 'ZA',
@@ -596,7 +597,15 @@ export default function MemberProfilePage() {
     setPickerPage(1);
     setRegisterError('');
     setShowPicker(true);
-  }, [location.state, trustId]);
+    // Consume one-time navigation intent so refresh stays on normal profile view.
+    navigate(location.pathname, {
+      replace: true,
+      state: {
+        ...(location.state || {}),
+        openPicker: false,
+      },
+    });
+  }, [location.pathname, location.state, navigate, trustId]);
 
   useEffect(() => {
     if (!showPicker) return;
@@ -864,7 +873,14 @@ export default function MemberProfilePage() {
     const raw = String(rawValue ?? '');
     const value = isNumericField ? sanitizeDigits(raw) : raw;
     if (isNumericField) {
-      setNumberWarning(/\D/.test(raw) ? `Only numbers are allowed in ${String(key).replace(/_/g, ' ')}.` : '');
+      if (/\D/.test(raw)) {
+        setNumberWarning(`Only numbers are allowed in ${String(key).replace(/_/g, ' ')}.`);
+      } else if (STRICT_TEN_DIGIT_PROFILE_KEYS.has(key) && value.length > 0 && value.length !== 10) {
+        const fieldLabel = key === 'whatsapp' ? 'WhatsApp number' : 'Emergency contact number';
+        setNumberWarning(`${fieldLabel} must be exactly 10 digits.`);
+      } else {
+        setNumberWarning('');
+      }
     }
     setEditForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -924,6 +940,18 @@ export default function MemberProfilePage() {
     if (canEditProfile && !editForm.name.trim()) {
       setSaveError('Name is required.');
       return;
+    }
+    if (canEditProfile) {
+      const whatsappDigits = sanitizeDigits(editForm.whatsapp);
+      const emergencyDigits = sanitizeDigits(editForm.emergency_contact_number);
+      if (whatsappDigits && whatsappDigits.length !== 10) {
+        setSaveError('WhatsApp number must be exactly 10 digits.');
+        return;
+      }
+      if (emergencyDigits && emergencyDigits.length !== 10) {
+        setSaveError('Emergency contact number must be exactly 10 digits.');
+        return;
+      }
     }
 
     setSaving(true);
@@ -1081,6 +1109,11 @@ export default function MemberProfilePage() {
       setFamilyError('Relation is required.');
       return;
     }
+    const familyContactDigits = sanitizeDigits(familyForm.contact_no);
+    if (familyContactDigits && familyContactDigits.length !== 10) {
+      setFamilyError('Family contact number must be exactly 10 digits.');
+      return;
+    }
 
     setFamilySaving(true);
     setFamilyError('');
@@ -1198,7 +1231,9 @@ export default function MemberProfilePage() {
   };
 
   const openNewMemberForm = () => {
-    navigate('/member/create_member', { state: { userName, trust } });
+    navigate('/member/create_member', {
+      state: { userName, trust, sidebarNavKey: currentSidebarNavKey, allowCreateMember: true },
+    });
   };
 
   const openRegisterForm = (directoryMember) => {
@@ -1258,7 +1293,7 @@ export default function MemberProfilePage() {
       <main className="mp-main">
         <PageHeader
           title="Profile"
-          subtitle="View Members, Registered Member, and Member Profile table data"
+          subtitle="View member details"
           onBack={() => navigate('/dashboard', { state: { userName, trust, sidebarNavKey: currentSidebarNavKey } })}
         />
 
@@ -1519,7 +1554,6 @@ export default function MemberProfilePage() {
                       <div className="mp-profile-sections">
                         <div className="mp-profile-section">
                           <h4>Registration</h4>
-                          <p className="mp-section-source">registered_members table</p>
                           <div className="mp-form-grid">
                             {REGISTRATION_FIELDS.map((field) => (
                               <label key={field.key}>
@@ -1560,28 +1594,13 @@ export default function MemberProfilePage() {
                                     value={getProfileFieldValue(field.key)}
                                     onClick={(event) => {
                                       if (field.key !== 'joined_date') return;
-
-                                      const openPicker = (input) => {
-                                        if (!input || typeof input.showPicker !== 'function') return;
-                                        try {
-                                          input.showPicker();
-                                        } catch {
-                                          // Ignore when browser blocks programmatic picker open.
-                                        }
-                                      };
-
-                                      if (!isFieldEditable(field.key)) {
-                                        handleStartEdit();
-                                        window.setTimeout(() => {
-                                          const input = document.querySelector('input[name="joined_date"]');
-                                          if (!input) return;
-                                          input.focus();
-                                          openPicker(input);
-                                        }, 0);
-                                        return;
+                                      if (!isFieldEditable(field.key)) return;
+                                      if (typeof event.currentTarget.showPicker !== 'function') return;
+                                      try {
+                                        event.currentTarget.showPicker();
+                                      } catch {
+                                        // Ignore when browser blocks programmatic picker open.
                                       }
-
-                                      openPicker(event.currentTarget);
                                     }}
                                     onFocus={(event) => {
                                       if (field.key !== 'joined_date' || !isFieldEditable(field.key)) return;
@@ -1606,7 +1625,6 @@ export default function MemberProfilePage() {
 
                         <div className="mp-profile-section">
                           <h4>Member Details</h4>
-                          <p className="mp-section-source">Members table</p>
                           <div className="mp-form-grid">
                             {MEMBER_DETAILS_FIELDS.map((field) => (
                               <label key={field.key}>
@@ -1628,7 +1646,6 @@ export default function MemberProfilePage() {
 
                         <div className="mp-profile-section">
                           <h4>Profile</h4>
-                          <p className="mp-section-source">member_profile table</p>
                           {PROFILE_SECTIONS.map((section) => (
                             <div key={section.title} className="mp-profile-subsection">
                               <h5>{section.title}</h5>
@@ -1665,7 +1682,10 @@ export default function MemberProfilePage() {
                                               className={`mp-choice-btn ${currentValue === option ? 'active' : ''}`}
                                               onClick={() => {
                                                 if (!isFieldEditable(field.key)) return;
-                                                setEditForm((prev) => ({ ...prev, [field.key]: option }));
+                                                setEditForm((prev) => ({
+                                                  ...prev,
+                                                  [field.key]: prev[field.key] === option ? '' : option,
+                                                }));
                                               }}
                                               disabled={!isFieldEditable(field.key)}
                                             >
@@ -1727,6 +1747,7 @@ export default function MemberProfilePage() {
                                         value={getProfileFieldValue(field.key)}
                                         inputMode={PROFILE_NUMERIC_FIELD_KEYS.has(field.key) ? 'numeric' : undefined}
                                         pattern={PROFILE_NUMERIC_FIELD_KEYS.has(field.key) ? '[0-9]*' : undefined}
+                                        maxLength={STRICT_TEN_DIGIT_PROFILE_KEYS.has(field.key) ? 10 : undefined}
                                         onChange={(event) => {
                                           if (!isFieldEditable(field.key)) return;
                                           handleEditFieldChange(field.key, event.target.value);
@@ -1820,7 +1841,12 @@ export default function MemberProfilePage() {
                                     role="radio"
                                     aria-checked={familyForm.gender === option}
                                     className={`mp-choice-btn ${familyForm.gender === option ? 'active' : ''}`}
-                                    onClick={() => setFamilyForm((prev) => ({ ...prev, gender: option }))}
+                                    onClick={() =>
+                                      setFamilyForm((prev) => ({
+                                        ...prev,
+                                        gender: prev.gender === option ? '' : option,
+                                      }))
+                                    }
                                   >
                                     <span className="mp-choice-dot" aria-hidden="true" />
                                     <span className="mp-choice-label">{option}</span>
@@ -1853,10 +1879,18 @@ export default function MemberProfilePage() {
                                 value={familyForm.contact_no}
                                 inputMode="numeric"
                                 pattern="[0-9]*"
+                                maxLength={10}
                                 onChange={(event) => {
                                   const raw = String(event.target.value ?? '');
-                                  setFamilyNumberWarning(/\D/.test(raw) ? 'Only numbers are allowed in family contact number.' : '');
-                                  setFamilyForm((prev) => ({ ...prev, contact_no: sanitizeDigits(raw) }));
+                                  const digits = sanitizeDigits(raw).slice(0, 10);
+                                  if (/\D/.test(raw)) {
+                                    setFamilyNumberWarning('Only numbers are allowed in family contact number.');
+                                  } else if (digits.length > 0 && digits.length !== 10) {
+                                    setFamilyNumberWarning('Family contact number must be exactly 10 digits.');
+                                  } else {
+                                    setFamilyNumberWarning('');
+                                  }
+                                  setFamilyForm((prev) => ({ ...prev, contact_no: digits }));
                                 }}
                               />
                             </label>

@@ -191,6 +191,7 @@ export default function EventsPage() {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
   const [attachmentWarning, setAttachmentWarning] = useState('');
+  const [previewImage, setPreviewImage] = useState(null);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [statusTab, setStatusTab] = useState('current');
   const [typeFilter, setTypeFilter] = useState('general');
@@ -274,13 +275,18 @@ export default function EventsPage() {
   }, []);
 
   useEffect(() => {
-    if (!previewEvent) return undefined;
+    if (!previewEvent && !previewImage) return undefined;
     const onEsc = (event) => {
-      if (event.key === 'Escape') setPreviewEvent(null);
+      if (event.key !== 'Escape') return;
+      if (previewImage) {
+        setPreviewImage(null);
+        return;
+      }
+      setPreviewEvent(null);
     };
     document.addEventListener('keydown', onEsc);
     return () => document.removeEventListener('keydown', onEsc);
-  }, [previewEvent]);
+  }, [previewEvent, previewImage]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1134,11 +1140,22 @@ export default function EventsPage() {
                               <span>Image Preview</span>
                               {attachmentMeta.firstImageUrl ? (
                                 <div className="ev-attachment-preview">
-                                  <img
-                                    src={attachmentMeta.firstImageUrl}
-                                    alt={selectedEvent.title || 'Event attachment preview'}
-                                    className="ev-attachment-preview-thumb"
-                                  />
+                                  <button
+                                    type="button"
+                                    className="ev-attachment-preview-btn"
+                                    onClick={() =>
+                                      setPreviewImage({
+                                        src: attachmentMeta.firstImageUrl,
+                                        alt: selectedEvent.title || 'Event attachment preview',
+                                      })
+                                    }
+                                  >
+                                    <img
+                                      src={attachmentMeta.firstImageUrl}
+                                      alt={selectedEvent.title || 'Event attachment preview'}
+                                      className="ev-attachment-preview-thumb"
+                                    />
+                                  </button>
                                 </div>
                               ) : (
                                 <strong>-</strong>
@@ -1203,6 +1220,31 @@ export default function EventsPage() {
                     ))}
                   </div>
                 )}
+              </article>
+            </div>
+          )}
+
+          {previewImage && (
+            <div className="ev-preview-backdrop" onClick={() => setPreviewImage(null)}>
+              <article
+                className="ev-image-lightbox"
+                onClick={(event) => event.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Image preview"
+              >
+                <button
+                  type="button"
+                  className="ev-preview-close"
+                  onClick={() => setPreviewImage(null)}
+                >
+                  Close
+                </button>
+                <img
+                  src={previewImage.src}
+                  alt={previewImage.alt || 'Event attachment preview'}
+                  className="ev-image-lightbox-img"
+                />
               </article>
             </div>
           )}

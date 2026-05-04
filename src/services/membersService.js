@@ -428,6 +428,20 @@ export async function fetchOtherMembershipsByTrustId(trustId) {
   }, 12000);
 }
 
+export async function fetchOtherMembershipById(otherMembershipId) {
+  if (!otherMembershipId) return { data: null, error: { message: 'Other membership id is required.' } };
+
+  const table = await resolveTable(OTHER_MEMBERSHIPS_TABLE_CANDIDATES, 'other_memberships');
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq('id', otherMembershipId)
+    .maybeSingle();
+
+  if (error) return { data: null, error };
+  return { data: data ? normalizeOtherMembershipRow(data) : null, error: null };
+}
+
 export async function createOtherMembership(payload = {}, trustId = null) {
   if (!payload?.membership_no?.trim()) {
     return { data: null, error: { message: 'Membership No is required.' } };

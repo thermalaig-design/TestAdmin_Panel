@@ -323,6 +323,10 @@
   font-weight: 600;
 }
 
+.mf-form-grid label > .mf-field-error {
+  color: #b91c1c;
+}
+
 .mf-field > span {
   font-size: 12px;
   color: #334155;
@@ -344,6 +348,11 @@
 
 .mf-form-grid textarea {
   resize: vertical;
+}
+
+.mf-form-grid input.mf-input-error {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.14);
 }
 
 .mf-radio-group {

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import PageHeader from '../components/PageHeader';
 import { createMemberRole, fetchMemberRolesByTrust, fetchRegisteredMembersByTrust, updateMemberRole } from '../services/membersService';
+import { getCachedQueryValue } from '../services/requestCache';
 import './ExecutiveBodyPage.css';
 
 const ROLE_TYPE_OPTIONS = [
@@ -71,6 +72,7 @@ export default function ExecutiveBodyPage() {
   const [createSaving, setCreateSaving] = useState(false);
   const normalizedTrustId = String(trustId || '');
   const backdropMouseDownRef = useRef({ edit: false, create: false });
+  const isAnyModalOpen = Boolean(editRoleId) || createOpen;
 
   useEffect(() => {
     if (!trustId) {
@@ -79,9 +81,29 @@ export default function ExecutiveBodyPage() {
     }
 
     let cancelled = false;
+    const roleCacheKey = `members:member-roles:${trustId}`;
+    const registeredCacheKey = `members:registered-by-trust:${trustId}`;
+    const cachedRoles = getCachedQueryValue(roleCacheKey);
+    const cachedRegistered = getCachedQueryValue(registeredCacheKey);
+
+    if (cachedRoles?.data && Array.isArray(cachedRoles.data)) {
+      const trustOnlyRoleData = cachedRoles.data.filter(
+        (item) => String(item?.member?.trust_id || '') === normalizedTrustId
+      );
+      setRoleMembers(trustOnlyRoleData);
+      setSelectedGroupKey((prev) => prev || toText(trustOnlyRoleData?.[0]?.title).toLowerCase() || '');
+      setLoading(false);
+    }
+
+    if (cachedRegistered?.data && Array.isArray(cachedRegistered.data)) {
+      const trustOnlyRegisteredData = cachedRegistered.data.filter(
+        (item) => String(item?.trust_id || '') === normalizedTrustId
+      );
+      setRegisteredMembers(trustOnlyRegisteredData);
+    }
 
     const load = async () => {
-      setLoading(true);
+      if (!(cachedRoles?.data && Array.isArray(cachedRoles.data))) setLoading(true);
       setError('');
       const { data: roleData, error: fetchError } = await fetchMemberRolesByTrust(trustId);
 
@@ -118,6 +140,15 @@ export default function ExecutiveBodyPage() {
       cancelled = true;
     };
   }, [navigate, trustId, trust, userName, currentSidebarNavKey, normalizedTrustId]);
+
+  useEffect(() => {
+    if (!isAnyModalOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isAnyModalOpen]);
 
   const filteredRoleMembers = useMemo(() => {
     const term = toText(search).toLowerCase();

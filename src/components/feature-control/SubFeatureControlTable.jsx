@@ -72,7 +72,7 @@ export default function SubFeatureControlTable({
   }
 
   return (
-    <div className="fc-table-wrap">
+    <div className="fc-table-wrap fc-table-wrap-subfeatures">
       <table className="fc-table">
         <thead>
           <tr>
@@ -93,25 +93,25 @@ export default function SubFeatureControlTable({
 
             return (
               <tr key={`${row.sub_feature_id}-${row.tier}`}>
-                <td>
+                <td data-label="Icon">
                   <div className="fc-icon-cell">
                     <div className="fc-icon-preview">
                       <IconCell iconUrl={row.icon_url} subFeatureName={row.master_name} />
                     </div>
                   </div>
                 </td>
-                <td>
+                <td data-label="Sub Feature">
                   <div className="fc-feature-name">{row.master_name}</div>
                   {row.master_subname ? <div className="fc-feature-sub">{row.master_subname}</div> : null}
                 </td>
-                <td>{row.display_name || '-'}</td>
-                <td>{row.tagline || '-'}</td>
-                <td>{row.route || '-'}</td>
-                <td>
+                <td data-label="Display Name">{row.display_name || '-'}</td>
+                <td data-label="Tagline">{row.tagline || '-'}</td>
+                <td data-label="Route">{row.route || '-'}</td>
+                <td data-label="Tier">
                   <span className="fc-pill">{row.tier}</span>
                 </td>
-                <td>{row.quick_order ?? '-'}</td>
-                <td>
+                <td data-label="Quick Order">{row.quick_order ?? '-'}</td>
+                <td data-label="Status">
                   <button
                     type="button"
                     className={`fc-toggle ${row.is_enabled ? 'on' : 'off'} ${isBusy ? 'busy' : ''}`}
@@ -126,10 +126,12 @@ export default function SubFeatureControlTable({
                     </span>
                   </button>
                 </td>
-                <td>
-                  <button className="fc-btn fc-btn-edit" type="button" onClick={() => onEdit(row)}>
-                    Edit
-                  </button>
+                <td data-label="Actions">
+                  <div className="fc-actions-cell">
+                    <button className="fc-btn fc-btn-edit fc-btn-action" type="button" onClick={() => onEdit(row)}>
+                      Edit
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

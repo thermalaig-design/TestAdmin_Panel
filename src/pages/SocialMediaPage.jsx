@@ -84,6 +84,7 @@ export default function SocialMediaPage() {
   const selectedPlatform = toTitleCase(searchParams.get('platform')) || '';
   const selectedPhotoId = searchParams.get('photoId') || '';
   const selectedPhotoUrl = searchParams.get('photoUrl') || '';
+  const selectedFolderId = searchParams.get('folderId') || '';
   const selectedFolder = searchParams.get('folder') || '';
 
   const [activeSection, setActiveSection] = useState(() => {
@@ -109,6 +110,7 @@ export default function SocialMediaPage() {
   const [generating, setGenerating] = useState(false);
   const [generateStatus, setGenerateStatus] = useState('');
   const aiCaptionCacheRef = useRef(new Map());
+  const selectedDetailsRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -436,6 +438,16 @@ export default function SocialMediaPage() {
     [mediaRows, selectedMediaId]
   );
 
+  const handleOpenMedia = (rowId) => {
+    const safeId = rowId || '';
+    setSelectedMediaId(safeId);
+    if (!safeId) return;
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(`sm-media-item-${safeId}`);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   const formatDateTime = (value) => {
     if (!value) return 'N/A';
     const date = new Date(value);
@@ -462,11 +474,11 @@ export default function SocialMediaPage() {
         <PageHeader
           title={pageTitle}
           subtitle={pageSubtitle}
-          onBack={() =>
-            navigate(isCreateRoute ? '/gallery' : '/dashboard', {
+          onBack={() => {
+            navigate('/social-media', {
               state: { userName, trust, superuserId, sidebarNavKey: currentSidebarNavKey },
-            })
-          }
+            });
+          }}
         />
 
         <section className="sm-content">
@@ -666,6 +678,7 @@ export default function SocialMediaPage() {
                         {mediaRows.map((row, index) => (
                           <div
                             key={row.id || `${row.title}-${index}`}
+                            id={row.id ? `sm-media-item-${row.id}` : undefined}
                             className={`sm-media-item ${selectedMediaId === row.id ? 'active' : ''}`}
                           >
                             <div className="sm-media-title">{row.title || 'Untitled'}</div>
@@ -678,7 +691,7 @@ export default function SocialMediaPage() {
                             <button
                               type="button"
                               className="sm-media-open-btn"
-                              onClick={() => setSelectedMediaId(row.id || '')}
+                              onClick={() => handleOpenMedia(row.id)}
                             >
                               Open
                             </button>
@@ -687,7 +700,7 @@ export default function SocialMediaPage() {
                       </div>
 
                       {selectedMediaRow ? (
-                        <div className="sm-media-details-card">
+                        <div ref={selectedDetailsRef} className="sm-media-details-card">
                           <div className="sm-media-details-head">
                             <h5>{selectedMediaRow.title || 'Untitled'}</h5>
                             <button

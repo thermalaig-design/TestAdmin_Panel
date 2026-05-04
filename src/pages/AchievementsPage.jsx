@@ -207,6 +207,7 @@ export default function AchievementsPage() {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
   const [attachmentWarning, setAttachmentWarning] = useState('');
+  const [previewImage, setPreviewImage] = useState(null);
   const [selectedFacilityId, setSelectedFacilityId] = useState('');
   const [statusTab, setStatusTab] = useState('all');
   const [typeFilter, setTypeFilter] = useState('general');
@@ -279,13 +280,18 @@ export default function AchievementsPage() {
   }, []);
 
   useEffect(() => {
-    if (!previewFacility) return undefined;
+    if (!previewFacility && !previewImage) return undefined;
     const onEsc = (event) => {
-      if (event.key === 'Escape') setPreviewFacility(null);
+      if (event.key !== 'Escape') return;
+      if (previewImage) {
+        setPreviewImage(null);
+        return;
+      }
+      setPreviewFacility(null);
     };
     document.addEventListener('keydown', onEsc);
     return () => document.removeEventListener('keydown', onEsc);
-  }, [previewFacility]);
+  }, [previewFacility, previewImage]);
 
   const activeFacilities = useMemo(
     () => facilities.filter((facility) => !isPausedStatus(facility?.status)),
@@ -1066,11 +1072,22 @@ const removeAttachment = (index) => {
                                 <div className="nb-attachment-preview-list">
                                   {attachmentMeta.imageUrls.map((imageUrl, index) => (
                                     <div key={`${imageUrl}-${index}`} className="nb-attachment-preview">
-                                      <AchievementAttachmentImage
-                                        src={imageUrl}
-                                        alt={`${selectedFacility.name || 'Achievement'} attachment ${index + 1}`}
-                                        className="nb-attachment-preview-thumb"
-                                      />
+                                      <button
+                                        type="button"
+                                        className="nb-attachment-preview-btn"
+                                        onClick={() =>
+                                          setPreviewImage({
+                                            src: imageUrl,
+                                            alt: `${selectedFacility.name || 'Achievement'} attachment ${index + 1}`,
+                                          })
+                                        }
+                                      >
+                                        <AchievementAttachmentImage
+                                          src={imageUrl}
+                                          alt={`${selectedFacility.name || 'Achievement'} attachment ${index + 1}`}
+                                          className="nb-attachment-preview-thumb"
+                                        />
+                                      </button>
                                     </div>
                                   ))}
                                 </div>
@@ -1139,6 +1156,31 @@ const removeAttachment = (index) => {
                     ))}
                   </div>
                 )}
+              </article>
+            </div>
+          )}
+
+          {previewImage && (
+            <div className="nb-preview-backdrop" onClick={() => setPreviewImage(null)}>
+              <article
+                className="nb-image-lightbox"
+                onClick={(event) => event.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Image preview"
+              >
+                <button
+                  type="button"
+                  className="nb-preview-close"
+                  onClick={() => setPreviewImage(null)}
+                >
+                  Close
+                </button>
+                <AchievementAttachmentImage
+                  src={previewImage.src}
+                  alt={previewImage.alt || 'Achievement attachment preview'}
+                  className="nb-image-lightbox-img"
+                />
               </article>
             </div>
           )}

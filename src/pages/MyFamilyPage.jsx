@@ -75,6 +75,7 @@ export default function MyFamilyPage() {
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
   const [ageError, setAgeError] = useState('');
+  const [contactError, setContactError] = useState('');
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(() => initialEditItem?.id || null);
   const [form, setForm] = useState(() => {
@@ -86,6 +87,7 @@ export default function MyFamilyPage() {
   const [memberPanelSearch, setMemberPanelSearch] = useState('');
   const [memberTypeFilter, setMemberTypeFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState('name_asc');
   const [memberPage, setMemberPage] = useState(1);
 
   const memberNameMap = useMemo(
@@ -126,7 +128,7 @@ export default function MyFamilyPage() {
   }, [memberOptions]);
   const filteredMemberOptions = useMemo(() => {
     const term = memberPanelSearch.trim().toLowerCase();
-    return memberOptions.filter((member) => {
+    const filtered = memberOptions.filter((member) => {
       if (isCreateRoute && member.member_type !== 'my') return false;
       if (memberTypeFilter === 'my' && member.member_type !== 'my') return false;
       if (memberTypeFilter === 'others' && member.member_type === 'my') return false;
@@ -143,7 +145,14 @@ export default function MyFamilyPage() {
       ];
       return searchable.some((value) => String(value || '').toLowerCase().includes(term));
     });
-  }, [memberOptions, memberPanelSearch, memberTypeFilter, roleFilter, isCreateRoute]);
+    return [...filtered].sort((left, right) => {
+      const order = String(left.name || '').localeCompare(String(right.name || ''), undefined, {
+        sensitivity: 'base',
+        numeric: true,
+      });
+      return sortOrder === 'name_desc' ? -order : order;
+    });
+  }, [memberOptions, memberPanelSearch, memberTypeFilter, roleFilter, isCreateRoute, sortOrder]);
   const memberPickerTotalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredMemberOptions.length / MEMBER_PICKER_PAGE_SIZE)),
     [filteredMemberOptions.length]
@@ -170,6 +179,7 @@ export default function MyFamilyPage() {
     setEditingId(null);
     setFormError('');
     setAgeError('');
+    setContactError('');
   };
 
   const handleSelectMember = (member) => {
@@ -180,6 +190,7 @@ export default function MyFamilyPage() {
     const label = formatMemberLabel(member);
     setForm((prev) => ({ ...prev, members_id: String(member.member_id) }));
     setMemberSearch(label);
+    setContactError('');
     if (
       formError === 'Member is required.' ||
       formError === 'Please select member from list.' ||
@@ -312,17 +323,24 @@ export default function MyFamilyPage() {
       setAgeError('Age should be greater than 0.');
       return;
     }
+    const cleanedContact = sanitizeDigits(form.contact_no);
+    if (cleanedContact !== '' && cleanedContact.length !== 10) {
+      setFormError('Contact number must be exactly 10 digits.');
+      setContactError('Contact number must be exactly 10 digits.');
+      return;
+    }
 
     setSaving(true);
     setFormError('');
     setAgeError('');
+    setContactError('');
     const payload = {
       name: form.name.trim(),
       relation: form.relation.trim(),
       gender: form.gender || null,
       age: form.age === '' ? null : Number(form.age),
       blood_group: form.blood_group || null,
-      contact_no: sanitizeDigits(form.contact_no) || null,
+      contact_no: cleanedContact || null,
       email: form.email.trim() || null,
       address: form.address.trim() || null,
     };
@@ -374,6 +392,7 @@ export default function MyFamilyPage() {
     setMemberSearch(memberLabelMap.get(toText(item.members_id)) || '');
     setFormError('');
     setAgeError('');
+    setContactError('');
   };
 
   const handleDelete = async (item) => {
@@ -437,6 +456,13 @@ export default function MyFamilyPage() {
                   {roleOptions.map((role) => (
                     <option key={role} value={role}>{role}</option>
                   ))}
+                </select>
+              </div>
+              <div className="mf-picker-role-row">
+                <span>Sort</span>
+                <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+                  <option value="name_asc">Name (A-Z)</option>
+                  <option value="name_desc">Name (Z-A)</option>
                 </select>
               </div>
               <input
@@ -570,9 +596,11 @@ export default function MyFamilyPage() {
                 <label>
                   <span>Age</span>
                   <input
+                    className={ageError ? 'mf-input-error' : ''}
                     type="number"
                     min="1"
                     step="1"
+                    aria-invalid={ageError ? 'true' : 'false'}
                     value={form.age}
                     onChange={(event) => {
                       const nextValue = event.target.value;
@@ -611,12 +639,25 @@ export default function MyFamilyPage() {
                 <label>
                   <span>Contact No</span>
                   <input
+                    className={contactError ? 'mf-input-error' : ''}
                     value={form.contact_no}
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    onChange={(event) => setForm((prev) => ({ ...prev, contact_no: sanitizeDigits(event.target.value) }))}
+                    maxLength={10}
+                    aria-invalid={contactError ? 'true' : 'false'}
+                    onChange={(event) => {
+                      const cleaned = sanitizeDigits(event.target.value).slice(0, 10);
+                      setForm((prev) => ({ ...prev, contact_no: cleaned }));
+                      if (cleaned === '' || cleaned.length === 10) {
+                        setContactError('');
+                        if (formError === 'Contact number must be exactly 10 digits.') setFormError('');
+                      } else {
+                        setContactError('Contact number must be exactly 10 digits.');
+                      }
+                    }}
                     placeholder="Contact number"
                   />
+                  {contactError && <span className="mf-field-error">{contactError}</span>}
                 </label>
                 <label>
                   <span>Email</span>

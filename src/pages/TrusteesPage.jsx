@@ -450,13 +450,13 @@ export default function TrusteesPage() {
               Back
             </button>
             <div className="tp-topbar-titles">
-              <h1 className="page-title">Trust Details</h1>
-              <p className="page-subtitle">View and manage your trust information</p>
+              <h1 className="tp-page-title">Trust Details</h1>
+              <p className="tp-page-subtitle">View and manage your trust information</p>
             </div>
           </div>
 
-          <div className="topbar-right">
-            <div className={`search-box ${searchFocused ? 'focused' : ''}`}>
+          <div className="tp-topbar-right">
+            <div className={`tp-search-box ${searchFocused ? 'focused' : ''}`}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
                 <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.6"/>
                 <path d="M11 11l2.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
@@ -464,7 +464,7 @@ export default function TrusteesPage() {
               <input
                 type="text"
                 placeholder="Search..."
-                className="search-input"
+                className="tp-search-input"
                 id="tp-search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -472,9 +472,9 @@ export default function TrusteesPage() {
                 onBlur={() => setSearchFocused(false)}
               />
             </div>
-            <div className="avatar-wrap">
-              <div className="avatar-btn">{userInitials}</div>
-              <div className="avatar-online"/>
+            <div className="tp-avatar-wrap">
+              <div className="tp-avatar-btn">{userInitials}</div>
+              <div className="tp-avatar-online"/>
             </div>
           </div>
         </header>

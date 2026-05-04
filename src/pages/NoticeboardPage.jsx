@@ -257,6 +257,7 @@ export default function NoticeboardPage() {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
   const [attachmentWarning, setAttachmentWarning] = useState('');
+  const [previewImage, setPreviewImage] = useState(null);
   const [selectedNoticeId, setSelectedNoticeId] = useState('');
   const [statusTab, setStatusTab] = useState('current');
   const [typeFilter, setTypeFilter] = useState('general');
@@ -332,13 +333,18 @@ export default function NoticeboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!previewNotice) return undefined;
+    if (!previewNotice && !previewImage) return undefined;
     const onEsc = (event) => {
-      if (event.key === 'Escape') setPreviewNotice(null);
+      if (event.key !== 'Escape') return;
+      if (previewImage) {
+        setPreviewImage(null);
+        return;
+      }
+      setPreviewNotice(null);
     };
     document.addEventListener('keydown', onEsc);
     return () => document.removeEventListener('keydown', onEsc);
-  }, [previewNotice]);
+  }, [previewNotice, previewImage]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1160,11 +1166,22 @@ export default function NoticeboardPage() {
                                 <div className="nb-attachment-preview-list">
                                   {attachmentMeta.imageUrls.map((imageUrl, index) => (
                                     <div key={`${imageUrl}-${index}`} className="nb-attachment-preview">
-                                      <NoticeAttachmentImage
-                                        src={imageUrl}
-                                        alt={`${selectedNotice.name || 'Notice'} attachment ${index + 1}`}
-                                        className="nb-attachment-preview-thumb"
-                                      />
+                                      <button
+                                        type="button"
+                                        className="nb-attachment-preview-btn"
+                                        onClick={() =>
+                                          setPreviewImage({
+                                            src: imageUrl,
+                                            alt: `${selectedNotice.name || 'Notice'} attachment ${index + 1}`,
+                                          })
+                                        }
+                                      >
+                                        <NoticeAttachmentImage
+                                          src={imageUrl}
+                                          alt={`${selectedNotice.name || 'Notice'} attachment ${index + 1}`}
+                                          className="nb-attachment-preview-thumb"
+                                        />
+                                      </button>
                                     </div>
                                   ))}
                                 </div>
@@ -1231,6 +1248,31 @@ export default function NoticeboardPage() {
                     ))}
                   </div>
                 )}
+              </article>
+            </div>
+          )}
+
+          {previewImage && (
+            <div className="nb-preview-backdrop" onClick={() => setPreviewImage(null)}>
+              <article
+                className="nb-image-lightbox"
+                onClick={(event) => event.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Image preview"
+              >
+                <button
+                  type="button"
+                  className="nb-preview-close"
+                  onClick={() => setPreviewImage(null)}
+                >
+                  Close
+                </button>
+                <NoticeAttachmentImage
+                  src={previewImage.src}
+                  alt={previewImage.alt || 'Notice attachment preview'}
+                  className="nb-image-lightbox-img"
+                />
               </article>
             </div>
           )}

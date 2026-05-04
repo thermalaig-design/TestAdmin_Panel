@@ -357,14 +357,15 @@
 
 .sm-media-item {
   width: 100%;
-  min-height: 210px;
+  min-height: 150px;
   display: flex;
   flex-direction: column;
   text-align: left;
   border: 1px solid rgba(99, 102, 241, 0.16);
   border-radius: 14px;
-  padding: 14px;
+  padding: 12px;
   background: #fff;
+  scroll-margin-top: 118px;
 }
 
 .sm-media-item.active {
@@ -373,26 +374,26 @@
 }
 
 .sm-media-title {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
   color: #1e1b4b;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .sm-media-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .sm-media-meta span {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #1d4ed8;
   border-radius: 999px;
   background: #dbeafe;
-  padding: 4px 8px;
+  padding: 3px 8px;
 }
 
 .sm-media-item p {
@@ -406,6 +407,10 @@
   border-radius: 14px;
   padding: 14px;
   background: #f8faff;
+  position: sticky;
+  top: 112px;
+  align-self: start;
+  scroll-margin-top: 118px;
 }
 
 .sm-media-details-card h5 {
@@ -474,9 +479,9 @@
   border-radius: 8px;
   background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 8px 12px;
+  padding: 7px 12px;
   cursor: pointer;
 }
 
@@ -532,6 +537,10 @@
 
   .sm-media-layout {
     grid-template-columns: 1fr;
+  }
+
+  .sm-media-details-card {
+    position: static;
   }
 
   .sm-media-list {

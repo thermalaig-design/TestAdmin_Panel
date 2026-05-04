@@ -175,6 +175,7 @@ export default function MembersPage() {
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
   const trustId = trust?.id || null;
   const isCreateRoute = location.pathname === MEMBERS_CREATE_PATH;
+  const canOpenCreateRoute = location.state?.allowCreateMember === true;
   const cachedMembers = isCreateRoute ? null : readMembersCache(trustId);
 
   const [registeredMembers, setRegisteredMembers] = useState(() => cachedMembers?.registeredMembers || []);
@@ -211,6 +212,15 @@ export default function MembersPage() {
   });
   const [registerCandidate, setRegisterCandidate] = useState(null);
   const currentPageParam = Number(new URLSearchParams(location.search).get('page') || '1');
+
+  useEffect(() => {
+    if (!isCreateRoute) return;
+    if (canOpenCreateRoute) return;
+    navigate(MEMBERS_LANDING_PATH, {
+      replace: true,
+      state: { userName, trust, sidebarNavKey: currentSidebarNavKey },
+    });
+  }, [isCreateRoute, canOpenCreateRoute, navigate, userName, trust, currentSidebarNavKey]);
 
   useEffect(() => {
     if (!trustId) navigate('/dashboard', { replace: true, state: { userName, trust } });
@@ -330,6 +340,7 @@ export default function MembersPage() {
   );
   const createMobileDigits = sanitizeDigits(createMobileQuery);
   const isCreateMobileSearchReady = createMobileDigits.length > 0;
+  const isCreateMobileCreateReady = createMobileDigits.length === 10;
   const isEditingExistingMember = !!selectedMember?.id;
   const isUsingExistingMemberInCreateFlow =
     isCreateRoute && createFlowStep === 'form' && !!selectedCreateMember?.member_id;
@@ -438,7 +449,9 @@ export default function MembersPage() {
     setShowRegisterForm(false);
     setShowDetailModal(false);
     setUseCustomMainRole(false);
-    navigate(MEMBERS_CREATE_PATH, { state: { userName, trust } });
+    navigate(MEMBERS_CREATE_PATH, {
+      state: { userName, trust, sidebarNavKey: currentSidebarNavKey, allowCreateMember: true },
+    });
   };
 
   const openCreateFormFromMobileSearch = (mobileDigits = '') => {
@@ -892,7 +905,7 @@ export default function MembersPage() {
                       )}
                     </div>
                   )}
-                  {isCreateMobileSearchReady && !loadingDirectory && (
+                  {isCreateMobileCreateReady && !loadingDirectory && (
                     <div className="sp-form-actions">
                         <button
                           className="sp-primary"
