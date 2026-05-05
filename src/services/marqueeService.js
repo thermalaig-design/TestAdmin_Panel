@@ -26,7 +26,7 @@ export async function fetchMarqueeUpdatesByTrust(trustId) {
       .from(TABLE_NAME)
       .select('*')
       .eq('trust_id', trustId)
-      .order('priority', { ascending: false })
+      .order('priority', { ascending: true })
       .order('created_at', { ascending: false });
 
     return { data: (data || []).map(normalizeMarqueeRow), error };
