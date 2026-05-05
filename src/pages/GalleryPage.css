@@ -36,6 +36,16 @@
   font-size: 13px;
 }
 
+.gallery-notice {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
 .gallery-shell {
   display: flex;
   flex-direction: column;

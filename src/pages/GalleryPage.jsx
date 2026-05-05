@@ -34,6 +34,7 @@ export default function GalleryPage() {
   const [selectedFolderId, setSelectedFolderId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isEditingFolder, setIsEditingFolder] = useState(false);
@@ -58,6 +59,7 @@ export default function GalleryPage() {
       if (!trustId) return;
       setLoading(true);
       setError('');
+      setNotice('');
       const { data: folderData, error: folderErr } = await fetchGalleryFolders(trustId);
       if (folderErr) setError(folderErr.message || 'Unable to load folders.');
 
@@ -356,6 +358,7 @@ export default function GalleryPage() {
 
     setUploading(true);
     setError('');
+    setNotice('');
 
     const uploaded = [];
     let failed = 0;
@@ -408,9 +411,18 @@ export default function GalleryPage() {
       if (sizeSkipped > 0) notes.push(`${sizeSkipped} could not be compressed to 25KB`);
       if (files.length !== imageFiles.length) notes.push(`${files.length - imageFiles.length} non-image skipped`);
       if (firstUploadError) notes.push(firstUploadError);
-      setError(`Uploaded ${uploaded.length}/${imageFiles.length} image(s). ${notes.join('. ')}.`);
+      const message = `Uploaded ${uploaded.length}/${imageFiles.length} image(s). ${notes.join('. ')}.`;
+      const hasActualError = failed > 0 || sizeSkipped > 0 || files.length !== imageFiles.length || Boolean(firstUploadError);
+      if (hasActualError) {
+        setError(message);
+        setNotice('');
+      } else {
+        setError('');
+        setNotice(message);
+      }
     } else {
       setError('');
+      setNotice('');
     }
 
     setUploading(false);
@@ -570,6 +582,7 @@ export default function GalleryPage() {
           onBack={handleHeaderBack}
         />
         <div className="gallery-content">
+          {notice && <div className="gallery-notice">{notice}</div>}
           {error && <div className="gallery-error">{error}</div>}
           <div className="gallery-shell">
             {!routeFolderId && (
