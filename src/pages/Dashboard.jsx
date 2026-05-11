@@ -3,6 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import './Dashboard.css';
 import { fetchTrustDetails } from '../services/authService';
 import { warmupTrustData } from '../services/warmupService';
+import { fetchNoticeboardByTrust } from '../services/noticeboardService';
+import { fetchEventsByTrust } from '../services/eventsService';
+import { fetchNotificationsByTrustId } from '../services/notificationsService';
+import { fetchDashboardByTrustId } from '../services/dashboardService';
 import Sidebar from '../components/Sidebar';
 
 // ── Export reusable icon renderer component ───────────────────────────────────
@@ -407,7 +411,7 @@ const MODULE_CARDS = [
 
 const APP_DESIGN_CARD_IDS = new Set(['card-logo', 'card-theme', 'card-feature-control', 'card-sub-feature-control', 'card-features-2-o']);
 const COMPANY_DETAILS_CARD_IDS = new Set(['card-trust', 'card-social-media-account-details']);
-const DASHBOARD_CARD_IDS = new Set(['card-user-management']);
+const DASHBOARD_CARD_IDS = new Set();
 const HOME_PAGE_CARD_IDS = new Set(['card-sponsor', 'card-gallery', 'card-marquee']);
 const QUICK_ACTION_CARD_IDS = new Set(['card-profile', 'card-executive-body', 'card-noticeboard', 'card-events', 'card-facilities', 'card-donations', 'card-members', 'card-achievements']);
 const MENU_MODULE_CARDS = [
@@ -747,6 +751,30 @@ export default function Dashboard() {
 
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [liveNotices, setLiveNotices] = useState([]);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState({
+    totalMembers: 0,
+    appDownloads: 0,
+    liveEvents: 0,
+    panelUsers: 0,
+    liveAppUsers: 0,
+  });
+  const [communityStats, setCommunityStats] = useState({
+    postsOnSocialMedia: 0,
+    galleryUploads: 0,
+    announcementsSent: 0,
+    referralActivities: 0,
+  });
+  const [governanceStats, setGovernanceStats] = useState({
+    electedMembers: 0,
+    committeeMembers: 0,
+    vipPatronMembers: 0,
+    total: 0,
+  });
+  const [memberGrowthSeries, setMemberGrowthSeries] = useState([0, 0, 0, 0, 0, 0]);
+  const [activeUsersSeries, setActiveUsersSeries] = useState([0, 0, 0, 0, 0, 0]);
+  const [liveFeed, setLiveFeed] = useState([]);
 
   const userInitials = initials(userName);
   const currentSidebarNavKey = location.state?.sidebarNavKey || 'dashboard';
@@ -785,6 +813,32 @@ export default function Dashboard() {
       return label.includes(query) || description.includes(query);
     });
   }, [searchTerm, scopedModules]);
+  const dashboardSummaryCards = [
+    { label: 'Total Members', value: String(dashboardStats.totalMembers || 0), note: `${dashboardStats.totalMembers || 0} registered`, tone: 'violet' },
+    { label: 'App Downloads', value: String(dashboardStats.appDownloads || 0), note: 'From panel data', tone: 'green' },
+    { label: 'Live Events', value: String(dashboardStats.liveEvents || 0), note: 'Upcoming / active', tone: 'orange' },
+    { label: 'Panel Users', value: String(dashboardStats.panelUsers || 0), note: 'Active on panel', tone: 'pink' },
+    { label: 'Live App Users', value: String(dashboardStats.liveAppUsers || 0), note: 'Estimated', tone: 'cyan' },
+  ];
+  const formatDayMonth = (input) => {
+    if (!input) return '--';
+    const parsed = new Date(input);
+    if (Number.isNaN(parsed.getTime())) return '--';
+    return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  };
+
+  const formatDisplayTime = (input) => {
+    if (!input) return '--';
+    if (typeof input === 'string' && input.includes(':')) {
+      const [h = '0', m = '0'] = input.split(':');
+      const d = new Date();
+      d.setHours(Number(h), Number(m), 0, 0);
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+    const parsed = new Date(input);
+    if (Number.isNaN(parsed.getTime())) return '--';
+    return parsed.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -798,6 +852,123 @@ export default function Dashboard() {
 
     return () => {
       mounted = false;
+    };
+  }, [trustId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!trustId) return undefined;
+
+    (async () => {
+      const [noticesRes, eventsRes] = await Promise.all([
+        fetchNoticeboardByTrust(trustId),
+        fetchEventsByTrust(trustId),
+      ]);
+      if (cancelled) return;
+
+      const notices = Array.isArray(noticesRes?.data) ? noticesRes.data : [];
+      const events = Array.isArray(eventsRes?.data) ? eventsRes.data : [];
+
+      setLiveNotices(
+        notices.slice(0, 3).map((row) => ({
+          title: String(row?.name || 'Untitled Notice'),
+          priority: String(row?.status || 'normal').toLowerCase() === 'urgent' ? 'Urgent' : String(row?.status || 'Normal'),
+          audience: String(row?.type || 'All Members'),
+          time: formatDisplayTime(row?.created_at),
+          expiry: row?.end_date ? new Date(row.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No expiry',
+        }))
+      );
+
+      setUpcomingEvents(
+        events
+          .filter((row) => !row?.startEventDate || new Date(row.startEventDate).getTime() >= new Date().setHours(0, 0, 0, 0))
+          .slice(0, 3)
+          .map((row) => ({
+            date: formatDayMonth(row?.startEventDate),
+            name: String(row?.title || 'Untitled Event'),
+            venue: String(row?.location || 'Venue not set'),
+            status: row?.status ? String(row.status).replace(/_/g, ' ') : 'Upcoming',
+          }))
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trustId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!trustId) return undefined;
+
+    (async () => {
+      const [eventsRes, noticesRes, notificationsRes, dashboardRes] = await Promise.all([
+        fetchEventsByTrust(trustId),
+        fetchNoticeboardByTrust(trustId),
+        fetchNotificationsByTrustId(trustId),
+        fetchDashboardByTrustId(trustId),
+      ]);
+      if (cancelled) return;
+
+      const events = Array.isArray(eventsRes?.data) ? eventsRes.data : [];
+      const notices = Array.isArray(noticesRes?.data) ? noticesRes.data : [];
+      const notifications = Array.isArray(notificationsRes?.data) ? notificationsRes.data : [];
+      const dashboardRow = dashboardRes?.data || null;
+
+      setDashboardStats({
+        totalMembers: Number(dashboardRow?.total_members ?? 0),
+        appDownloads: Number(dashboardRow?.app_downloads ?? 0),
+        liveEvents: Number(dashboardRow?.live_events ?? 0),
+        panelUsers: Number(dashboardRow?.panel_users ?? 0),
+        liveAppUsers: Number(dashboardRow?.live_app_users ?? 0),
+      });
+      setGovernanceStats({
+        electedMembers: Number(dashboardRow?.elected_members ?? 0),
+        committeeMembers: Number(dashboardRow?.committee_members ?? 0),
+        vipPatronMembers: Number(dashboardRow?.vip_patron_members ?? 0),
+        total: Number(dashboardRow?.total_members ?? 0),
+      });
+      setCommunityStats({
+        postsOnSocialMedia: Number(dashboardRow?.posts_on_social_media ?? 0),
+        galleryUploads: Number(dashboardRow?.gallery_uploads ?? 0),
+        announcementsSent: Number(dashboardRow?.announcements_sent ?? 0),
+        referralActivities: Number(dashboardRow?.referral_activities ?? 0),
+      });
+      setMemberGrowthSeries(Array(6).fill(Number(dashboardRow?.total_members ?? 0)));
+      setActiveUsersSeries(Array(6).fill(Number(dashboardRow?.live_app_users ?? 0)));
+
+      const notificationFeed = notifications.slice(0, 5).map((item) => ({
+        title: item?.title ? String(item.title) : 'Notification sent',
+        subtitle: item?.message ? String(item.message) : 'Trust notification update',
+        time: formatDisplayTime(item?.created_at),
+        ts: item?.created_at ? new Date(item.created_at).getTime() : 0,
+      }));
+
+      const noticeFeed = notices.slice(0, 5).map((item) => ({
+        title: item?.name ? `Notice: ${item.name}` : 'Notice updated',
+        subtitle: item?.description ? String(item.description).slice(0, 60) : 'Noticeboard entry updated',
+        time: formatDisplayTime(item?.created_at),
+        ts: item?.created_at ? new Date(item.created_at).getTime() : 0,
+      }));
+
+      const eventsFeed = events.slice(0, 5).map((item) => ({
+        title: item?.title ? `Event: ${item.title}` : 'Event updated',
+        subtitle: item?.location ? String(item.location) : 'Event details updated',
+        time: formatDisplayTime(item?.created_at || item?.startEventDate),
+        ts: item?.created_at
+          ? new Date(item.created_at).getTime()
+          : (item?.startEventDate ? new Date(item.startEventDate).getTime() : 0),
+      }));
+
+      const mergedFeed = [...notificationFeed, ...noticeFeed, ...eventsFeed]
+        .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+        .slice(0, 6)
+        .map(({ title, subtitle, time }) => ({ title, subtitle, time }));
+      setLiveFeed(mergedFeed);
+    })();
+
+    return () => {
+      cancelled = true;
     };
   }, [trustId]);
 
@@ -942,6 +1113,191 @@ export default function Dashboard() {
               <span className="trust-badge-text">{activeTrust?.name || 'No Trust'}</span>
             </div>
           </div>
+
+          {currentSidebarNavKey === 'dashboard' && (
+            <section className="dp-wrap">
+              <div className="dp-head">
+                <h2>Overview Dashboard</h2>
+                <p>Key highlights for {activeTrust?.name || 'your trust'}</p>
+              </div>
+
+              <div className="dp-kpis">
+                {dashboardSummaryCards.map((item) => (
+                  <article key={item.label} className={`dp-kpi dp-${item.tone}`}>
+                    <div className="dp-kpi-title">{item.label}</div>
+                    <div className="dp-kpi-value">{item.value}</div>
+                    <div className="dp-kpi-note">{item.note}</div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="dp-grid">
+                <article className="dp-card">
+                  <div className="dp-card-head">
+                    <h3>Governance Overview</h3>
+                    <span>{governanceStats.total} total</span>
+                  </div>
+                  <div className="dp-donut-row gov">
+                    <div className="dp-donut gov">
+                      <strong>{governanceStats.total}</strong>
+                      <span>Total Members</span>
+                    </div>
+                    <div className="dp-list gov">
+                      <div className="dp-list-row">
+                        <div className="dp-list-meta"><span className="dot purple" /> Elected Members</div>
+                        <b>{governanceStats.electedMembers}</b>
+                      </div>
+                      <div className="dp-meter"><span style={{ width: `${governanceStats.total ? (governanceStats.electedMembers / governanceStats.total) * 100 : 0}%` }} className="meter-purple" /></div>
+
+                      <div className="dp-list-row">
+                        <div className="dp-list-meta"><span className="dot gold" /> Committee Members</div>
+                        <b>{governanceStats.committeeMembers}</b>
+                      </div>
+                      <div className="dp-meter"><span style={{ width: `${governanceStats.total ? (governanceStats.committeeMembers / governanceStats.total) * 100 : 0}%` }} className="meter-gold" /></div>
+
+                      <div className="dp-list-row">
+                        <div className="dp-list-meta"><span className="dot green" /> VIP / Patron Members</div>
+                        <b>{governanceStats.vipPatronMembers}</b>
+                      </div>
+                      <div className="dp-meter"><span style={{ width: `${governanceStats.total ? (governanceStats.vipPatronMembers / governanceStats.total) * 100 : 0}%` }} className="meter-green" /></div>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="dp-card">
+                  <div className="dp-card-head">
+                    <h3>Community Engagement</h3>
+                  </div>
+                  <div className="dp-metric-list">
+                    <div><span>Posts on Social Media</span><b>{communityStats.postsOnSocialMedia}</b></div>
+                    <div><span>Gallery Uploads</span><b>{communityStats.galleryUploads}</b></div>
+                    <div><span>Announcements Sent</span><b>{communityStats.announcementsSent}</b></div>
+                    <div><span>Referral Activities</span><b>{communityStats.referralActivities}</b></div>
+                  </div>
+                </article>
+
+                <article className="dp-card">
+                  <div className="dp-card-head">
+                    <h3>Live Activity Feed</h3>
+                    <button type="button">View all</button>
+                  </div>
+                  <div className="dp-feed">
+                    {liveFeed.length === 0 && <div className="dp-empty-note">No live activity found.</div>}
+                    {liveFeed.map((item) => (
+                      <div key={`${item.title}-${item.time}`} className="dp-feed-item">
+                        <div>
+                          <strong>{item.title}</strong>
+                          <span>{item.subtitle}</span>
+                        </div>
+                        <time>{item.time}</time>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </div>
+
+              <div className="dp-charts">
+                <article className="dp-chart-card">
+                  <h3>Member Growth (Last 6 Months)</h3>
+                  <div className="dp-line-chart">
+                    <svg className="dp-line-svg" viewBox="0 0 520 180" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6f58ff" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#6f58ff" stopOpacity="0.04" />
+                        </linearGradient>
+                        <linearGradient id="growthBar" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#7c6bff" />
+                          <stop offset="100%" stopColor="#a79cff" />
+                        </linearGradient>
+                      </defs>
+                      <rect x="52" y={Math.max(20, 170 - ((memberGrowthSeries[0] || 0) * 2))} width="36" height={Math.min(150, (memberGrowthSeries[0] || 0) * 2)} rx="8" fill="url(#growthBar)" opacity="0.9" />
+                      <rect x="126" y={Math.max(20, 170 - ((memberGrowthSeries[1] || 0) * 2))} width="36" height={Math.min(150, (memberGrowthSeries[1] || 0) * 2)} rx="8" fill="url(#growthBar)" opacity="0.9" />
+                      <rect x="200" y={Math.max(20, 170 - ((memberGrowthSeries[2] || 0) * 2))} width="36" height={Math.min(150, (memberGrowthSeries[2] || 0) * 2)} rx="8" fill="url(#growthBar)" opacity="0.9" />
+                      <rect x="274" y={Math.max(20, 170 - ((memberGrowthSeries[3] || 0) * 2))} width="36" height={Math.min(150, (memberGrowthSeries[3] || 0) * 2)} rx="8" fill="url(#growthBar)" opacity="0.9" />
+                      <rect x="348" y={Math.max(20, 170 - ((memberGrowthSeries[4] || 0) * 2))} width="36" height={Math.min(150, (memberGrowthSeries[4] || 0) * 2)} rx="8" fill="url(#growthBar)" opacity="0.9" />
+                      <rect x="422" y={Math.max(20, 170 - ((memberGrowthSeries[5] || 0) * 2))} width="36" height={Math.min(150, (memberGrowthSeries[5] || 0) * 2)} rx="8" fill="url(#growthBar)" opacity="0.9" />
+                      <path d="M70 128 C108 121, 132 116, 144 114 C182 106, 206 100, 218 96 C256 88, 280 82, 292 78 C330 70, 354 62, 366 58 C404 52, 428 45, 440 42 L440 170 L70 170 Z" fill="url(#growthFill)" />
+                      <path d="M70 128 C108 121, 132 116, 144 114 C182 106, 206 100, 218 96 C256 88, 280 82, 292 78 C330 70, 354 62, 366 58 C404 52, 428 45, 440 42" className="dp-line-path growth" />
+                      <circle cx="40" cy="130" r="4" className="dp-point growth" />
+                      <circle cx="144" cy="114" r="4" className="dp-point growth" />
+                      <circle cx="218" cy="96" r="4" className="dp-point growth" />
+                      <circle cx="292" cy="78" r="4" className="dp-point growth" />
+                      <circle cx="366" cy="58" r="4" className="dp-point growth" />
+                      <circle cx="440" cy="42" r="4" className="dp-point growth" />
+                    </svg>
+                  </div>
+                </article>
+                <article className="dp-chart-card">
+                  <h3>Active Users (Last 30 Days)</h3>
+                  <div className="dp-line-chart alt">
+                    <svg className="dp-line-svg" viewBox="0 0 520 180" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="activeFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#22c1c3" stopOpacity="0.26" />
+                          <stop offset="100%" stopColor="#22c1c3" stopOpacity="0.03" />
+                        </linearGradient>
+                      </defs>
+                      <rect x="0" y="56" width="520" height="38" fill="#e9f8f8" opacity="0.8" />
+                      <path d={`M40 ${Math.max(30, 170 - ((activeUsersSeries[0] || 0) * 3))} C72 ${Math.max(30, 170 - ((activeUsersSeries[0] || 0) * 3) + 4)}, 98 ${Math.max(30, 170 - ((activeUsersSeries[1] || 0) * 3) - 6)}, 130 ${Math.max(30, 170 - ((activeUsersSeries[1] || 0) * 3))} C162 ${Math.max(30, 170 - ((activeUsersSeries[1] || 0) * 3) - 5)}, 186 ${Math.max(30, 170 - ((activeUsersSeries[2] || 0) * 3) + 3)}, 220 ${Math.max(30, 170 - ((activeUsersSeries[2] || 0) * 3))} C252 ${Math.max(30, 170 - ((activeUsersSeries[3] || 0) * 3) - 4)}, 278 ${Math.max(30, 170 - ((activeUsersSeries[3] || 0) * 3) + 2)}, 310 ${Math.max(30, 170 - ((activeUsersSeries[3] || 0) * 3))} C344 ${Math.max(30, 170 - ((activeUsersSeries[4] || 0) * 3) + 2)}, 370 ${Math.max(30, 170 - ((activeUsersSeries[4] || 0) * 3) - 2)}, 400 ${Math.max(30, 170 - ((activeUsersSeries[4] || 0) * 3))} C432 ${Math.max(30, 170 - ((activeUsersSeries[5] || 0) * 3))}, 458 ${Math.max(30, 170 - ((activeUsersSeries[5] || 0) * 3))}, 485 ${Math.max(30, 170 - ((activeUsersSeries[5] || 0) * 3))} L485 170 L40 170 Z`} fill="url(#activeFill)" />
+                      <path d={`M40 ${Math.max(30, 170 - ((activeUsersSeries[0] || 0) * 3))} C72 ${Math.max(30, 170 - ((activeUsersSeries[0] || 0) * 3) + 4)}, 98 ${Math.max(30, 170 - ((activeUsersSeries[1] || 0) * 3) - 6)}, 130 ${Math.max(30, 170 - ((activeUsersSeries[1] || 0) * 3))} C162 ${Math.max(30, 170 - ((activeUsersSeries[1] || 0) * 3) - 5)}, 186 ${Math.max(30, 170 - ((activeUsersSeries[2] || 0) * 3) + 3)}, 220 ${Math.max(30, 170 - ((activeUsersSeries[2] || 0) * 3))} C252 ${Math.max(30, 170 - ((activeUsersSeries[3] || 0) * 3) - 4)}, 278 ${Math.max(30, 170 - ((activeUsersSeries[3] || 0) * 3) + 2)}, 310 ${Math.max(30, 170 - ((activeUsersSeries[3] || 0) * 3))} C344 ${Math.max(30, 170 - ((activeUsersSeries[4] || 0) * 3) + 2)}, 370 ${Math.max(30, 170 - ((activeUsersSeries[4] || 0) * 3) - 2)}, 400 ${Math.max(30, 170 - ((activeUsersSeries[4] || 0) * 3))} C432 ${Math.max(30, 170 - ((activeUsersSeries[5] || 0) * 3))}, 458 ${Math.max(30, 170 - ((activeUsersSeries[5] || 0) * 3))}, 485 ${Math.max(30, 170 - ((activeUsersSeries[5] || 0) * 3))}`} className="dp-line-path active" />
+                      <circle cx="40" cy={Math.max(30, 170 - ((activeUsersSeries[0] || 0) * 3))} r="4" className="dp-point active" />
+                      <circle cx="130" cy={Math.max(30, 170 - ((activeUsersSeries[1] || 0) * 3))} r="4" className="dp-point active" />
+                      <circle cx="220" cy={Math.max(30, 170 - ((activeUsersSeries[2] || 0) * 3))} r="4" className="dp-point active" />
+                      <circle cx="310" cy={Math.max(30, 170 - ((activeUsersSeries[3] || 0) * 3))} r="4" className="dp-point active" />
+                      <circle cx="400" cy={Math.max(30, 170 - ((activeUsersSeries[4] || 0) * 3))} r="4" className="dp-point active" />
+                      <circle cx="485" cy={Math.max(30, 170 - ((activeUsersSeries[5] || 0) * 3))} r="4" className="dp-point active" />
+                    </svg>
+                  </div>
+                </article>
+              </div>
+
+              <div className="dp-extra-grid">
+                <article className="dp-card">
+                  <div className="dp-card-head">
+                    <h3>Live Notices</h3>
+                    <button type="button">Create notice</button>
+                  </div>
+                  <div className="dp-notices">
+                    {liveNotices.length === 0 && <div className="dp-empty-note">No live notices found.</div>}
+                    {liveNotices.map((notice) => (
+                      <div key={`${notice.title}-${notice.time}`} className="dp-notice-item">
+                        <div className="dp-notice-top">
+                          <strong>{notice.title}</strong>
+                          <span className={`dp-priority ${String(notice.priority || '').toLowerCase()}`}>{notice.priority}</span>
+                        </div>
+                        <div className="dp-notice-meta">
+                          <span>{notice.audience}</span>
+                          <span>{notice.time}</span>
+                        </div>
+                        <div className="dp-notice-expiry">Expiry: {notice.expiry}</div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="dp-card">
+                  <div className="dp-card-head">
+                    <h3>Upcoming Events Timeline</h3>
+                    <button type="button">View calendar</button>
+                  </div>
+                  <div className="dp-timeline">
+                    {upcomingEvents.length === 0 && <div className="dp-empty-note">No upcoming events found.</div>}
+                    {upcomingEvents.map((event) => (
+                      <div key={`${event.name}-${event.date}`} className="dp-time-item">
+                        <div className="dp-time-date">{event.date}</div>
+                        <div className="dp-time-body">
+                          <strong>{event.name}</strong>
+                          <span>{event.venue}</span>
+                          <em>{event.status}</em>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </div>
+            </section>
+          )}
 
           {/* ──── Module Cards Heading ──── */}
           {!hideModuleCards && (

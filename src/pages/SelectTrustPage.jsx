@@ -1,7 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './SelectTrustPage.css';
-import { fetchLinkedTrusts, insertSuperuser } from '../services/authService';
+import {
+  fetchLinkedTrusts,
+  insertSuperuser,
+  recordAdminSessionAction,
+  ADMIN_MOBILE_SESSION_KEY,
+  ADMIN_NAME_SESSION_KEY,
+} from '../services/authService';
 
 const GRADIENTS = [
   'linear-gradient(135deg,#6366F1,#8B5CF6)',
@@ -83,6 +89,21 @@ export default function SelectTrustPage() {
       t.remark?.toLowerCase().includes(q)
     );
   }, [search, trusts]);
+
+  const handleSignOut = async () => {
+    const storedName = typeof window !== 'undefined' ? window.sessionStorage.getItem(ADMIN_NAME_SESSION_KEY) : null;
+    const storedMobile = typeof window !== 'undefined' ? window.sessionStorage.getItem(ADMIN_MOBILE_SESSION_KEY) : null;
+    if (superuserId) {
+      await recordAdminSessionAction({
+        superuserId,
+        name: userName || storedName || null,
+        mobile: fullMobile || phone || storedMobile || null,
+        actionType: 'logout',
+        metadata: { source: 'select_trust_signout' },
+      });
+    }
+    navigate('/login');
+  };
 
   // ── NEW USER VIEW ────────────────────────────────────────────────────────
   if (isNewUser && !registered) {
@@ -167,7 +188,7 @@ export default function SelectTrustPage() {
               </button>
             </form>
 
-            <button className="st-back-btn" onClick={() => navigate('/login')}>
+            <button className="st-back-btn" onClick={handleSignOut}>
               ← Back to login
             </button>
           </div>
@@ -227,7 +248,7 @@ export default function SelectTrustPage() {
               </svg>
             </button>
 
-            <button className="st-back-btn" onClick={() => navigate('/login')}>← Sign out</button>
+            <button className="st-back-btn" onClick={handleSignOut}>← Sign out</button>
           </div>
         </div>
       </div>
@@ -374,7 +395,7 @@ export default function SelectTrustPage() {
             Create New App
           </button>
 
-          <button className="st-back-btn" onClick={() => navigate('/login')}>← Sign out</button>
+          <button className="st-back-btn" onClick={handleSignOut}>← Sign out</button>
         </div>
       </div>
     </div>

@@ -1,6 +1,10 @@
 import { supabase } from '../lib/supabase';
 import { cachedQuery, invalidateCache } from './requestCache';
 
+export const ADMIN_SUPERUSER_SESSION_KEY = 'admin:superuserId';
+export const ADMIN_NAME_SESSION_KEY = 'admin:userName';
+export const ADMIN_MOBILE_SESSION_KEY = 'admin:mobile';
+
 function digitsOnly(value = '') {
   return String(value).replace(/\D/g, '');
 }
@@ -161,4 +165,32 @@ export async function verifyOtp(mobile, otp) {
   // New user fallback (demo OTP)
   const valid = code === '123456';
   return { valid, reason: valid ? null : 'otp_mismatch' };
+}
+
+export async function recordAdminSessionAction({
+  superuserId,
+  name = null,
+  mobile = null,
+  actionType,
+  metadata = {},
+} = {}) {
+  if (!superuserId || !actionType) {
+    return { data: null, error: { message: 'superuserId and actionType are required.' } };
+  }
+
+  const payload = {
+    superuser_id: superuserId,
+    name: name ? String(name).slice(0, 100) : null,
+    mobile: mobile ? String(mobile).slice(0, 15) : null,
+    action_type: actionType,
+    metadata: metadata && typeof metadata === 'object' ? metadata : {},
+  };
+
+  const { data, error } = await supabase
+    .from('admin_session')
+    .insert([payload])
+    .select('id, superuser_id, action_type, action_at, session_id')
+    .single();
+
+  return { data, error };
 }

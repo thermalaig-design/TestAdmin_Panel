@@ -2,7 +2,14 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import './LoginPage.css';
 import './OtpPage.css';
-import { verifyOtp, sendOtp } from '../services/authService';
+import {
+  verifyOtp,
+  sendOtp,
+  recordAdminSessionAction,
+  ADMIN_SUPERUSER_SESSION_KEY,
+  ADMIN_NAME_SESSION_KEY,
+  ADMIN_MOBILE_SESSION_KEY,
+} from '../services/authService';
 
 const OTP_LENGTH = 6;
 const RESEND_COUNTDOWN = 30;
@@ -82,6 +89,20 @@ export default function OtpPage() {
     if (valid) {
       setLoading(false);
       setSuccess(true);
+      if (typeof window !== 'undefined' && superuserId) {
+        window.sessionStorage.setItem(ADMIN_SUPERUSER_SESSION_KEY, String(superuserId));
+        window.sessionStorage.setItem(ADMIN_NAME_SESSION_KEY, String(userName || 'Admin'));
+        window.sessionStorage.setItem(ADMIN_MOBILE_SESSION_KEY, String(fullMobile || phone || ''));
+      }
+      if (superuserId) {
+        await recordAdminSessionAction({
+          superuserId,
+          name: userName || null,
+          mobile: fullMobile || phone || null,
+          actionType: 'login',
+          metadata: { source: 'otp_verify' },
+        });
+      }
       await new Promise(res => setTimeout(res, 700));
 
       navigate('/select-trust', {

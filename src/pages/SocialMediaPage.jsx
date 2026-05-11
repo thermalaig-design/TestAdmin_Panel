@@ -475,6 +475,12 @@ export default function SocialMediaPage() {
           title={pageTitle}
           subtitle={pageSubtitle}
           onBack={() => {
+            if (isAccountsDetailsRoute) {
+              navigate('/dashboard', {
+                state: { userName, trust, superuserId, sidebarNavKey: 'company-details' },
+              });
+              return;
+            }
             navigate('/social-media', {
               state: { userName, trust, superuserId, sidebarNavKey: currentSidebarNavKey },
             });

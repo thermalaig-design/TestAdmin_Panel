@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react';
 import './Sidebar.css';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { fetchLinkedTrusts } from '../services/authService';
+import {
+  fetchLinkedTrusts,
+  recordAdminSessionAction,
+  ADMIN_SUPERUSER_SESSION_KEY,
+  ADMIN_NAME_SESSION_KEY,
+  ADMIN_MOBILE_SESSION_KEY,
+} from '../services/authService';
 
-const SUPERUSER_SESSION_KEY = 'admin:superuserId';
+const SUPERUSER_SESSION_KEY = ADMIN_SUPERUSER_SESSION_KEY;
 
 const navItems = [
   {
@@ -28,6 +34,21 @@ const navItems = [
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'nav-user-management',
+    label: 'User Management',
+    route: '/user-management',
+    navKey: 'menu',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <circle cx="8.5" cy="8" r="2.8" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M4.2 18c0-2.6 2.1-4.6 4.7-4.6s4.7 2 4.7 4.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <rect x="14.2" y="10.8" width="5.6" height="7.2" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
+        <line x1="17" y1="12.8" x2="17" y2="16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="15.4" y1="14.4" x2="18.6" y2="14.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -348,7 +369,31 @@ export default function Sidebar({ trustName = 'Trust', onDashboard, onLogout }) 
           {switchTrustError && <div className="sb-bottom-error">{switchTrustError}</div>}
           <button
             className="sb-logout"
-            onClick={() => {
+            onClick={async () => {
+              const storedName = typeof window !== 'undefined' ? window.sessionStorage.getItem(ADMIN_NAME_SESSION_KEY) : null;
+              const storedMobile = typeof window !== 'undefined' ? window.sessionStorage.getItem(ADMIN_MOBILE_SESSION_KEY) : null;
+              if (resolvedSuperuserId) {
+                await recordAdminSessionAction({
+                  superuserId: resolvedSuperuserId,
+                  name: userName || storedName || null,
+                  mobile: location.state?.fullMobile || location.state?.phone || storedMobile || null,
+                  actionType: 'logout',
+                  metadata: await (async () => {
+  try {
+    const geo = await fetch('https://ipapi.co/json/').then(r => r.json());
+    return {
+      source: 'sidebar_logout',
+      country: geo.country_code || null,
+      city: geo.city || null,
+      ip: geo.ip || null,
+      device: navigator.platform || null,
+    };
+  } catch {
+    return { source: 'sidebar_logout' };
+  }
+})(),
+                });
+              }
               if (onLogout) onLogout();
               else navigate('/login');
               closeMobileMenu();
